@@ -1,0 +1,103 @@
+import React, { useEffect } from 'react';
+import { getStoreConfig } from '../lib/queries';
+import { supabase } from '../lib/supabase';
+
+interface Config {
+  font_heading?: string;
+  font_sub?: string;
+  font_body?: string;
+  logo_height?: string;
+  header_menu_size?: string;
+  hero_card_x?: string;
+  hero_card_y?: string;
+  hero_card_visible?: string;
+  hero_card_scale?: string;
+  hero_image_x?: string;
+  hero_image_y?: string;
+  hero_image_scale?: string;
+  hero_image_fit?: string;
+}
+
+export const StoreThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEffect(() => {
+    const applyConfig = (cfg: Config) => {
+      const root = document.documentElement;
+
+      // Defaults
+      const heading = cfg.font_heading || 'Francois One';
+      const sub = cfg.font_sub || 'Barlow Semi Condensed';
+      const body = cfg.font_body || 'Catamaran';
+
+      // Inject Google Fonts link safely
+      const addFont = (fontFamily: string, id: string) => {
+        let link = document.getElementById(id) as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.id = id;
+          link.rel = 'stylesheet';
+          document.head.appendChild(link);
+        }
+        // Using v1 API which is more forgiving with weights:
+        link.href = `https://fonts.googleapis.com/css?family=${fontFamily.replace(/ /g, '+')}:300,400,500,600,700,800&display=swap`;
+      };
+
+      addFont(heading, 'dynamic-font-heading');
+      addFont(sub, 'dynamic-font-sub');
+      addFont(body, 'dynamic-font-body');
+
+      // Apply CSS Variables
+      root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
+      root.style.setProperty('--f-sub', `"${sub}", sans-serif`);
+      root.style.setProperty('--f-body', `"${body}", sans-serif`);
+
+      // Generic variables accessible via var() globally
+      if (cfg.logo_height) root.style.setProperty('--logo-h', `${String(cfg.logo_height).replace('px', '')}px`);
+      else root.style.setProperty('--logo-h', '40px');
+
+      if (cfg.header_menu_size) root.style.setProperty('--header-menu-size', `${String(cfg.header_menu_size).replace('px', '')}px`);
+      else root.style.setProperty('--header-menu-size', '13px');
+
+      if (cfg.hero_card_visible) root.style.setProperty('--hero-card-display', cfg.hero_card_visible);
+      else root.style.setProperty('--hero-card-display', 'flex');
+
+      if (cfg.hero_card_x) root.style.setProperty('--hero-x', `${String(cfg.hero_card_x).replace('px', '')}px`);
+      if (cfg.hero_card_y) root.style.setProperty('--hero-y', `${String(cfg.hero_card_y).replace('px', '')}px`);
+      if (cfg.hero_card_scale) root.style.setProperty('--hero-scale', String(cfg.hero_card_scale));
+
+      const hx = String(cfg.hero_image_x || '0');
+      const hy = String(cfg.hero_image_y || '0');
+      root.style.setProperty('--hero-img-x', `${hx.replace('px', '')}px`);
+      root.style.setProperty('--hero-img-y', `${hy.replace('px', '')}px`);
+      root.style.setProperty('--hero-img-scale', String(cfg.hero_image_scale || '1'));
+      root.style.setProperty('--hero-img-fit', String(cfg.hero_image_fit || 'cover'));
+    };
+
+    getStoreConfig().then((cfg) => applyConfig(cfg as Config));
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'ADMIN_PREVIEW_UPDATE') {
+        applyConfig(e.data.payload as Config);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    const channel = supabase
+      .channel('theme-config-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_config' },
+        async () => {
+          const fresh = await getStoreConfig();
+          applyConfig(fresh as Config);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  return <>{children}</>;
+};

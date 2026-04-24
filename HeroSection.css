@@ -1,0 +1,248 @@
+/* ── Hero Section ────────────────────────────────────────── */
+.hero {
+  /* Anchored to the viewport so it truly goes edge-to-edge
+     regardless of any overflow-x:hidden on parent containers */
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+  height: 100vh;
+  min-height: 600px;
+  max-height: 900px;
+  overflow: hidden;
+  background: #000;
+  margin-top: calc(var(--nav-h) * -1);
+}
+
+/* Background */
+.hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.hero__media-placeholder {
+  width: 100%; height: 100%;
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(48,98,223,0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(196,252,21,0.15) 0%, transparent 50%),
+    linear-gradient(135deg, #060606 0%, #0d0d1a 50%, #060606 100%);
+}
+
+/* When real image is set via CSS var */
+.hero__media img {
+  width: 100%; height: 100%;
+  object-fit: var(--hero-img-fit, cover);
+  object-position: center;
+  filter: brightness(1);
+  position: relative;
+  z-index: 2;
+  transform: translate(var(--hero-img-x, 0), var(--hero-img-y, 0)) scale(var(--hero-img-scale, 1));
+  transform-origin: center;
+}
+
+.hero__media-backdrop {
+  position: absolute;
+  inset: -10%;
+  width: 120%; height: 120%;
+  object-fit: var(--hero-img-fit, cover);
+  filter: blur(40px) brightness(0.6);
+  z-index: 1;
+  transform: translate(calc(var(--hero-img-x, 0px) * 0.5), calc(var(--hero-img-y, 0px) * 0.5)) scale(calc(var(--hero-img-scale, 1) * 1.05));
+  transform-origin: center;
+}
+
+/* Overlay */
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 60%);
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Glow */
+.hero__glow {
+  position: absolute;
+  top: -10%; right: -5%;
+  width: 50%; height: 60%;
+  background: radial-gradient(circle, rgba(48,98,223,0.2) 0%, transparent 70%);
+  filter: blur(120px);
+  z-index: 4;
+  pointer-events: none;
+  animation: glowShift 12s infinite alternate ease-in-out;
+}
+
+/* Scroll hint */
+.hero__scroll-hint {
+  position: absolute;
+  bottom: 40px; left: 60px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.hero__scroll-line {
+  width: 1px; height: 60px;
+  background: linear-gradient(to bottom, transparent, var(--c-glow-blue), transparent);
+}
+
+.hero__scroll-hint span {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5em;
+  color: rgba(255,255,255,0.2);
+  transform: rotate(90deg);
+  transform-origin: left;
+  white-space: nowrap;
+  font-family: var(--f-accent);
+}
+
+/* Container */
+.hero__container {
+  position: relative;
+  z-index: 10;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: var(--nav-h);
+}
+
+/* Content card */
+.hero__content {
+  max-width: 560px;
+  padding: 40px;
+  transform: translate(var(--hero-x, -20px), var(--hero-y, 40px)) scale(var(--hero-scale, 1));
+  animation: heroEntrance 1.8s var(--ease-out) forwards;
+  box-shadow: 0 50px 120px -20px rgba(0,0,0,0.9),
+              inset 0 0 100px rgba(255,255,255,0.03);
+
+  /* Override glass vars for hero */
+  --glass-bg: rgba(0,0,0,0.2);
+  --glass-blur: 30px;
+  --glass-radius: 40px;
+}
+
+.hero__content::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent);
+  border-radius: 40px 40px 0 0;
+}
+
+/* Label */
+.hero__label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--f-accent);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5em;
+  color: var(--c-lime);
+  margin-bottom: 20px;
+}
+
+.hero__label-line {
+  height: 1px;
+  width: 36px;
+  background: var(--c-lime);
+  flex-shrink: 0;
+}
+
+/* Heading */
+.hero__heading {
+  font-family: var(--f-heading);
+  font-size: 48px;
+  color: var(--c-white);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  font-style: italic;
+  margin-bottom: 20px;
+}
+
+.hero__heading-accent {
+  background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(48,98,223,1) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-style: normal;
+}
+
+/* Text */
+.hero__text {
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 28px;
+  max-width: 480px;
+}
+
+/* CTAs */
+.hero__ctas {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* ── Responsive — Tablet ─────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hero {
+    height: 80vh;
+    min-height: 500px;
+    max-height: 700px;
+  }
+  .hero__content {
+    transform: translate(0, 20px);
+    max-width: 480px;
+    padding: 32px;
+  }
+  .hero__heading { font-size: 40px; }
+  .hero__text { font-size: 14px; }
+}
+
+/* ── Responsive — Mobile ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .hero {
+    height: 85vh;
+    min-height: 480px;
+    max-height: 650px;
+  }
+  .hero__container {
+    align-items: flex-end;
+    padding-bottom: 40px;
+  }
+  .hero__content {
+    transform: translate(0, 0);
+    padding: 28px 22px;
+    max-width: 100%;
+    border-radius: 28px;
+  }
+  .hero__heading { font-size: 34px; }
+  .hero__scroll-hint { display: none; }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    height: 75vh;
+    min-height: 420px;
+    max-height: 580px;
+  }
+  .hero__content {
+    padding: 24px 20px;
+  }
+  .hero__heading { font-size: 28px; }
+  .hero__text { font-size: 13px; margin-bottom: 20px; }
+  .hero__ctas { flex-direction: column; }
+  .hero__ctas .btn { width: 100%; justify-content: center; }
+}

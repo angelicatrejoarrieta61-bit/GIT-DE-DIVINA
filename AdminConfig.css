@@ -1,0 +1,61 @@
+.admin-compact-controls {
+  font-size: 11px;
+}
+
+.admin-compact-controls .input-dark {
+  font-size: 11px;
+  padding: 6px 8px;
+  min-height: 28px;
+}
+
+.admin-compact-controls textarea.input-dark {
+  min-height: 56px;
+}
+
+.admin-compact-controls .btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  min-height: 28px;
+}
+
+.admin-mini-btn {
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  min-height: 22px !important;
+  line-height: 1;
+}
+
+.admin-mini-btn.active {
+  border-color: rgba(196, 252, 21, 0.55) !important;
+  color: var(--c-lime) !important;
+  background: rgba(196, 252, 21, 0.12) !important;
+}
+
+.admin-live-preview__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.admin-live-preview__devices {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.admin-live-preview__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0;
+  color: var(--c-text-muted);
+}
+
+.admin-live-preview__frame {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #070707;
+}

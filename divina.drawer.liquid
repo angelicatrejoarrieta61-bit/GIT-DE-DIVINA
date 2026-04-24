@@ -1,0 +1,220 @@
+{% comment %}
+  DIVINA DRAWER SYSTEM - REACTIVE V4 (Auto-Update)
+  - Estilo Glassmorphic
+  - Actualización automática de contador y productos
+{% endcomment %}
+
+<style>
+  /* --- ESTRUCTURA --- */
+  #DivinaCartDrawer {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 2147483647 !important;
+    visibility: hidden; pointer-events: none;
+  }
+  
+  #DivinaCartDrawer.is-visible { visibility: visible; pointer-events: auto; }
+
+  /* Fondo oscuro */
+  .divina-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+  
+  #DivinaCartDrawer.is-visible .divina-overlay { opacity: 1; }
+
+  /* Caja Glassmorphic */
+  .divina-drawer-box {
+    position: absolute; top: 0; right: 0; 
+    width: 420px; max-width: 90vw; height: 100%;
+    background: rgba(15, 15, 20, 0.85); /* Un poco más oscuro para legibilidad */
+    backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: -20px 0 50px rgba(0,0,0,0.5);
+    transform: translateX(100%);
+    transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    display: flex; flex-direction: column;
+    color: #ffffff;
+  }
+
+  #DivinaCartDrawer.is-visible .divina-drawer-box { transform: translateX(0); }
+
+  /* Header */
+  .divina-header { 
+    padding: 25px; border-bottom: 1px solid rgba(255,255,255, 0.1); 
+    display: flex; justify-content: space-between; align-items: center; 
+    background: rgba(255,255,255, 0.02);
+  }
+  .divina-header h2 { margin: 0; font-size: 20px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+  .divina-close-btn { 
+    background: rgba(255,255,255,0.1); border: none; border-radius: 50%; 
+    width: 32px; height: 32px; cursor: pointer; color: #fff; 
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+
+  /* Items */
+  .divina-items { flex: 1; overflow-y: auto; padding: 25px; }
+  .divina-item { 
+    display: flex; gap: 15px; margin-bottom: 20px; padding: 15px; border-radius: 12px;
+    background: rgba(255,255,255, 0.03); border: 1px solid rgba(255,255,255, 0.05);
+  }
+  .divina-item img { border-radius: 6px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); }
+  .divina-item-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .divina-item-title { display: block; font-weight: 600; color: #fff; text-decoration: none; font-size: 14px; margin-bottom: 8px; }
+  .divina-item-price { color: rgba(255,255,255, 0.7); font-size: 13px; font-family: monospace; }
+
+  /* Footer */
+  .divina-footer { 
+    padding: 30px; border-top: 1px solid rgba(255,255,255, 0.1); 
+    background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+  }
+  .divina-subtotal { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.8); }
+  .divina-total-price { font-size: 18px; font-weight: bold; color: #fff; }
+  
+  .divina-checkout-btn {
+    display: block; width: 100%; padding: 18px; 
+    background: linear-gradient(135deg, #3062DF 0%, #1e4bd1 100%);
+    color: white; text-align: center; text-decoration: none; 
+    font-weight: 800; border-radius: 50px; text-transform: uppercase; 
+    letter-spacing: 2px; font-size: 14px; border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 10px 30px -10px rgba(48, 98, 223, 0.6); cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .divina-checkout-btn:hover { transform: scale(1.02); filter: brightness(1.1); }
+  .divina-empty { text-align: center; margin-top: 80px; color: rgba(255,255,255,0.5); }
+</style>
+
+<div id="DivinaCartDrawer">
+  <div class="divina-overlay" onclick="closeDivinaDrawer()"></div>
+  <div class="divina-drawer-box">
+    
+    <div class="divina-header">
+      <h2>Tu Carrito</h2>
+      <button class="divina-close-btn" onclick="closeDivinaDrawer()">✕</button>
+    </div>
+
+    <div class="divina-items" id="DivinaDrawerItems">
+      {% if cart.item_count == 0 %}
+        <div class="divina-empty">
+          <p style="margin-bottom:20px;">Tu carrito está vacío</p>
+          <a href="{{ routes.all_products_collection_url }}" class="divina-checkout-btn" style="background:transparent; border:1px solid rgba(255,255,255,0.3); box-shadow:none;">
+            Descubrir Productos
+          </a>
+        </div>
+      {% else %}
+        <form action="{{ routes.cart_url }}" method="post" id="divina-cart-form">
+          {% for item in cart.items %}
+            <div class="divina-item">
+              {% if item.image %}
+                <img src="{{ item.image | image_url: width: 140 }}" width="70" height="{{ 70 | divided_by: item.image.aspect_ratio | ceil }}" loading="lazy" alt="{{ item.title | escape }}">
+              {% endif %}
+              <div class="divina-item-info">
+                <a href="{{ item.url }}" class="divina-item-title">{{ item.product.title }}</a>
+                <div class="divina-item-price">
+                  {{ item.quantity }} x <span style="color:#fff;">{{ item.final_price | money }}</span>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="divina-footer" id="DivinaDrawerFooter">
+      <div class="divina-subtotal">
+        <span>SUBTOTAL</span>
+        <span class="divina-total-price">{{ cart.total_price | money }}</span>
+      </div>
+      
+      {% if cart.item_count > 0 %}
+        <button type="submit" name="checkout" form="divina-cart-form" class="divina-checkout-btn">
+          PAGAR AHORA
+        </button>
+        <p style="text-align:center; margin-top:15px; font-size:10px; opacity:0.5; letter-spacing:1px;">
+          ENVÍOS CALCULADOS AL FINALIZAR
+        </p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // --- FUNCIONES DE APERTURA/CIERRE ---
+  function openDivinaDrawer() {
+    const drawer = document.getElementById('DivinaCartDrawer');
+    if(drawer) {
+      drawer.classList.add('is-visible');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function closeDivinaDrawer() {
+    const drawer = document.getElementById('DivinaCartDrawer');
+    if(drawer) {
+      drawer.classList.remove('is-visible');
+      document.body.style.overflow = ''; 
+    }
+  }
+
+  // --- EL CEREBRO DE ACTUALIZACIÓN (AJAX REFRESH) ---
+  async function refreshDivinaCart() {
+    // 1. Obtener la data fresca del servidor (Fetch background)
+    try {
+      const response = await fetch(window.location.href);
+      const text = await response.text();
+      const newDoc = new DOMParser().parseFromString(text, 'text/html');
+
+      // 2. Actualizar ITEMS del Cajón
+      const newItems = newDoc.getElementById('DivinaDrawerItems');
+      const currentItems = document.getElementById('DivinaDrawerItems');
+      if (newItems && currentItems) currentItems.innerHTML = newItems.innerHTML;
+
+      // 3. Actualizar FOOTER del Cajón (Precio total)
+      const newFooter = newDoc.getElementById('DivinaDrawerFooter');
+      const currentFooter = document.getElementById('DivinaDrawerFooter');
+      if (newFooter && currentFooter) currentFooter.innerHTML = newFooter.innerHTML;
+
+      // 4. Actualizar la BURBUJA del Header (La bolita roja)
+      const newBubble = newDoc.getElementById('cart-icon-bubble');
+      const currentBubble = document.getElementById('cart-icon-bubble');
+      if (newBubble && currentBubble) currentBubble.innerHTML = newBubble.innerHTML;
+      
+      // 5. ¡Abrir el cajón para mostrar el éxito!
+      openDivinaDrawer();
+
+    } catch (e) {
+      console.error("Error actualizando carrito:", e);
+    }
+  }
+
+  // --- INTERCEPTOR DE COMPRAS (El espía) ---
+  // Esto detecta cuando cualquier botón "Agregar al carrito" en tu tienda es presionado
+  (function() {
+    const originalFetch = window.fetch;
+    window.fetch = function() {
+      return originalFetch.apply(this, arguments).then((response) => {
+        // Si la URL contiene '/cart/add', significa que alguien agregó algo
+        if (response.url.includes('/cart/add')) {
+          setTimeout(refreshDivinaCart, 500); // Esperar medio segundo y actualizar todo
+        }
+        return response;
+      });
+    };
+  })();
+
+  // --- RECONEXIÓN DE BOTONES AL CARGAR ---
+  document.addEventListener("DOMContentLoaded", function() {
+    const headerBtn = document.getElementById('cart-icon-bubble');
+    if (headerBtn) {
+      // Clonar para limpiar eventos viejos
+      const newBtn = headerBtn.cloneNode(true);
+      headerBtn.parentNode.replaceChild(newBtn, headerBtn);
+      // Asignar apertura manual
+      newBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        openDivinaDrawer();
+      });
+    }
+  });
+</script>

@@ -1,0 +1,283 @@
+{% comment %}
+  Renders Cart Drawer - Versión Standalone (Sin dependencias externas)
+{% endcomment %}
+
+<style>
+  .drawer {
+    visibility: hidden;
+  }
+  
+  cart-drawer.active .drawer {
+    visibility: visible;
+  }
+  
+  .drawer__inner {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    width: 40rem;
+    max-width: 100vw;
+    z-index: 10000;
+    background-color: #ffffff; /* Fondo blanco forzado */
+    border-left: 1px solid rgba(0,0,0, 0.1);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    box-shadow: -5px 0 20px rgba(0,0,0,0.1);
+  }
+
+  cart-drawer.active .drawer__inner {
+    transform: translateX(0);
+  }
+
+  .drawer__header {
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0, 0.05);
+  }
+
+  .drawer__heading {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #000;
+  }
+
+  .drawer__close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 1rem;
+    color: #000;
+  }
+
+  .drawer__overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 9999;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  cart-drawer.active .drawer__overlay {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Contenido del Carrito */
+  cart-drawer-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+  }
+
+  .cart-item {
+    display: grid;
+    grid-template-columns: 80px 1fr; /* Imagen más pequeña para dejar espacio */
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(0,0,0, 0.05);
+  }
+
+  .cart-item__media img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+
+  .cart-item__details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cart-item__name {
+    text-decoration: none;
+    color: #000;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .cart-item__price-wrapper {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .drawer__footer {
+    padding: 2rem;
+    border-top: 1px solid rgba(0,0,0, 0.1);
+    background-color: #f9f9f9;
+  }
+
+  .totals__subtotal {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    display: block;
+    text-align: right;
+    color: #000;
+  }
+
+  .cart__checkout-button {
+    width: 100%;
+    padding: 1rem;
+    background-color: #3062DF; /* Tu color Divina */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.3s ease;
+  }
+  
+  .cart__checkout-button:hover {
+    background-color: #2048b5;
+  }
+
+  .drawer__empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+  }
+  
+  .drawer__empty-state p {
+    margin-bottom: 1.5rem;
+    color: #000;
+  }
+  
+  .button.empty-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #000;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+  }
+</style>
+
+<cart-drawer class="drawer{% if cart == empty %} is-empty{% endif %}">
+  <div id="CartDrawer" class="drawer">
+    <div id="CartDrawer-Overlay" class="drawer__overlay" onclick="this.closest('cart-drawer').close()"></div>
+    
+    <div class="drawer__inner" role="dialog" aria-modal="true" aria-label="Carrito de compras" tabindex="-1">
+      
+      <div class="drawer__header">
+        <h2 class="drawer__heading">Tu Carrito ({{ cart.item_count }})</h2>
+        <button class="drawer__close" type="button" onclick="this.closest('cart-drawer').close()" aria-label="Cerrar">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <cart-drawer-items class="{% if cart == empty %} is-empty{% endif %}">
+        <form action="{{ routes.cart_url }}" method="post" id="CartDrawer-Form" class="cart__contents">
+          {%- if cart == empty -%}
+            <div class="drawer__empty-state">
+              <p>Tu carrito está vacío</p>
+              <a href="{{ routes.all_products_collection_url }}" class="button empty-btn">Ver productos</a>
+            </div>
+          {%- else -%}
+            <div class="drawer__contents" id="CartDrawer-CartItems">
+              {%- for item in cart.items -%}
+                <div class="cart-item" id="CartItem-{{ item.index | plus: 1 }}">
+                  <div class="cart-item__media">
+                    {% if item.image %}
+                      <img src="{{ item.image | image_url: width: 300 }}" alt="{{ item.image.alt | escape }}" width="150" height="{{ 150 | divided_by: item.image.aspect_ratio | ceil }}" loading="lazy">
+                    {% endif %}
+                  </div>
+                  <div class="cart-item__details">
+                    <a href="{{ item.url }}" class="cart-item__name">{{ item.product.title | escape }}</a>
+                    {%- if item.product.has_only_default_variant == false -%}
+                      <p class="product-option" style="font-size: 0.8em; color: #666; margin: 0;">{{ item.variant.title }}</p>
+                    {%- endif -%}
+                    <div class="cart-item__price-wrapper">
+                      <span class="price">{{ item.final_price | money }}</span>
+                    </div>
+                    <div class="cart-item__quantity">
+                       <small>Cant: {{ item.quantity }}</small>
+                    </div>
+                  </div>
+                </div>
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+        </form>
+      </cart-drawer-items>
+
+      <div class="drawer__footer">
+        {%- if cart != empty -%}
+          <div class="cart-drawer__footer" id="CartDrawer-Footer">
+            <div class="totals" role="status">
+              <span class="totals__subtotal">Subtotal: {{ cart.total_price | money_with_currency }}</span>
+            </div>
+            <div class="cart__ctas">
+              <button type="submit" id="CartDrawer-Checkout" class="cart__checkout-button" name="checkout" form="CartDrawer-Form">
+                Finalizar Compra
+              </button>
+            </div>
+          </div>
+        {%- endif -%}
+      </div>
+      
+    </div>
+  </div>
+</cart-drawer>
+
+<script>
+  // Lógica del Carrito integrada (Sin archivos externos)
+  class CartDrawer extends HTMLElement {
+    constructor() {
+      super();
+      this.addEventListener('keyup', (evt) => evt.code === 'Escape' && this.close());
+      
+      // Escuchar evento de apertura global
+      document.addEventListener('cart:open', () => this.open());
+      
+      // Escuchar cambios en el carrito (si otros scripts lo actualizan)
+      document.addEventListener('cart:updated', () => {
+         // Aquí podríamos recargar el contenido, por ahora simplemente abrimos para mostrar
+         this.open();
+      });
+    }
+
+    open() {
+      this.classList.add('active');
+      const drawer = this.querySelector('.drawer');
+      if(drawer) drawer.style.visibility = 'visible';
+      document.body.classList.add('overflow-hidden');
+    }
+
+    close() {
+      this.classList.remove('active');
+      const drawer = this.querySelector('.drawer');
+      
+      // Pequeño delay para permitir la animación de salida
+      setTimeout(() => {
+        if(!this.classList.contains('active') && drawer) {
+           drawer.style.visibility = 'hidden';
+        }
+      }, 300);
+      
+      document.body.classList.remove('overflow-hidden');
+    }
+  }
+
+  // Definir el elemento si no existe
+  if (!customElements.get('cart-drawer')) {
+    customElements.define('cart-drawer', CartDrawer);
+  }
+</script>

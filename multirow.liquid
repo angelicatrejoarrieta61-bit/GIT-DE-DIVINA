@@ -1,0 +1,224 @@
+<section class="multirow">
+  {% for block in section.blocks %}
+    <div class="row" {{ block.shopify_attributes }}>
+      {% if block.settings.image %}
+        <div class="image-wrapper" style="text-align: {{ block.settings.image_alignment }};">
+          <img 
+            src="{{ block.settings.image | image_url: width: 1200 }}" 
+            alt="{{ block.settings.image.alt | default: block.settings.heading }}"
+            width="1200"
+            height="{{ 1200 | divided_by: block.settings.image.aspect_ratio | round }}"
+            loading="lazy"
+            style="width: {{ block.settings.image_size }}%; height: auto; display: inline-block;">
+        </div>
+      {% endif %}
+      
+      {% if block.settings.heading != blank %}
+        <h2 style="font-size: {{ block.settings.heading_font_size }}px; text-align: {{ block.settings.heading_alignment }};">
+          {{ block.settings.heading }}
+        </h2>
+      {% endif %}
+      
+      {% if block.settings.text != blank %}
+        <div class="text-content" style="font-size: {{ block.settings.body_font_size }}px; text-align: {{ block.settings.text_alignment }};">
+          {{ block.settings.text }}
+        </div>
+      {% endif %}
+      
+      {% if block.settings.button_label != blank and block.settings.button_link != blank %}
+        <a href="{{ block.settings.button_link }}" class="btn">{{ block.settings.button_label }}</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+
+{% schema %}
+{
+  "name": "Filas múltiples",
+  "max_blocks": 20,
+  "blocks": [
+    {
+      "type": "row",
+      "name": "Fila",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Imagen"
+        },
+        {
+          "type": "range",
+          "id": "image_size",
+          "min": 10,
+          "max": 100,
+          "step": 5,
+          "unit": "%",
+          "label": "Tamaño de imagen",
+          "default": 50
+        },
+        {
+          "type": "select",
+          "id": "image_alignment",
+          "label": "Alineación de imagen",
+          "options": [
+            {
+              "value": "left",
+              "label": "Izquierda"
+            },
+            {
+              "value": "center",
+              "label": "Centrada"
+            },
+            {
+              "value": "right",
+              "label": "Derecha"
+            }
+          ],
+          "default": "center"
+        },
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Título",
+          "default": "Título de la fila"
+        },
+        {
+          "type": "range",
+          "id": "heading_font_size",
+          "min": 12,
+          "max": 72,
+          "step": 2,
+          "unit": "px",
+          "label": "Tamaño del título",
+          "default": 32
+        },
+        {
+          "type": "select",
+          "id": "heading_alignment",
+          "label": "Alineación del título",
+          "options": [
+            {
+              "value": "left",
+              "label": "Izquierda"
+            },
+            {
+              "value": "center",
+              "label": "Centrado"
+            },
+            {
+              "value": "right",
+              "label": "Derecha"
+            }
+          ],
+          "default": "center"
+        },
+        {
+          "type": "richtext",
+          "id": "text",
+          "label": "Texto",
+          "default": "<p>Contenido de la fila</p>"
+        },
+        {
+          "type": "range",
+          "id": "body_font_size",
+          "min": 12,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Tamaño del texto",
+          "default": 16
+        },
+        {
+          "type": "select",
+          "id": "text_alignment",
+          "label": "Alineación del texto",
+          "options": [
+            {
+              "value": "left",
+              "label": "Izquierda"
+            },
+            {
+              "value": "center",
+              "label": "Centrado"
+            },
+            {
+              "value": "right",
+              "label": "Derecha"
+            },
+            {
+              "value": "justify",
+              "label": "Justificado"
+            }
+          ],
+          "default": "left"
+        },
+        {
+          "type": "text",
+          "id": "button_label",
+          "label": "Texto del botón"
+        },
+        {
+          "type": "url",
+          "id": "button_link",
+          "label": "Enlace del botón"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Filas múltiples"
+    }
+  ]
+}
+{% endschema %}
+
+{% stylesheet %}
+.multirow {
+  padding: 40px 20px;
+}
+.row {
+  max-width: 1200px;
+  margin: 0 auto 60px;
+}
+.image-wrapper {
+  margin-bottom: 20px;
+}
+.row img {
+  height: auto;
+  margin-bottom: 0;
+}
+.row h2 {
+  margin-bottom: 15px;
+}
+.text-content {
+  margin-bottom: 20px;
+  line-height: 1.6;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.text-content ul,
+.text-content ol {
+  margin: 15px 0;
+  padding-left: 30px;
+}
+.text-content li {
+  margin-bottom: 10px;
+}
+.text-content strong {
+  font-weight: bold;
+}
+.text-content em {
+  font-style: italic;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 30px;
+  background: #000;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+}
+{% endstylesheet %}

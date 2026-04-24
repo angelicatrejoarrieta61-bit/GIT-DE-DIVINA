@@ -1,0 +1,377 @@
+
+{% comment %}
+  Section: Categorías Diagonales High-End Pro V3.3
+  Version: 3.3 - Minimal Spacing & Enhanced Hover Expansion
+{% endcomment %}
+
+<style>
+  .cat-blade-container-{{ section.id }} {
+    background-color: #000000;
+    width: 100%;
+    position: relative;
+    z-index: 20;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .cat-blade-flex-{{ section.id }} {
+    display: flex;
+    height: {{ section.settings.section_height }}px;
+    width: 100%;
+    gap: 2px;
+  }
+
+  .cat-blade-item-{{ section.id }} {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    transition: all 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+    clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+    margin-left: -4%;
+    text-decoration: none !important;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  
+  .cat-blade-item-{{ section.id }}:first-child {
+    margin-left: -2%;
+  }
+
+  .cat-blade-item-{{ section.id }}:hover {
+    flex: 3; /* Aumentado ligeramente para mayor sensación de crecimiento */
+    z-index: 5;
+  }
+
+  .cat-blade-img-{{ section.id }} {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: grayscale({{ section.settings.grayscale }}%) brightness({{ section.settings.brightness }});
+    transition: transform 3s cubic-bezier(0.165, 0.84, 0.44, 1), filter 1s ease;
+  }
+
+  .cat-blade-item-{{ section.id }}:hover .cat-blade-img-{{ section.id }} {
+    transform: scale(1.15);
+    filter: grayscale(0%) brightness(1);
+  }
+
+  .cat-blade-overlay-{{ section.id }} {
+    position: absolute;
+    inset: 0;
+    background: {{ section.settings.overlay_gradient }};
+    opacity: {{ section.settings.overlay_opacity }};
+    transition: opacity 0.7s ease;
+  }
+
+  .cat-blade-item-{{ section.id }}:hover .cat-blade-overlay-{{ section.id }} {
+    opacity: {{ section.settings.overlay_opacity_hover }};
+  }
+
+  .cat-blade-content-{{ section.id }} {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 30px 15px; /* Ajuste fino de padding para pegarlo más abajo */
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* Glassmorphic Panel - Ultra Delgado */
+  {% if section.settings.enable_glass %}
+  .cat-blade-glass-{{ section.id }} {
+    background: {{ section.settings.glass_bg | color_modify: 'alpha', section.settings.glass_opacity }};
+    backdrop-filter: blur({{ section.settings.glass_blur }}px);
+    -webkit-backdrop-filter: blur({{ section.settings.glass_blur }}px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: {{ section.settings.glass_radius }}px;
+    padding: 12px 18px; /* Padding interno más reducido */
+    width: 92%;
+    max-width: 260px;
+    transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    margin-bottom: 10px;
+  }
+  /* Animación de crecimiento del panel Glassmorphic */
+  .cat-blade-item-{{ section.id }}:hover .cat-blade-glass-{{ section.id }} {
+    transform: scale(1.1) translateY(-10px); /* El panel se hace más grande y sube ligeramente */
+    border-color: rgba(255,255,255,0.5);
+    background: {{ section.settings.glass_bg | color_modify: 'alpha', section.settings.glass_opacity | plus: 0.15 }};
+    box-shadow: 0 15px 45px 0 rgba(0, 0, 0, 0.5);
+  }
+  {% endif %}
+
+  /* Estilos de Bloque (Personalización Individual) */
+  {% for block in section.blocks %}
+    .title-{{ block.id }} {
+      color: {{ block.settings.title_color }};
+      font-size: {{ block.settings.title_size_mobile }}px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 0.95;
+      text-transform: uppercase;
+      margin-top: 2px; /* Espacio mínimo con el subtítulo */
+      text-shadow: 0 {{ block.settings.shadow_offset }}px {{ block.settings.shadow_blur }}px {{ block.settings.shadow_color }};
+      transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .subtitle-{{ block.id }} {
+      color: {{ block.settings.subtitle_color }};
+      font-size: {{ block.settings.subtitle_size }}px;
+      font-weight: 800;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 1px; /* ESPACIO DE 1PX SOLICITADO */
+      display: block;
+      transition: all 0.7s ease;
+    }
+
+    .line-{{ block.id }} {
+      width: 20px;
+      height: 2px;
+      background: {{ block.settings.line_color }};
+      margin: 8px auto 0;
+      transition: width 1s ease, box-shadow 0.5s ease;
+      box-shadow: 0 0 10px {{ block.settings.line_color }};
+    }
+
+    .cat-blade-item-{{ section.id }}:hover .title-{{ block.id }} { transform: scale(1.05); }
+    .cat-blade-item-{{ section.id }}:hover .subtitle-{{ block.id }} { opacity: 1; letter-spacing: 0.4em; }
+    .cat-blade-item-{{ section.id }}:hover .line-{{ block.id }} { width: 70px; }
+
+    @media (min-width: 768px) {
+      .title-{{ block.id }} {
+        font-size: {{ block.settings.title_size_desktop }}px;
+      }
+    }
+  {% endfor %}
+
+  @media (max-width: 767px) {
+    .cat-blade-flex-{{ section.id }} {
+      flex-direction: column;
+      height: auto;
+    }
+    .cat-blade-item-{{ section.id }} {
+      flex: none;
+      height: {{ section.settings.section_height_mobile }}px;
+      clip-path: none;
+      margin-left: 0 !important;
+      margin-bottom: 2px;
+    }
+    .cat-blade-item-{{ section.id }}:hover {
+      height: {{ section.settings.section_height_mobile | plus: 60 }}px;
+      flex: none;
+    }
+    .cat-blade-content-{{ section.id }} {
+      padding: 20px 10px;
+    }
+    .cat-blade-glass-{{ section.id }} {
+      padding: 10px 12px;
+      max-width: 220px;
+    }
+  }
+</style>
+
+<div class="cat-blade-container-{{ section.id }}">
+  <div class="cat-blade-flex-{{ section.id }}">
+    {% for block in section.blocks %}
+      <a href="{{ block.settings.link }}" class="cat-blade-item-{{ section.id }}" {{ block.shopify_attributes }}>
+        {% if block.settings.image %}
+          {%- assign img = block.settings.image -%}
+          <img src="{{ img | image_url: width: 1400 }}" 
+               width="{{ img.width }}"
+               height="{{ img.height }}"
+               class="cat-blade-img-{{ section.id }}" 
+               loading="lazy"
+               alt="{{ block.settings.title | escape }}">
+        {% else %}
+          {{ 'lifestyle-1' | placeholder_svg_tag: 'cat-blade-img-' | append: section.id }}
+        {% endif %}
+        
+        <div class="cat-blade-overlay-{{ section.id }}"></div>
+        
+        <div class="cat-blade-content-{{ section.id }}">
+          <div class="cat-blade-glass-{{ section.id }}">
+            <span class="subtitle-{{ block.id }}">{{ block.settings.count_text }}</span>
+            <h3 class="title-{{ block.id }}">{{ block.settings.title }}</h3>
+            <div class="line-{{ block.id }}"></div>
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Categorías Blade V3 Pro",
+  "max_blocks": 5,
+  "settings": [
+    {
+      "type": "header",
+      "content": "Ajustes de Sección"
+    },
+    {
+      "type": "range",
+      "id": "section_height",
+      "min": 200,
+      "max": 800,
+      "step": 10,
+      "unit": "px",
+      "label": "Altura (Desktop)",
+      "default": 400
+    },
+    {
+      "type": "range",
+      "id": "section_height_mobile",
+      "min": 150,
+      "max": 500,
+      "step": 10,
+      "unit": "px",
+      "label": "Altura (Mobile)",
+      "default": 250
+    },
+    {
+      "type": "header",
+      "content": "Efectos de Imagen"
+    },
+    {
+      "type": "range",
+      "id": "grayscale",
+      "min": 0,
+      "max": 100,
+      "step": 10,
+      "unit": "%",
+      "label": "Escala de Grises",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "brightness",
+      "min": 0,
+      "max": 1,
+      "step": 0.1,
+      "label": "Brillo Normal",
+      "default": 0.8
+    },
+    {
+      "type": "header",
+      "content": "Superposición y Fondo"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "Gradiente de Fondo",
+      "default": "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 70%)"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "min": 0,
+      "max": 1,
+      "step": 0.1,
+      "label": "Opacidad (Normal)",
+      "default": 0.7
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity_hover",
+      "min": 0,
+      "max": 1,
+      "step": 0.1,
+      "label": "Opacidad (Hover)",
+      "default": 0.4
+    },
+    {
+      "type": "header",
+      "content": "Efecto Glassmorphic"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_glass",
+      "label": "Activar Panel Glassmorphic",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "glass_bg",
+      "label": "Color del Panel",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "glass_opacity",
+      "min": 0,
+      "max": 0.8,
+      "step": 0.1,
+      "label": "Opacidad del Panel",
+      "default": 0.1
+    },
+    {
+      "type": "range",
+      "id": "glass_blur",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "label": "Desenfoque (Blur)",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "glass_radius",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "label": "Radio de Bordes",
+      "default": 20
+    }
+  ],
+  "blocks": [
+    {
+      "type": "category",
+      "name": "Categoría Individual",
+      "settings": [
+        { "type": "header", "content": "Contenido" },
+        { "type": "image_picker", "id": "image", "label": "Imagen de Fondo" },
+        { "type": "text", "id": "title", "label": "Título", "default": "NUEVA COLECCIÓN" },
+        { "type": "text", "id": "count_text", "label": "Subtítulo / Items", "default": "12 ITEMS" },
+        { "type": "url", "id": "link", "label": "Enlace" },
+        { "type": "header", "content": "Diseño del Título" },
+        { "type": "color", "id": "title_color", "label": "Color Título", "default": "#FFFFFF" },
+        { "type": "range", "id": "title_size_desktop", "min": 16, "max": 80, "step": 1, "unit": "px", "label": "Tamaño Desktop", "default": 28 },
+        { "type": "range", "id": "title_size_mobile", "min": 14, "max": 40, "step": 1, "unit": "px", "label": "Tamaño Mobile", "default": 20 },
+        { "type": "header", "content": "Sombra del Texto" },
+        { "type": "color", "id": "shadow_color", "label": "Color Sombra", "default": "rgba(0,0,0,0.8)" },
+        { "type": "range", "id": "shadow_blur", "min": 0, "max": 40, "step": 1, "unit": "px", "label": "Difuminado Sombra", "default": 15 },
+        { "type": "range", "id": "shadow_offset", "min": 0, "max": 15, "step": 1, "unit": "px", "label": "Desplazamiento Y", "default": 3 },
+        { "type": "header", "content": "Diseño del Subtítulo" },
+        { "type": "color", "id": "subtitle_color", "label": "Color Subtítulo", "default": "#3062DF" },
+        { "type": "range", "id": "subtitle_size", "min": 8, "max": 20, "step": 1, "unit": "px", "label": "Tamaño Subtítulo", "default": 10 },
+        { "type": "color", "id": "line_color", "label": "Color Línea Acento", "default": "#3062DF" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Blade Categorías High-End V3 Pro",
+      "blocks": [
+        { "type": "category", "settings": { "title": "SERUMS FACIALES" } },
+        { "type": "category", "settings": { "title": "LIMPIADORES" } },
+        { "type": "category", "settings": { "title": "FOTOPROTECCIÓN" } },
+        { "type": "category", "settings": { "title": "GROOMING" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,38 @@
+<section class="image-banner">
+  <img 
+    src="{{ section.settings.banner_image | image_url: width: 1920 }}" 
+    alt="{{ section.settings.banner_image.alt | default: 'Banner' }}"
+    width="1920"
+    height="600"
+    loading="eager">
+</section>
+
+{% schema %}
+{
+  "name": "Banner de imagen",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "banner_image",
+      "label": "Imagen del banner"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Banner de imagen"
+    }
+  ]
+}
+{% endschema %}
+
+{% stylesheet %}
+.image-banner {
+  width: 100%;
+  overflow: hidden;
+}
+.image-banner img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+{% endstylesheet %}

@@ -1,0 +1,309 @@
+
+{% comment %}
+  DIVINA MASTER V160.0 - "INDUSTRIAL LOGO PRECISION & COMPLIANCE SUPREME"
+  - Mandato: Logo Precision (W:150, X:70), Nav en Header con controles de Color/Opacidad.
+  - Fixes: Width/Height en IMGs, Steps <= 101 en Schema, Defaults exactos en pasos.
+  - Banners: Full Color Siempre.
+{% endcomment %}
+
+{% liquid
+  assign bg_opacity = section.settings.bg_opacity
+  assign header_bg = section.settings.bg_color | color_modify: 'alpha', bg_opacity
+  assign accent = section.settings.accent_color
+  assign nav_ls = section.settings.nav_letter_spacing | divided_by: 100.0
+  assign modal_bg = section.settings.modal_bg_color | default: "#050505"
+  
+  assign h_nav_color = section.settings.header_nav_color | color_modify: 'alpha', section.settings.header_nav_opacity
+%}
+
+<style>
+  :root {
+    --d-neon: {{ accent }};
+    --h-h: {{ section.settings.bar_height }}px;
+    --nav-sz: {{ section.settings.nav_font_size_main }}px;
+    --nav-ls: {{ nav_ls }}em;
+    --m-bg: {{ modal_bg }};
+    --m-blur: {{ section.settings.modal_blur }}px;
+    --density: 0.82; /* High density line-height */
+    
+    /* Header Nav Props */
+    --h-nav-c: {{ h_nav_color }};
+    --h-nav-sz: {{ section.settings.header_nav_size }}px;
+    --h-nav-ls: {{ section.settings.header_nav_ls | divided_by: 100.0 }}em;
+  }
+
+  body.m-open { overflow: hidden !important; }
+
+  /* HEADER ARCHITECTURE */
+  .divina-header-160 {
+    position: fixed; top: 0; left: 0; width: 100%; height: var(--h-h); z-index: 1000;
+    background: {{ header_bg }};
+    backdrop-filter: blur({{ section.settings.blur_amount }}px) saturate(220%);
+    -webkit-backdrop-filter: blur({{ section.settings.blur_amount }}px) saturate(220%);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.12);
+    display: flex; align-items: center;
+    padding: 0 {{ section.settings.side_padding }}px;
+    transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .d-grid-160 { display: grid; grid-template-columns: auto 1fr auto; align-items: center; width: 100%; gap: 40px; }
+
+  /* LOGO PRECISION - USER DEFINED: W:150, X:70 */
+  .d-logo-wrap { 
+    display: flex; align-items: center; 
+    transform: translate({{ section.settings.logo_x }}px, {{ section.settings.logo_y }}px);
+    transition: transform 0.3s ease;
+  }
+  .d-logo-img { 
+    width: {{ section.settings.logo_width }}px;
+    height: auto;
+    filter: drop-shadow(0 0 15px rgba(0,0,0,0.5)); 
+    display: block;
+  }
+
+  /* HEADER NAV MATRIX */
+  .d-h-nav { display: flex; align-items: center; gap: 35px; margin-left: 20px; }
+  .d-h-link {
+    font-size: var(--h-nav-sz);
+    font-weight: 900;
+    color: var(--h-nav-c);
+    text-transform: uppercase;
+    letter-spacing: var(--h-nav-ls);
+    text-decoration: none;
+    transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    padding-bottom: 4px;
+    line-height: 1;
+  }
+  .d-h-link:hover { color: #fff; transform: translateY(-1px); text-shadow: 0 0 10px var(--d-neon); }
+  .d-h-link::after { content: ""; position: absolute; bottom: 0; left: 0; width: 0; height: 1px; background: var(--d-neon); transition: 0.3s; }
+  .d-h-link:hover::after { width: 100%; }
+
+  /* MODAL ARCHITECTURE */
+  .d-modal-160 {
+    position: fixed; inset: 0; z-index: 9999; visibility: hidden; opacity: 0;
+    transition: 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+  }
+  .d-modal-160.is-active { visibility: visible; opacity: 1; }
+  .d-m-wrap-160 {
+    width: 100%; height: 100%; background: var(--m-bg);
+    backdrop-filter: blur(var(--m-blur)) saturate(160%);
+    display: grid; grid-template-columns: 1.6fr 1fr;
+    padding: 100px 80px 80px 100px; gap: 80px; position: relative;
+    overflow: hidden;
+  }
+
+  /* COL 1: NAV + COLORED MATRIX */
+  .d-col-nav { display: flex; flex-direction: column; justify-content: center; gap: 8px; overflow-y: auto; z-index: 10; }
+  .d-nav-item {
+    font-size: var(--nav-sz); font-weight: 900; line-height: var(--density);
+    letter-spacing: var(--nav-ls); text-transform: uppercase;
+    color: #fff; text-decoration: none; transition: 0.5s; display: inline-block;
+  }
+  .d-nav-item:hover { color: var(--d-neon); transform: translateX(30px); }
+  
+  .d-sub-colored { margin: 25px 0 35px 65px; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 45px; }
+  .d-cat-link { font-size: 38px; font-weight: 900; text-transform: uppercase; text-decoration: none; line-height: 0.82; transition: 0.4s; }
+  .d-cat-link:hover { transform: translateX(15px); filter: brightness(1.3); }
+
+  /* GRADIENTES MATRIX */
+  .cat-pink { background: linear-gradient(to right, #FF00FF, #FFD1DC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .cat-green { background: linear-gradient(to right, #98FF98, #F0FFF0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .cat-blue { background: linear-gradient(to right, #00D1FF, #E0F7FA); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .cat-brown { background: linear-gradient(to right, #A18A68, #D7CCC8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* COL 2: BANNERS FULL COLOR (ZERO GRAYSCALE) */
+  .d-col-banners { display: flex; flex-direction: column; gap: 24px; justify-content: center; z-index: 10; }
+  .d-banner-card {
+    height: 230px; border: 1px solid rgba(255,255,255,0.12); background: #000;
+    position: relative; overflow: hidden; cursor: pointer; transition: 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    clip-path: polygon(25px 0%, 100% 0%, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0% 100%, 0% 25px);
+  }
+  .d-banner-card:hover { border-color: var(--d-neon); transform: translateY(-10px); }
+  .d-banner-card img { width: 100%; height: 100%; object-fit: cover; opacity: 1; filter: none !important; transition: 1.5s; display: block; }
+  .d-banner-card:hover img { transform: scale(1.1); }
+  
+  .d-b-title { position: absolute; inset: 0; display: flex; items: center; justify-content: center; font-size: 44px; font-weight: 900; color: #fff; text-transform: uppercase; font-style: italic; z-index: 15; text-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+
+  /* UI TOOLS */
+  .d-cart-btn { width: 64px; height: 64px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; position: relative; }
+  .d-cart-count { position: absolute; top: -5px; right: -5px; background: var(--d-neon); color: #000; font-size: 11px; font-weight: 900; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fff; }
+
+  .d-close-160 { position: absolute; top: 40px; right: 40px; background: none; border: none; color: #fff; cursor: pointer; transition: 0.5s; opacity: 0.4; z-index: 100; }
+  .d-close-160:hover { opacity: 1; transform: rotate(90deg); color: var(--d-neon); }
+
+  @media (max-width: 1200px) {
+    .d-h-nav { display: none; }
+    .d-m-wrap-160 { grid-template-columns: 1fr; padding: 50px; overflow-y: auto; }
+    .d-col-banners { display: none; }
+  }
+</style>
+
+<header class="divina-header-160">
+  <div class="d-grid-160">
+    <!-- TRIGGER AREA -->
+    <div class="header-left">
+      <button id="trig-160" aria-label="Open Protocol" style="background:none; border:1px solid rgba(255,255,255,0.2); padding: 14px; cursor:pointer;">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><path d="M4 8h16M4 16h16"/></svg>
+      </button>
+    </div>
+
+    <!-- CENTER AREA: LOGO (PRECISION) + NAV (MATRIX) -->
+    <div class="header-center flex items-center justify-center">
+      <div class="d-logo-wrap">
+        <a href="{{ routes.root_url }}">
+          {% if section.settings.logo_image != blank %}
+            {% liquid
+              assign logo_w = section.settings.logo_width
+              assign logo_h = logo_w | divided_by: section.settings.logo_image.aspect_ratio | round
+            %}
+            <img 
+              src="{{ section.settings.logo_image | image_url: width: logo_w }}" 
+              class="d-logo-img" 
+              alt="{{ shop.name }}"
+              width="{{ logo_w }}"
+              height="{{ logo_h }}"
+              loading="eager"
+            >
+          {% else %}
+            <span style="font-size:34px; font-weight:900; color:#fff; font-style:italic;">DIVINA</span>
+          {% endif %}
+        </a>
+      </div>
+
+      <nav class="d-h-nav">
+        {%- for link in section.settings.main_menu.links -%}
+          <a href="{{ link.url }}" class="d-h-link">{{ link.title }}</a>
+        {%- endfor -%}
+      </nav>
+    </div>
+
+    <!-- TOOLS AREA -->
+    <div class="header-right">
+      <div class="d-cart-btn" onclick="location.href='{{ routes.cart_url }}'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.8"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="d-cart-count">{{ cart.item_count }}</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="modal-160" class="d-modal-160">
+  <div class="d-m-wrap-160">
+    <!-- COL 1: NAVEGACIÓN + COLORED MATRIX -->
+    <div class="d-col-nav">
+      {%- for link in section.settings.main_menu.links -%}
+        <div class="nav-item-wrap">
+          <a href="{{ link.url }}" class="d-nav-item">{{ link.title }}</a>
+          {%- if link.title contains 'Catálogo' or link.title contains 'Catalogo' -%}
+            <div class="d-sub-colored">
+              {%- for sublink in section.settings.secondary_menu.links -%}
+                {% liquid
+                  assign color_cls = "cat-brown"
+                  assign text_up = sublink.title | upcase
+                  if text_up contains "CREMA" or text_up contains "SERUM"
+                    assign color_cls = "cat-pink"
+                  elsif text_up contains "LIMPIA" or text_up contains "JABON"
+                    assign color_cls = "cat-green"
+                  elsif text_up contains "FOTO" or text_up contains "SOLAR"
+                    assign color_cls = "cat-blue"
+                  endif
+                %}
+                <a href="{{ sublink.url }}" class="d-cat-link {{ color_cls }}">{{ sublink.title }}</a>
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+        </div>
+      {%- endfor -%}
+    </div>
+
+    <!-- COL 2: BANNERS FULL COLOR -->
+    <div class="d-col-banners">
+      {%- for block in section.blocks -%}
+        <div class="d-banner-card" {{ block.shopify_attributes }} onclick="location.href='{{ block.settings.link | default: routes.root_url }}'">
+          <h4 class="d-b-title">{{ block.settings.title }}</h4>
+          {% if block.settings.image != blank %}
+            {% liquid
+               assign banner_h = 1000 | divided_by: block.settings.image.aspect_ratio | round
+            %}
+            <img 
+              src="{{ block.settings.image | image_url: width: 1000 }}" 
+              alt="{{ block.settings.title | escape }}"
+              width="1000"
+              height="{{ banner_h }}"
+              loading="lazy"
+            >
+          {% endif %}
+        </div>
+      {%- endfor -%}
+    </div>
+
+    <button id="close-160" class="d-close-160" aria-label="Close">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const initModal = () => {
+      const t = document.getElementById('trig-160'), c = document.getElementById('close-160'), m = document.getElementById('modal-160');
+      if(t && c && m) {
+        t.onclick = () => { m.classList.add('is-active'); document.body.classList.add('m-open'); };
+        c.onclick = () => { m.classList.remove('is-active'); document.body.classList.remove('m-open'); };
+      }
+    };
+    initModal();
+    document.addEventListener('shopify:section:load', initModal);
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Divina V160 SUPREME",
+  "settings": [
+    { "type": "header", "content": "Gestión de Menús" },
+    { "type": "link_list", "id": "main_menu", "label": "Menú 1: Navegación", "default": "main-menu" },
+    { "type": "link_list", "id": "secondary_menu", "label": "Menú 2: Matrix de Colores", "default": "main-menu" },
+    
+    { "type": "header", "content": "Identidad Logo (Precisión)" },
+    { "type": "image_picker", "id": "logo_image", "label": "Imagen Logo" },
+    { "type": "range", "id": "logo_width", "min": 50, "max": 500, "step": 5, "label": "Ancho Logo (PX)", "default": 150 },
+    { "type": "range", "id": "logo_x", "min": -200, "max": 200, "step": 5, "label": "Eje X (PX)", "default": 70 },
+    { "type": "range", "id": "logo_y", "min": -100, "max": 100, "step": 2, "label": "Eje Y (PX)", "default": 0 },
+
+    { "type": "header", "content": "Header Nav Matrix" },
+    { "type": "color", "id": "header_nav_color", "label": "Color Links Header", "default": "#ffffff" },
+    { "type": "range", "id": "header_nav_opacity", "min": 0, "max": 1, "step": 0.1, "label": "Opacidad Links", "default": 0.4 },
+    { "type": "range", "id": "header_nav_size", "min": 8, "max": 24, "step": 1, "label": "Tamaño Fuente", "default": 11 },
+    { "type": "range", "id": "header_nav_ls", "min": -10, "max": 90, "step": 5, "label": "Letter Spacing", "default": 45 },
+
+    { "type": "header", "content": "Atmósfera Barra" },
+    { "type": "range", "id": "bar_height", "min": 60, "max": 160, "step": 5, "label": "Altura Barra", "default": 100 },
+    { "type": "range", "id": "bg_opacity", "min": 0, "max": 1, "step": 0.1, "label": "Opacidad Vidrio", "default": 0.5 },
+    { "type": "range", "id": "blur_amount", "min": 0, "max": 100, "step": 5, "label": "Blur Barra", "default": 60 },
+    { "type": "color", "id": "bg_color", "label": "Color Barra", "default": "#000000" },
+    { "type": "color", "id": "accent_color", "label": "Color Acento", "default": "#d9ff00" },
+    { "type": "range", "id": "side_padding", "min": 0, "max": 200, "step": 5, "label": "Padding Lateral", "default": 80 },
+
+    { "type": "header", "content": "Modal Studio" },
+    { "type": "range", "id": "nav_font_size_main", "min": 40, "max": 180, "step": 5, "label": "Tamaño Colosal", "default": 120 },
+    { "type": "range", "id": "nav_letter_spacing", "min": -20, "max": 50, "step": 1, "label": "Letter Spacing Modal", "default": -6 },
+    { "type": "color", "id": "modal_bg_color", "label": "Fondo Modal", "default": "#050505" },
+    { "type": "range", "id": "modal_blur", "min": 0, "max": 100, "step": 5, "label": "Blur Modal", "default": 80 }
+  ],
+  "blocks": [
+    {
+      "type": "banner",
+      "name": "Industrial Banner",
+      "limit": 3,
+      "settings": [
+        { "type": "text", "id": "title", "label": "Título Banner", "default": "ELITE BATCH" },
+        { "type": "image_picker", "id": "image", "label": "Fondo Banner" },
+        { "type": "url", "id": "link", "label": "Enlace Banner" }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Divina V160 SUPREME MASTER" }]
+}
+{% endschema %}

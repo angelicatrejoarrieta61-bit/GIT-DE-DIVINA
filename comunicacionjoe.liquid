@@ -1,0 +1,266 @@
+
+{% comment %}
+  Section: Floating WhatsApp "Support Hub" V2.0
+  - Arquitectura Multi-Agente (Blocks).
+  - Estética Glassmorphic High-End.
+  - Formato técnico de enlaces wa.me optimizado.
+{% endcomment %}
+
+<style>
+  :root {
+    --wa-hub-accent: {{ section.settings.accent_color }};
+    --wa-hub-bg: {{ section.settings.glass_color | color_modify: 'alpha', 0.4 }};
+    --wa-hub-blur: {{ section.settings.blur_amount }}px;
+  }
+
+  .wa-hub-container {
+    position: fixed;
+    bottom: {{ section.settings.offset_y }}px;
+    {% if section.settings.position == 'right' %}
+      right: {{ section.settings.offset_x }}px;
+    {% else %}
+      left: {{ section.settings.offset_x }}px;
+    {% endif %}
+    z-index: 5000;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* El Menú de Agentes */
+  .wa-hub-menu {
+    position: absolute;
+    bottom: calc(100% + 15px);
+    {% if section.settings.position == 'right' %}
+      right: 0;
+    {% else %}
+      left: 0;
+    {% endif %}
+    width: 280px;
+    background: var(--wa-hub-bg);
+    backdrop-filter: blur(var(--wa-hub-blur));
+    -webkit-backdrop-filter: blur(var(--wa-hub-blur));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 15px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+  }
+
+  .wa-hub-container:hover .wa-hub-menu,
+  .wa-hub-container.is-open .wa-hub-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+
+  .wa-hub-header {
+    margin-bottom: 12px;
+    padding: 0 5px;
+  }
+
+  .wa-hub-header h4 {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--wa-hub-accent);
+    margin: 0;
+  }
+
+  /* Tarjeta de Agente */
+  .wa-agent-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 10px;
+    text-decoration: none !important;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+  }
+
+  .wa-agent-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--wa-hub-accent);
+    transform: translateX({% if section.settings.position == 'right' %}-5px{% else %}5px{% endif %});
+  }
+
+  .wa-agent-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    background: #111;
+  }
+
+  .wa-agent-avatar img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+
+  .wa-status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: #00ff88;
+    border: 2px solid #000;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #00ff88;
+  }
+
+  .wa-agent-info {
+    flex-grow: 1;
+  }
+
+  .wa-agent-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  .wa-agent-role {
+    display: block;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+  }
+
+  /* Botón Principal (El Trigger) */
+  .wa-hub-trigger {
+    width: 65px;
+    height: 65px;
+    background: var(--wa-hub-bg);
+    backdrop-filter: blur(var(--wa-hub-blur));
+    -webkit-backdrop-filter: blur(var(--wa-hub-blur));
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    pointer-events: auto;
+    position: relative;
+    transition: all 0.4s ease;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  }
+
+  .wa-hub-trigger:hover {
+    transform: rotate(15deg) scale(1.05);
+    border-color: var(--wa-hub-accent);
+  }
+
+  .wa-hub-trigger svg {
+    width: 32px;
+    height: 32px;
+    fill: currentColor;
+    filter: drop-shadow(0 0 8px var(--wa-hub-accent));
+  }
+
+  /* Animación de Pulso Principal */
+  .wa-main-pulse {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--wa-hub-accent);
+    border-radius: 50%;
+    animation: wa-pulse 2s infinite;
+    pointer-events: none;
+  }
+
+  @keyframes wa-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+</style>
+
+<div class="wa-hub-container" id="WaHub-{{ section.id }}">
+  <!-- Menú de Agentes -->
+  <div class="wa-hub-menu">
+    <div class="wa-hub-header">
+      <h4>Asistencia Divina</h4>
+    </div>
+    <div class="wa-hub-agents">
+      {% for block in section.blocks %}
+        {% liquid
+          assign clean_number = block.settings.phone | replace: '+', '' | replace: ' ', '' | replace: '-', ''
+          assign wa_link = 'https://wa.me/' | append: clean_number | append: '?text=' | append: block.settings.message | url_param_escape
+        %}
+        <a href="{{ wa_link }}" target="_blank" class="wa-agent-card" {{ block.shopify_attributes }}>
+          <div class="wa-agent-avatar">
+            {% if block.settings.avatar != blank %}
+              <img src="{{ block.settings.avatar | image_url: width: 100 }}" alt="{{ block.settings.name }}">
+            {% else %}
+              <div style="width:100%;height:100%;background:{{ section.settings.accent_color }};opacity:0.2;"></div>
+            {% endif %}
+            <div class="wa-status-dot"></div>
+          </div>
+          <div class="wa-agent-info">
+            <span class="wa-agent-name">{{ block.settings.name }}</span>
+            <span class="wa-agent-role">{{ block.settings.role }}</span>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="opacity: 0.3;">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Botón Trigger -->
+  <div class="wa-hub-trigger">
+    <div class="wa-main-pulse"></div>
+    <svg viewBox="0 0 24 24">
+      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217s.231.006.332.009c.109.004.258-.041.405.314.159.386.541 1.32.588 1.417.048.097.079.21.014.339-.065.129-.099.21-.197.323-.097.113-.204.253-.292.341-.102.102-.209.213-.09.417.119.204.53.873 1.139 1.414.786.698 1.445.915 1.647 1.014.201.099.319.083.438-.053.119-.136.511-.597.648-.8.136-.203.273-.171.462-.1.188.07 1.197.564 1.403.667.206.102.343.151.393.238.051.087.051.503-.093.908z"/>
+      <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm0 22c-5.514 0-10-4.486-10-10s4.486-10 10-10 10 4.486 10 10-4.486 10-10 10z"/>
+    </svg>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "WhatsApp Support Hub V2",
+  "settings": [
+    { "type": "header", "content": "Visuales del Hub" },
+    { "type": "select", "id": "position", "label": "Posición", "options": [
+        { "value": "left", "label": "Izquierda" },
+        { "value": "right", "label": "Derecha" }
+      ], "default": "right" },
+    { "type": "color", "id": "accent_color", "label": "Color Acento", "default": "#3062DF" },
+    { "type": "color", "id": "glass_color", "label": "Color Cristal", "default": "#000000" },
+    { "type": "range", "id": "blur_amount", "min": 0, "max": 100, "step": 5, "unit": "px", "label": "Intensidad Blur", "default": 60 },
+    { "type": "range", "id": "offset_x", "min": 10, "max": 100, "step": 5, "unit": "px", "label": "Margen Lateral", "default": 40 },
+    { "type": "range", "id": "offset_y", "min": 10, "max": 100, "step": 5, "unit": "px", "label": "Margen Inferior", "default": 40 }
+  ],
+  "blocks": [
+    {
+      "type": "agent",
+      "name": "Agente / Canal",
+      "settings": [
+        { "type": "text", "id": "name", "label": "Nombre del Agente", "default": "Consultora Divina" },
+        { "type": "text", "id": "role", "label": "Especialidad", "default": "Ventas y Asesoría" },
+        { "type": "image_picker", "id": "avatar", "label": "Foto Agente" },
+        { "type": "header", "content": "Datos Técnicos WA" },
+        { "type": "text", "id": "phone", "label": "Número WhatsApp", "info": "Formato: 5491166778899 (País + Área + Número). NO usar +, espacios ni guiones.", "default": "5491122334455" },
+        { "type": "textarea", "id": "message", "label": "Mensaje Predeterminado", "default": "Hola! Deseo recibir información personalizada sobre Divina Core System." }
+      ]
+    }
+  ],
+  "presets": [
+    { 
+      "name": "WhatsApp Support Hub Master",
+      "blocks": [
+        { "type": "agent", "settings": { "name": "Elena", "role": "Dermatología Clinica" } },
+        { "type": "agent", "settings": { "name": "Soporte Divino", "role": "Envíos y Pedidos" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

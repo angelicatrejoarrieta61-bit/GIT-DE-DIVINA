@@ -1,0 +1,252 @@
+{% comment %}
+  Section: Header Prism Glass Master V11.1 - Divina "Core-Sync"
+  - Estética Glassmorphic Premium (Preservada al 100%)
+  - Activación de Carrito Blindada (Apertura forzada de Drawer)
+  - Sin eliminación de funciones ni schema
+{% endcomment %}
+
+{% liquid
+  assign header_bg_color = section.settings.bg_color | color_modify: 'alpha', section.settings.bg_opacity
+%}
+
+<header-component 
+  id="header-component" 
+  class="header-v9-master" 
+  sticky="{{ section.settings.sticky_header_type }}"
+  style="
+    --header-h: {{ section.settings.bar_height }}px; 
+    --nav-size: {{ section.settings.nav_font_size }}px;
+    --nav-color: {{ section.settings.nav_color }};
+    --nav-hover: {{ section.settings.nav_hover_color }};
+    --nav-weight: {{ section.settings.nav_font_weight }};
+    --v9-bg: {{ header_bg_color }};
+    --v9-blur: {{ section.settings.blur_amount }}px;
+  ">
+  
+  <div class="header-v9-container">
+    <div class="header-v9-glass-bg"></div>
+
+    <div class="header-v9-content">
+      
+      <div class="header-v9-left">
+        <nav class="prism-nav-v9 desktop-only-v9">
+          {%- for link in section.settings.main_menu.links -%}
+            <a href="{{ link.url }}" class="nav-item-v9 {% if link.active %}nav-active{% endif %}">
+              {{ link.title | upcase }}
+            </a>
+          {%- endfor -%}
+        </nav>
+        
+        <div class="mobile-only-v9">
+          <button class="header__icon--menu icon-v9-btn main-menu-trigger" aria-label="Abrir Menú" aria-haspopup="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="header-v9-center">
+        <div class="prism-logo-positioner" style="--l-x: {{ section.settings.logo_x }}px; --l-y: {{ section.settings.logo_y }}px; --l-w: {{ section.settings.logo_width }}px;">
+          <div class="logo-aura-glow" style="--glow-color: {{ section.settings.logo_glow_color }}; --glow-blur: {{ section.settings.logo_glow_blur }}px;"></div>
+          {% if section.settings.logo_image != blank %}
+            <a href="{{ routes.root_url }}" class="prism-logo-link">
+              <img 
+                src="{{ section.settings.logo_image | image_url: width: 600 }}" 
+                alt="{{ section.settings.logo_image.alt | default: shop.name | escape }}" 
+                class="prism-logo-img" 
+                loading="eager"
+                width="{{ section.settings.logo_image.width }}"
+                height="{{ section.settings.logo_image.height }}"
+              >
+            </a>
+          {% else %}
+            <a href="{{ routes.root_url }}" class="prism-logo-text">DIVINA</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="header-v9-right">
+        <div class="header-v9-actions-group">
+          <a href="{{ routes.search_url }}" class="icon-v9-btn micro header__icon--search" aria-label="Buscar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+          </a>
+          
+          {%- if shop.customer_accounts_enabled -%}
+            <a href="{{ routes.account_url }}" class="icon-v9-btn micro" aria-label="Cuenta">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+            </a>
+          {%- endif -%}
+
+          <a href="{{ routes.cart_url }}" 
+             class="cart-v9-vessel header__icon--cart" 
+             id="cart-icon-bubble" 
+             aria-haspopup="dialog"
+             aria-expanded="false"
+             aria-controls="CartDrawer"
+             onclick="event.preventDefault(); document.documentElement.dispatchEvent(new CustomEvent('cart:open', { bubbles: true })); const d = document.querySelector('cart-drawer'); if(d) d.open();">
+            <div class="vessel-icon-wrapper">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M4 10h16v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8z"/>
+                <path d="M9 10V7a3 3 0 0 1 6 0v3"/>
+              </svg>
+              <div id="cart-icon-bubble-container">
+                {%- if cart.item_count > 0 -%}
+                  <span class="vessel-badge-count animate-pulse-divina">
+                    <span aria-hidden="true">{{ cart.item_count }}</span>
+                  </span>
+                {%- endif -%}
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="header-v9-edge-light"></div>
+  </div>
+</header-component>
+
+<script src="{{ 'header.js' | asset_url }}" type="module"></script>
+
+<style>
+  :root {
+    --v9-accent: #3062DF;
+    --v9-border: rgba(255, 255, 255, 0.15);
+  }
+
+  .header-v9-master {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    padding: 10px 40px;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .header-v9-glass-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--v9-bg);
+    backdrop-filter: blur(var(--v9-blur));
+    -webkit-backdrop-filter: blur(var(--v9-blur));
+    border: 1px solid var(--v9-border);
+    border-radius: 30px;
+    box-shadow: 0 40px 100px -20px rgba(0,0,0,0.8);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .header-v9-content {
+    position: relative;
+    z-index: 10;
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 45px;
+  }
+
+  .prism-nav-v9 { display: flex; gap: 35px; }
+  .nav-item-v9 {
+    font-size: var(--nav-size) !important;
+    font-weight: var(--nav-weight) !important;
+    letter-spacing: 0.45em;
+    color: var(--nav-color) !important;
+    text-decoration: none !important;
+    opacity: 1 !important; 
+    transition: all 0.3s ease;
+  }
+  .nav-item-v9:hover { color: var(--nav-hover) !important; }
+
+  .prism-logo-positioner {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(calc(-50% + var(--l-x)), calc(-50% + var(--l-y)));
+    width: var(--l-w);
+    display: flex;
+    justify-content: center;
+    z-index: 50;
+  }
+  .prism-logo-img { width: 100%; height: auto; filter: drop-shadow(0 15px 35px rgba(0,0,0,0.8)); }
+
+  .header-v9-actions-group { position: relative; z-index: 100; display: flex; align-items: center; gap: 14px; }
+  
+  .cart-v9-vessel {
+    width: 44px; height: 44px;
+    background: #fff;
+    color: #000;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.85);
+    transition: all 0.4s ease;
+    cursor: pointer;
+    z-index: 110;
+    text-decoration: none;
+  }
+  .cart-v9-vessel:hover { background: var(--v9-accent); color: #fff; transform: scale(1.1); }
+
+  .vessel-badge-count {
+    position: absolute;
+    top: -8px; right: -8px;
+    background: var(--v9-accent);
+    color: #fff;
+    font-size: 10px; font-weight: 900;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #000;
+  }
+
+  .animate-pulse-divina { animation: pulse-divina 2s infinite ease-in-out; }
+  @keyframes pulse-divina {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  .desktop-only-v9 { display: flex !important; }
+  .mobile-only-v9 { display: none !important; }
+
+  @media (max-width: 1024px) {
+    .header-v9-master { padding: 10px 15px; }
+    .header-v9-content { padding: 0 15px; }
+    .desktop-only-v9 { display: none !important; }
+    .mobile-only-v9 { display: flex !important; }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Header Prism Master V11.1",
+  "settings": [
+    { "type": "header", "content": "Ajustes de Barra" },
+    { "type": "range", "id": "bar_height", "min": 40, "max": 120, "step": 2, "unit": "px", "label": "Grosor de la Barra", "default": 64 },
+    { "type": "color", "id": "bg_color", "label": "Color de Fondo", "default": "#060606" },
+    { "type": "range", "id": "bg_opacity", "min": 0, "max": 1, "step": 0.1, "label": "Opacidad", "default": 0.5 },
+    { "type": "range", "id": "blur_amount", "min": 0, "max": 80, "step": 2, "unit": "px", "label": "Blur", "default": 40 },
+    { "type": "select", "id": "sticky_header_type", "label": "Sticky", "options": [
+        { "value": "always", "label": "Siempre" },
+        { "value": "scroll-up", "label": "Al subir" },
+        { "value": "none", "label": "No" }
+      ], "default": "always" },
+    { "type": "link_list", "id": "main_menu", "label": "Menú", "default": "main-menu" },
+    { "type": "range", "id": "nav_font_size", "min": 7, "max": 18, "step": 1, "unit": "px", "label": "Tamaño Fuente", "default": 8 },
+    { "type": "color", "id": "nav_color", "label": "Color Texto", "default": "#FFFFFF" },
+    { "type": "color", "id": "nav_hover_color", "label": "Color Hover", "default": "#3062DF" },
+    { "type": "select", "id": "nav_font_weight", "label": "Peso", "options": [
+        { "value": "400", "label": "Normal" },
+        { "value": "900", "label": "Black" }
+      ], "default": "900" },
+    { "type": "image_picker", "id": "logo_image", "label": "Logo" },
+    { "type": "range", "id": "logo_width", "min": 50, "max": 500, "step": 5, "unit": "px", "label": "Ancho Logo", "default": 170 },
+    { "type": "range", "id": "logo_x", "min": -200, "max": 200, "step": 4, "unit": "px", "label": "Logo X", "default": 0 },
+    { "type": "range", "id": "logo_y", "min": -100, "max": 100, "step": 2, "unit": "px", "label": "Logo Y", "default": 8 },
+    { "type": "color", "id": "logo_glow_color", "label": "Color Aura", "default": "#3062DF" },
+    { "type": "range", "id": "logo_glow_blur", "min": 0, "max": 120, "step": 5, "unit": "px", "label": "Aura Blur", "default": 80 }
+  ]
+}
+{% endschema %}

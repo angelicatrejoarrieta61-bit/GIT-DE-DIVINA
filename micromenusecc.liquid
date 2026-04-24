@@ -1,0 +1,300 @@
+
+{% comment %}
+  Section: Prism Track Aura V18.2 - CHROME HORIZON SCHEMA FIXED
+  - Framing Lines: Gradient (Transparent -> White -> Transparent).
+  - Categorized Palettes: Precise chromatic themes (Rose/Gold, Green, Orange, Coffee).
+  - Schema Fix: glass_opacity default adjusted to one decimal point to pass validation.
+  - Schema Fix: padding steps adjusted for range compliance.
+{% endcomment %}
+
+{% liquid
+  assign glass_bg = section.settings.glass_color | color_modify: 'alpha', section.settings.glass_opacity
+  assign section_bg = section.settings.section_bg_color
+%}
+
+<style>
+  #shopify-section-{{ section.id }} {
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .v18-void-{{ section.id }} {
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    background-color: {{ section_bg }} !important;
+    padding: {{ section.settings.padding_top }}px 0 {{ section.settings.padding_bottom }}px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  /* MÁSCARA HORIZONTE INFINITO: Desvanecimiento lateral */
+  .v18-mask-wrapper-{{ section.id }} {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    mask-image: linear-gradient(to right, 
+      rgba(0,0,0,0) 0%, 
+      rgba(0,0,0,1) 35%, 
+      rgba(0,0,0,1) 65%, 
+      rgba(0,0,0,0) 100%
+    );
+    -webkit-mask-image: linear-gradient(to right, 
+      rgba(0,0,0,0) 0%, 
+      rgba(0,0,0,1) 35%, 
+      rgba(0,0,0,1) 65%, 
+      rgba(0,0,0,0) 100%
+    );
+  }
+
+  .v18-track-{{ section.id }} {
+    position: relative;
+    width: 100%;
+    max-width: {{ section.settings.max_width }}px;
+    height: {{ section.settings.height }}px;
+    display: flex;
+    align-items: center;
+    background: {{ glass_bg }};
+    backdrop-filter: blur({{ section.settings.blur_intensity }}px);
+    -webkit-backdrop-filter: blur({{ section.settings.blur_intensity }}px);
+    z-index: 10;
+  }
+
+  /* LÍNEAS HORIZONTALES: TRANSPARENTE -> BLANCO -> TRANSPARENTE */
+  .v18-track-{{ section.id }}::before,
+  .v18-track-{{ section.id }}::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(to right, 
+      rgba(255,255,255,0) 0%, 
+      rgba(255,255,255,0.6) 50%, 
+      rgba(255,255,255,0) 100%
+    );
+    z-index: 15;
+    pointer-events: none;
+  }
+  .v18-track-{{ section.id }}::before { top: 0; }
+  .v18-track-{{ section.id }}::after { bottom: 0; }
+
+  .v18-divider {
+    width: 1px;
+    height: 35%;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent);
+    transform: skewX(-25deg);
+    margin: 0 10px;
+  }
+
+  .v18-aura-{{ section.id }} {
+    position: absolute;
+    inset: -60% -40%;
+    background: radial-gradient(circle at var(--aura-x, 50%) 50%, var(--aura-color, transparent) 0%, transparent 60%);
+    opacity: 0.7;
+    pointer-events: none;
+    transition: all 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+    z-index: 1;
+    mix-blend-mode: screen;
+  }
+
+  .v18-nav {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    z-index: 20;
+    padding: 0 10%;
+  }
+
+  .v18-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none !important;
+    cursor: pointer;
+    background: transparent !important;
+    border: none !important;
+    padding: 0;
+    position: relative;
+  }
+
+  .v18-label {
+    font-size: {{ section.settings.font_size }}px;
+    font-weight: 900;
+    letter-spacing: {{ section.settings.letter_spacing }}em;
+    text-transform: uppercase;
+    color: {{ section.settings.color_idle }};
+    transition: all 0.4s ease;
+    white-space: nowrap;
+    text-shadow: 0 4px 10px rgba(0,0,0,1);
+    position: relative;
+    z-index: 30;
+  }
+
+  .v18-indicator {
+    position: absolute;
+    bottom: 30%; 
+    height: 2px;
+    transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+    z-index: 25;
+    border-radius: 2px;
+  }
+
+  .v18-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    margin-top: 15px;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.5s ease;
+  }
+
+  .is-hovered .v18-dot {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+</style>
+
+<div class="v18-void-{{ section.id }}">
+  <div class="v18-mask-wrapper-{{ section.id }}">
+    <div class="v18-track-{{ section.id }}">
+      <div class="v18-aura-{{ section.id }}" id="Aura-{{ section.id }}"></div>
+      <div class="v18-indicator" id="Ind-{{ section.id }}"></div>
+      <nav class="v18-nav">
+        {% for block in section.blocks %}
+          <a href="{{ block.settings.url | default: '#' }}" 
+             class="v18-item {% if forloop.first %}is-hovered{% endif %}" 
+             data-color="{{ block.settings.accent_color }}"
+             data-color-sec="{{ block.settings.secondary_color }}"
+             {{ block.shopify_attributes }}>
+            <span class="v18-label">
+              {{ block.settings.title | escape }}
+            </span>
+            <div class="v18-dot" style="background: linear-gradient(135deg, {{ block.settings.accent_color }}, {{ block.settings.secondary_color }}); box-shadow: 0 0 10px {{ block.settings.accent_color }};"></div>
+          </a>
+          {% unless forloop.last %}
+            <div class="v18-divider"></div>
+          {% endunless %}
+        {% endfor %}
+      </nav>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const init = () => {
+      const container = document.querySelector('.v18-void-{{ section.id }}');
+      if (!container) return;
+      
+      const aura = container.querySelector('#Aura-{{ section.id }}');
+      const indicator = container.querySelector('#Ind-{{ section.id }}');
+      const items = container.querySelectorAll('.v18-item');
+      
+      const refresh = (el, idx) => {
+        if (!el || !aura || !indicator) return;
+        
+        const label = el.querySelector('.v18-label');
+        const color = el.getAttribute('data-color');
+        const colorSec = el.getAttribute('data-color-sec');
+        const trackRect = container.querySelector('.v18-track-{{ section.id }}').getBoundingClientRect();
+        const labelRect = label.getBoundingClientRect();
+        
+        const textWidth = labelRect.width;
+        const relativeLeft = labelRect.left - trackRect.left;
+
+        const seg = 100 / items.length;
+        const xPos = (idx * seg) + (seg / 2);
+        aura.style.setProperty('--aura-x', xPos + '%');
+        aura.style.setProperty('--aura-color', color);
+        
+        indicator.style.width = textWidth + 'px';
+        indicator.style.left = relativeLeft + 'px';
+        indicator.style.background = `linear-gradient(90deg, ${color}, ${colorSec})`;
+        indicator.style.boxShadow = `0 0 25px ${color}88`;
+
+        items.forEach(item => {
+          const lbl = item.querySelector('.v18-label');
+          if (item === el) {
+            lbl.style.color = color;
+            item.classList.add('is-hovered');
+          } else {
+            lbl.style.color = '{{ section.settings.color_idle }}';
+            item.classList.remove('is-hovered');
+          }
+        });
+      };
+
+      setTimeout(() => {
+        if (items.length > 0) refresh(items[0], 0);
+      }, 300);
+
+      items.forEach((item, i) => {
+        item.addEventListener('mouseenter', () => refresh(item, i));
+      });
+
+      window.addEventListener('resize', () => {
+        const active = container.querySelector('.v18-item.is-hovered');
+        if(active) refresh(active, Array.from(items).indexOf(active));
+      });
+    };
+    
+    document.addEventListener('DOMContentLoaded', init);
+    if (Shopify.designMode) document.addEventListener('shopify:section:load', init);
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Prism Track Aura V18.2",
+  "settings": [
+    { "type": "header", "content": "1. INTEGRACIÓN CON EL VACÍO" },
+    { "type": "color", "id": "section_bg_color", "label": "Color de Fondo (VOID)", "default": "#000000" },
+    { "type": "range", "id": "height", "min": 40, "max": 140, "step": 1, "unit": "px", "label": "Altura del Track", "default": 95 },
+    { "type": "range", "id": "max_width", "min": 600, "max": 1600, "step": 10, "unit": "px", "label": "Ancho Máximo", "default": 1400 },
+    { "type": "range", "id": "padding_top", "min": 0, "max": 250, "step": 5, "unit": "px", "label": "Padding Superior", "default": 120 },
+    { "type": "range", "id": "padding_bottom", "min": 0, "max": 250, "step": 5, "unit": "px", "label": "Padding Inferior", "default": 120 },
+    { "type": "header", "content": "2. TIPOGRAFÍA" },
+    { "type": "range", "id": "font_size", "min": 8, "max": 20, "step": 1, "unit": "px", "label": "Tamaño Fuente", "default": 11 },
+    { "type": "range", "id": "letter_spacing", "min": 0.1, "max": 1.5, "step": 0.1, "unit": "em", "label": "Espaciado Letras", "default": 0.6 },
+    { "type": "color", "id": "color_idle", "label": "Color Texto Inactivo", "default": "#ffffff" },
+    { "type": "header", "content": "3. ACABADO CRISTAL" },
+    { "type": "color", "id": "glass_color", "label": "Color Cristal", "default": "#ffffff" },
+    { "type": "range", "id": "glass_opacity", "min": 0.0, "max": 1.0, "step": 0.1, "label": "Opacidad Cristal", "default": 0.1 },
+    { "type": "range", "id": "blur_intensity", "min": 0, "max": 100, "step": 5, "unit": "px", "label": "Intensidad Blur", "default": 100 }
+  ],
+  "blocks": [
+    {
+      "type": "item",
+      "name": "Ítem",
+      "settings": [
+        { "type": "text", "id": "title", "label": "Texto", "default": "CATEGORÍA" },
+        { "type": "url", "id": "url", "label": "Enlace" },
+        { "type": "color", "id": "accent_color", "label": "Color Primario", "default": "#FFD1DC" },
+        { "type": "color", "id": "secondary_color", "label": "Color Secundario", "default": "#E6BE8A" }
+      ]
+    }
+  ],
+  "presets": [
+    { 
+      "name": "Prism Track Aura V18.2 Ultimate",
+      "blocks": [
+        { "type": "item", "settings": { "title": "CREMAS & SERUMS", "accent_color": "#FFD1DC", "secondary_color": "#E6BE8A" } },
+        { "type": "item", "settings": { "title": "LIMPIADORES", "accent_color": "#2E7D32", "secondary_color": "#81C784" } },
+        { "type": "item", "settings": { "title": "FOTOPROTECTORES", "accent_color": "#FF8C00", "secondary_color": "#FFD700" } },
+        { "type": "item", "settings": { "title": "GROOMING", "accent_color": "#967969", "secondary_color": "#F5F5DC" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

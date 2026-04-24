@@ -1,0 +1,359 @@
+
+{% comment %}
+  Section: Catálogo Sublime Pro Master
+  Version: 5.1 - Final Corrected Schema & Typography Colors
+{% endcomment %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+
+  :root {
+    --gs-bg: {{ section.settings.bg_color | color_modify: 'alpha', section.settings.bg_opacity }};
+    --gs-border: {{ section.settings.border_color | color_modify: 'alpha', section.settings.border_opacity }};
+    --gs-blur: {{ section.settings.blur_amount }}px;
+    --gs-radius: {{ section.settings.card_radius }}px;
+    --gs-gap: {{ section.settings.gap }}px;
+    --gs-accent: #3062DF;
+    --gs-badge-bg: {{ section.settings.badge_bg_color }};
+    --gs-badge-text: {{ section.settings.badge_text_color }};
+    --gs-brand-color: {{ section.settings.brand_color }};
+    --gs-title-color: {{ section.settings.title_color }};
+    --gs-price-color: {{ section.settings.price_color }};
+    --gs-font: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .gs-master-wrapper {
+    background-color: #050505;
+    color: #ffffff;
+    padding: 80px 20px;
+    font-family: var(--gs-font);
+    overflow-x: hidden;
+  }
+
+  /* Reset radical de hipervínculos */
+  .gs-master-wrapper a, 
+  .gs-master-wrapper a:hover, 
+  .gs-master-wrapper a:visited, 
+  .gs-master-wrapper a:active {
+    text-decoration: none !important;
+    color: inherit !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .gs-promo-bar {
+    background: rgba(48, 98, 223, 0.1);
+    border: 1px solid rgba(48, 98, 223, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+    margin-bottom: 60px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .gs-promo-bar p {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: var(--gs-accent);
+    margin: 0;
+  }
+
+  .gs-header {
+    max-width: 1400px;
+    margin: 0 auto 80px;
+  }
+  .gs-header-line {
+    height: 2px;
+    width: 60px;
+    background: var(--gs-accent);
+    margin-bottom: 24px;
+  }
+  .gs-header-title {
+    font-size: clamp(48px, 8vw, 110px);
+    font-weight: 800;
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    margin: 0 0 24px;
+  }
+  .gs-header-desc {
+    font-size: clamp(16px, 2vw, 20px);
+    color: rgba(255,255,255,0.4);
+    max-width: 700px;
+    line-height: 1.6;
+  }
+
+  .gs-grid {
+    display: grid;
+    gap: var(--gs-gap);
+    max-width: 1400px;
+    margin: 0 auto;
+    grid-template-columns: repeat({{ section.settings.cols_mobile }}, 1fr);
+    grid-auto-flow: dense;
+  }
+
+  @media (min-width: 768px) {
+    .gs-grid {
+      grid-template-columns: repeat({{ section.settings.cols_desktop }}, 1fr);
+    }
+  }
+
+  .gs-card {
+    position: relative;
+    background: var(--gs-bg);
+    backdrop-filter: blur(var(--gs-blur));
+    -webkit-backdrop-filter: blur(var(--gs-blur));
+    border: {{ section.settings.border_width }}px solid var(--gs-border);
+    border-radius: var(--gs-radius);
+    overflow: hidden;
+    transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    text-decoration: none !important;
+  }
+  .gs-card:hover {
+    transform: translateY(-12px);
+    border-color: rgba(255,255,255,0.4);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.7);
+  }
+
+  .gs-card-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+  }
+  .gs-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .gs-card:hover .gs-card-media img { transform: scale(1.08); }
+
+  .gs-badge {
+    position: absolute;
+    top: 20px; left: 20px;
+    background: var(--gs-badge-bg);
+    color: var(--gs-badge-text);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    z-index: 10;
+  }
+
+  .gs-card-info {
+    padding: 24px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .gs-vendor {
+    font-size: {{ section.settings.brand_size }}px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--gs-brand-color);
+    margin-bottom: 8px;
+    display: block;
+    text-decoration: none !important;
+  }
+  .gs-title {
+    font-size: {{ section.settings.title_size }}px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0 0 16px;
+    color: var(--gs-title-color);
+    transition: opacity 0.3s ease;
+    display: block;
+    text-decoration: none !important;
+  }
+  .gs-card:hover .gs-title { opacity: 0.8; }
+
+  .gs-bottom-row {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .gs-price {
+    font-size: {{ section.settings.price_size }}px;
+    font-weight: 800;
+    color: var(--gs-price-color);
+    text-decoration: none !important;
+  }
+
+  .gs-btn {
+    position: relative;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f3f4f6 0%, #9ca3af 50%, #374151 100%);
+    color: #000 !important;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.2);
+    display: inline-block;
+    text-decoration: none !important;
+  }
+  .gs-btn::after {
+    content: '';
+    position: absolute;
+    inset: -100%;
+    width: 300%;
+    height: 300%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent);
+    transform: rotate(-45deg) translateX(-150%);
+    transition: transform 1s ease;
+  }
+  .gs-btn:hover::after { transform: rotate(-45deg) translateX(150%); }
+
+  .gs-banner-content {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 70%);
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 5;
+  }
+  .gs-banner-vertical .gs-banner-content { align-items: center; text-align: center; }
+</style>
+
+<div class="gs-master-wrapper">
+  {% if section.settings.promo_text != blank %}
+    <div class="gs-promo-bar"><p>{{ section.settings.promo_text | escape }}</p></div>
+  {% endif %}
+
+  <div class="gs-header">
+    <div class="gs-header-line"></div>
+    <h2 class="gs-header-title">{{ section.settings.heading | escape }}</h2>
+    <p class="gs-header-desc">{{ section.settings.subheading | escape }}</p>
+  </div>
+
+  <div class="gs-grid">
+    {% assign p_idx = 0 %}
+    {% assign products = section.settings.collection.products %}
+
+    {% for i in (1..60) %}
+      {% assign current_block = null %}
+      {% for block in section.blocks %}
+        {% if block.settings.pos == i %}
+          {% assign current_block = block %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+
+      {% if current_block %}
+        {% assign banner_type = current_block.settings.type %}
+        {% assign banner_col = banner_type | split: 'x' | first %}
+        {% assign banner_row = banner_type | split: 'x' | last %}
+        {% assign is_vertical = false %}
+        {% if banner_type == '1x2' %}{% assign is_vertical = true %}{% endif %}
+
+        <div class="gs-card {% if is_vertical %}gs-banner-vertical{% endif %}" 
+             style="grid-column: span {{ banner_col }}; grid-row: span {{ banner_row }}; min-height: 400px;"
+             {{ current_block.shopify_attributes }}>
+          {% if current_block.settings.img %}
+            {% assign b_w = 1200 %}
+            {% assign b_h = b_w | divided_by: current_block.settings.img.aspect_ratio | round %}
+            <img src="{{ current_block.settings.img | image_url: width: b_w }}" class="gs-card-media" style="position: absolute; inset:0; width:100%; height:100%; object-fit:cover;" width="{{ b_w }}" height="{{ b_h }}" loading="lazy">
+          {% endif %}
+          <div class="gs-banner-content">
+            <h3 style="font-size: {% if is_vertical %}32px{% else %}64px{% endif %}; font-weight: 900; margin: 0; line-height: 0.9;">{{ current_block.settings.title | escape }}</h3>
+            <p style="font-size: 11px; font-weight: 800; opacity: 0.6; text-transform: uppercase; margin-top: 15px; letter-spacing: 0.2em;">{{ current_block.settings.txt | escape }}</p>
+          </div>
+        </div>
+      {% elsif p_idx < section.settings.limit %}
+        {% assign product = products[p_idx] %}
+        {% if product %}
+          <a href="{{ product.url }}" class="gs-card">
+            <div class="gs-card-media">
+              {% assign p_w = 800 %}
+              {% assign p_h = p_w | divided_by: product.featured_image.aspect_ratio | round %}
+              <img src="{{ product.featured_image | image_url: width: p_w }}" width="{{ p_w }}" height="{{ p_h }}" loading="lazy">
+              {% if product.compare_at_price > product.price %}
+                <div class="gs-badge">OFERTA</div>
+              {% endif %}
+            </div>
+            <div class="gs-card-info">
+              <span class="gs-vendor">{{ product.vendor | escape }}</span>
+              <h4 class="gs-title">{{ product.title | escape }}</h4>
+              <div class="gs-bottom-row">
+                <span class="gs-price">{{ product.price | money }}</span>
+                <span class="gs-btn">Ver Más+</span>
+              </div>
+            </div>
+          </a>
+          {% assign p_idx = p_idx | plus: 1 %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Catálogo Sublime Pro",
+  "settings": [
+    { "type": "header", "content": "Contenido" },
+    { "type": "text", "id": "heading", "label": "Título", "default": "Nuestro Catálogo Sublime" },
+    { "type": "textarea", "id": "subheading", "label": "Descripción", "default": "Explora piezas seleccionadas para tu belleza." },
+    { "type": "collection", "id": "collection", "label": "Colección" },
+    { "type": "text", "id": "promo_text", "label": "Texto Promo", "default": "AHORRA 25% DESCUENTO AUTOMATICO" },
+    { "type": "header", "content": "Configuración de Grid" },
+    { "type": "range", "id": "limit", "min": 4, "max": 48, "step": 4, "label": "Productos", "default": 32 },
+    { "type": "range", "id": "cols_desktop", "min": 2, "max": 6, "step": 1, "label": "Cols Desktop", "default": 4 },
+    { "type": "range", "id": "cols_mobile", "min": 1, "max": 3, "step": 1, "label": "Cols Mobile", "default": 1 },
+    { "type": "range", "id": "gap", "min": 10, "max": 60, "step": 2, "label": "Espaciado (Gap)", "default": 30 },
+    { "type": "header", "content": "Tipografía (Tamaños)" },
+    { "type": "range", "id": "brand_size", "min": 8, "max": 24, "step": 1, "label": "Marca Tamaño", "default": 10 },
+    { "type": "range", "id": "title_size", "min": 12, "max": 40, "step": 1, "label": "Título Tamaño", "default": 18 },
+    { "type": "range", "id": "price_size", "min": 14, "max": 60, "step": 1, "label": "Precio Tamaño", "default": 22 },
+    { "type": "header", "content": "Tipografía (Colores)" },
+    { "type": "color", "id": "brand_color", "label": "Color Marca", "default": "#FFFFFF" },
+    { "type": "color", "id": "title_color", "label": "Color Título", "default": "#FFFFFF" },
+    { "type": "color", "id": "price_color", "label": "Color Precio", "default": "#FFFFFF" },
+    { "type": "header", "content": "Colores del Badge" },
+    { "type": "color", "id": "badge_bg_color", "label": "Fondo Badge", "default": "#3062DF" },
+    { "type": "color", "id": "badge_text_color", "label": "Texto Badge", "default": "#FFFFFF" },
+    { "type": "header", "content": "Estética Glassmorphic" },
+    { "type": "color", "id": "bg_color", "label": "Color Tarjeta", "default": "#3062DF" },
+    { "type": "range", "id": "bg_opacity", "min": 0, "max": 1, "step": 0.1, "label": "Opacidad", "default": 0.4 },
+    { "type": "color", "id": "border_color", "label": "Color Borde", "default": "#FFFFFF" },
+    { "type": "range", "id": "border_opacity", "min": 0, "max": 1, "step": 0.1, "label": "Opacidad Borde", "default": 0.2 },
+    { "type": "range", "id": "border_width", "min": 0, "max": 6, "step": 1, "label": "Grosor Borde", "default": 1 },
+    { "type": "range", "id": "blur_amount", "min": 0, "max": 80, "step": 5, "label": "Blur", "default": 20 },
+    { "type": "range", "id": "card_radius", "min": 0, "max": 80, "step": 4, "label": "Radio", "default": 24 }
+  ],
+  "blocks": [
+    {
+      "type": "banner",
+      "name": "Banner",
+      "settings": [
+        { "type": "select", "id": "type", "label": "Formato", "options": [
+          { "value": "1x2", "label": "Vertical (2 filas)" },
+          { "value": "3x1", "label": "Horizontal (3 columnas)" }
+        ], "default": "1x2" },
+        { "type": "range", "id": "pos", "min": 1, "max": 50, "step": 1, "label": "Posición", "default": 1 },
+        { "type": "image_picker", "id": "img", "label": "Imagen" },
+        { "type": "text", "id": "title", "label": "Título", "default": "NUEVA ERA" },
+        { "type": "text", "id": "txt", "label": "Subtítulo", "default": "Minimalismo Puro" }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Catálogo Sublime Master" }]
+}
+{% endschema %}

@@ -1,0 +1,496 @@
+{%- style -%}
+  :root {
+    --footer-accent: {{ section.settings.accent_color }};
+    --footer-bg-solid: {{ section.settings.footer_bg_color_1 }};
+    {% if section.settings.footer_bg_type == 'gradient' %}
+      --footer-bg-main: linear-gradient(180deg, {{ section.settings.footer_bg_color_1 }} 0%, {{ section.settings.footer_bg_color_2 }} 100%);
+    {% else %}
+      --footer-bg-main: {{ section.settings.footer_bg_color_1 }};
+    {% endif %}
+    --footer-text: #ffffff;
+    --footer-text-muted: rgba(255, 255, 255, 0.6);
+    --footer-border: rgba(255, 255, 255, 0.1);
+    --footer-line-height: {{ section.settings.line_height }};
+  }
+
+  /* RESET & FULL WIDTH BREAKOUT */
+  .divina-footer {
+    background-color: transparent;
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .footer__main-black {
+    background: var(--footer-bg-main);
+    width: 100%;
+    padding: 80px 0 100px;
+    position: relative;
+    border-top: 1px solid var(--footer-border);
+  }
+
+  /* SHIMMER EFFECT */
+  .footer__main-black::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, transparent 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%);
+    transform: skewX(-20deg);
+    animation: shimmer-swipe 12s infinite;
+    pointer-events: none;
+  }
+
+  @keyframes shimmer-swipe {
+    0% { left: -150%; }
+    40% { left: 150%; }
+    100% { left: 150%; }
+  }
+
+  /* CONTENT WRAPPER */
+  .footer__content-wrapper {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 40px;
+    position: relative;
+    z-index: 5;
+    box-sizing: border-box;
+  }
+
+  /* GRID SYSTEM */
+  .footer__grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  /* BRANDING */
+  .footer__brand-text {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -1px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    line-height: 0.9;
+  }
+  
+  .footer__logo-img {
+    max-width: 220px;
+    height: auto;
+    display: block;
+    margin-bottom: 25px;
+  }
+
+  /* NEWSLETTER */
+  .footer__subscribe-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 10px;
+    border-left: 4px solid var(--footer-accent);
+    padding-left: 15px;
+    text-transform: uppercase;
+  }
+
+  .footer__subscribe-text {
+    font-size: 14px;
+    color: var(--footer-text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
+  .footer__form {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--footer-border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    max-width: 100%;
+  }
+
+  .footer__form input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    outline: none;
+  }
+
+  .footer__form button {
+    background: var(--footer-accent);
+    border: none;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+  }
+  
+  .footer__form button:hover { background: #fff; color: #000; }
+
+  /* LINKS */
+  .footer__col-title {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 25px;
+    display: block;
+  }
+
+  .footer__links { list-style: none; padding: 0; margin: 0; }
+  .footer__links li { margin-bottom: 12px; }
+  
+  .footer__links a {
+    color: var(--footer-text-muted);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-block;
+  }
+
+  .footer__links a:hover { color: #fff; transform: translateX(5px); }
+
+  /* LEGAL SECTION */
+  .footer__bottom-legal {
+    margin-top: 60px;
+    padding-top: 30px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .footer__legal-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 20px;
+  }
+  
+  .footer__legal-nav button {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.3s;
+  }
+  .footer__legal-nav button:hover { color: #fff; }
+
+  /* FLOATING BAR (DESKTOP) & SOLID BAR (MOBILE) */
+  .footer__accent-bar-wrapper {
+    width: 100%;
+    max-width: 1600px;
+    margin: -50px auto 40px;
+    padding: 0 40px;
+    position: relative;
+    z-index: 20;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+
+  .footer__accent-bar {
+    background-color: var(--footer-accent);
+    border-radius: 20px;
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+  }
+
+  .footer__socials-list { display: flex; gap: 15px; list-style: none; padding: 0; margin: 0;}
+  .footer__socials-list a svg { width: 24px; height: 24px; fill: #fff; }
+
+  .footer__copy-text {
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .footer__payments-container { display: flex; align-items: center; gap: 20px; }
+  .footer__payments-box { background: rgba(0,0,0,0.2); padding: 8px 20px; border-radius: 12px; }
+  .footer__payments-img { height: 25px; width: auto; display: block; }
+
+  .footer__to-top {
+    width: 45px;
+    height: 45px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.3s;
+  }
+  .footer__to-top:hover { transform: scale(1.1); }
+
+  /* MODAL */
+  .footer-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9); z-index: 9999; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    backdrop-filter: blur(5px);
+  }
+  .footer-modal.is-active { display: flex; }
+  .modal__content {
+    background: #fff; width: 100%; max-width: 600px; max-height: 80vh;
+    border-radius: 20px; padding: 40px; position: relative; overflow-y: auto;
+  }
+  .modal__close { position: absolute; top: 20px; right: 20px; font-size: 30px; cursor: pointer; border: none; background: none; color: #000; }
+
+  /* --- RESPONSIVIDAD (MOBILE FIRST & TABLET) --- */
+  @media (max-width: 1024px) {
+    .footer__grid { grid-template-columns: 1fr 1fr; gap: 40px; }
+    .footer__brand { grid-column: span 2; text-align: center; margin-bottom: 20px; }
+    .footer__logo-img { margin: 0 auto 25px; }
+    .footer__subscribe { margin: 0 auto; max-width: 400px; }
+    .footer__subscribe-title { border-left: none; border-bottom: 3px solid var(--footer-accent); display: inline-block; padding-left: 0; }
+    
+    .footer__accent-bar { flex-direction: column; gap: 20px; text-align: center; padding: 30px; }
+    .footer__copy-text { order: 2; margin-top: 10px; }
+    .footer__payments-container { order: 3; }
+    .footer__socials-list { order: 1; }
+  }
+
+  @media (max-width: 768px) {
+    .divina-footer { width: 100%; margin: 0; left: 0; right: 0; }
+    .footer__content-wrapper { padding: 0 20px; }
+    .footer__main-black { padding: 60px 0 0px; } /* Remove bottom padding on mobile to merge with bar */
+    
+    .footer__grid { grid-template-columns: 1fr; gap: 35px; text-align: center; }
+    .footer__brand { grid-column: span 1; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 30px; }
+    .footer__form { margin: 0 auto; }
+    
+    .footer__col-title { 
+      font-size: 13px; margin-bottom: 15px; 
+      text-decoration: underline; text-underline-offset: 5px; text-decoration-color: var(--footer-accent);
+    }
+    .footer__links li { margin-bottom: 16px; }
+    .footer__links a { font-size: 16px; padding: 5px 0; display: block; }
+
+    /* TRANSFORMACIÓN BARRA FLOTANTE A SOLIDA EN MOVIL */
+    .footer__accent-bar-wrapper { 
+      margin: 40px 0 0; padding: 0; max-width: 100%; 
+      background: var(--footer-accent); width: 100%;
+    }
+    .footer__accent-bar {
+      border-radius: 0; background: transparent; box-shadow: none; border: none;
+      padding: 40px 20px 60px; /* Extra padding bottom for iOS safe area */
+      flex-direction: column; gap: 25px;
+    }
+    
+    .footer__payments-container { flex-direction: column; width: 100%; position: relative; }
+    .footer__to-top { position: absolute; top: -140px; right: 0px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 30; }
+    
+    .footer__bottom-legal { 
+      flex-direction: column; text-align: center; gap: 15px; margin-top: 0; 
+      padding: 20px 0; border-top: none; background: rgba(0,0,0,0.2);
+    }
+    .footer__legal-nav { flex-direction: column; gap: 10px; }
+  }
+{%- endstyle -%}
+
+<section class="divina-footer" data-section-id="{{ section.id }}">
+  <div class="footer__main-black">
+    <div class="footer__content-wrapper">
+      <div class="footer__grid">
+        <div class="footer__brand">
+          {%- if section.settings.logo_image != blank -%}
+            <img 
+              src="{{ section.settings.logo_image | image_url: width: 600 }}" 
+              alt="{{ section.settings.logo_image.alt | default: section.settings.logo_text | escape }}" 
+              width="{{ section.settings.logo_image.width }}"
+              height="{{ section.settings.logo_image.height }}"
+              class="footer__logo-img"
+              loading="lazy"
+            >
+          {%- else -%}
+            <div class="footer__brand-text">{{ section.settings.logo_text }}</div>
+          {%- endif -%}
+
+          <div class="footer__subscribe">
+            <h3 class="footer__subscribe-title">{{ section.settings.sub_title }}</h3>
+            <p class="footer__subscribe-text">{{ section.settings.sub_text }}</p>
+            {%- form 'customer', class: 'footer__form' -%}
+              <input type="hidden" name="contact[tags]" value="newsletter">
+              <input type="email" name="contact[email]" placeholder="Tu email..." required>
+              <button type="submit" aria-label="Suscribirse">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9 22,2"/></svg>
+              </button>
+            {%- endform -%}
+          </div>
+        </div>
+
+        <div class="footer__col">
+          <h4 class="footer__col-title">{{ section.settings.col_1_title }}</h4>
+          <ul class="footer__links">
+            {%- for link in linklists[section.settings.menu_1].links -%}
+              <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+            {%- endfor -%}
+          </ul>
+        </div>
+
+        <div class="footer__col">
+          <h4 class="footer__col-title">{{ section.settings.col_2_title }}</h4>
+          <ul class="footer__links">
+            {%- for link in linklists[section.settings.menu_2].links -%}
+              <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+            {%- endfor -%}
+          </ul>
+        </div>
+
+        <div class="footer__col">
+          <h4 class="footer__col-title">{{ section.settings.col_3_title }}</h4>
+          <ul class="footer__links">
+            {%- for link in linklists[section.settings.menu_3].links -%}
+              <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+            {%- endfor -%}
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer__bottom-legal">
+        <ul class="footer__legal-nav">
+          <li><button onclick="openModal('Privacy Policy', '{{ section.settings.privacy_text | escape }}')">Privacy Policy</button></li>
+          <li><button onclick="openModal('Refund Policy', '{{ section.settings.refund_text | escape }}')">Refund Policy</button></li>
+          <li><button onclick="openModal('Terms of Service', '{{ section.settings.terms_text | escape }}')">Terms of Service</button></li>
+        </ul>
+        <div style="color:rgba(255,255,255,0.2); font-size:10px; font-weight:800; letter-spacing: 2px;">SECURE SSL ENCRYPTED</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer__accent-bar-wrapper">
+    <div class="footer__accent-bar">
+      <ul class="footer__socials-list">
+        {% if section.settings.social_fb != blank %}
+        <li><a href="{{ section.settings.social_fb }}" target="_blank" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a></li>
+        {% endif %}
+        {% if section.settings.social_ig != blank %}
+        <li><a href="{{ section.settings.social_ig }}" target="_blank" aria-label="Instagram"><svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a></li>
+        {% endif %}
+      </ul>
+
+      <div class="footer__copy-text">{{ section.settings.copyright_text }}</div>
+
+      <div class="footer__payments-container">
+        <div class="footer__payments-box">
+          {%- if section.settings.payment_icons_image != blank -%}
+            <img 
+              src="{{ section.settings.payment_icons_image | image_url: width: 600 }}" 
+              alt="Payment Methods" 
+              class="footer__payments-img" 
+              width="{{ section.settings.payment_icons_image.width }}" 
+              height="{{ section.settings.payment_icons_image.height }}" 
+              loading="lazy"
+            >
+          {%- else -%}
+             <span style="color:#fff; font-weight:800; font-size:10px; letter-spacing:1px;">VISA / MC / AMEX</span>
+          {%- endif -%}
+        </div>
+        <button class="footer__to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Volver arriba">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="FooterModal" class="footer-modal" onclick="closeModal()">
+    <div class="modal__content" onclick="event.stopPropagation()">
+      <button class="modal__close" onclick="closeModal()">&times;</button>
+      <h2 id="ModalTitle" style="font-weight: 900; font-size: 28px; text-transform: uppercase; margin-bottom: 20px;"></h2>
+      <div id="ModalBody" style="color: #333; line-height: 1.6;"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function openModal(title, text) {
+    const modal = document.getElementById('FooterModal');
+    if(modal) {
+      document.getElementById('ModalTitle').innerText = title;
+      document.getElementById('ModalBody').innerHTML = text.replace(/\n/g, '<br>');
+      modal.classList.add('is-active');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+  function closeModal() {
+    const modal = document.getElementById('FooterModal');
+    if(modal) {
+      modal.classList.remove('is-active');
+      document.body.style.overflow = 'auto';
+    }
+  }
+</script>
+
+{% schema %}
+{
+  "name": "Divina V11 Masterpiece",
+  "settings": [
+    { "type": "header", "content": "Identidad & Color" },
+    { "type": "image_picker", "id": "logo_image", "label": "Logo Footer (PNG Blanco)" },
+    { "type": "text", "id": "logo_text", "label": "Nombre Texto", "default": "DIVINA." },
+    { "type": "color", "id": "accent_color", "label": "Color Acento", "default": "#7C30DF" },
+    { "type": "select", "id": "footer_bg_type", "label": "Tipo Fondo", "options": [
+      { "value": "solid", "label": "Sólido" },
+      { "value": "gradient", "label": "Degradado" }
+    ], "default": "solid" },
+    { "type": "color", "id": "footer_bg_color_1", "label": "Fondo 1", "default": "#000000" },
+    { "type": "color", "id": "footer_bg_color_2", "label": "Fondo 2", "default": "#111111" },
+    { "type": "range", "id": "line_height", "label": "Altura de Línea", "min": 1.2, "max": 2.0, "step": 0.1, "default": 1.5 },
+    { "type": "header", "content": "Newsletter" },
+    { "type": "text", "id": "sub_title", "label": "Título", "default": "Únete al Club" },
+    { "type": "text", "id": "sub_text", "label": "Texto corto", "default": "Ofertas exclusivas y drops únicos." },
+    { "type": "header", "content": "Navegación" },
+    { "type": "text", "id": "col_1_title", "label": "Columna 1", "default": "SHOP" },
+    { "type": "link_list", "id": "menu_1", "label": "Menú 1" },
+    { "type": "text", "id": "col_2_title", "label": "Columna 2", "default": "INFO" },
+    { "type": "link_list", "id": "menu_2", "label": "Menú 2" },
+    { "type": "text", "id": "col_3_title", "label": "Columna 3", "default": "LEGAL" },
+    { "type": "link_list", "id": "menu_3", "label": "Menú 3" },
+    { "type": "header", "content": "Legales (Modales)" },
+    { "type": "textarea", "id": "privacy_text", "label": "Privacidad" },
+    { "type": "textarea", "id": "refund_text", "label": "Reembolsos" },
+    { "type": "textarea", "id": "terms_text", "label": "Términos" },
+    { "type": "header", "content": "Social & Footer Bar" },
+    { "type": "url", "id": "social_fb", "label": "Facebook" },
+    { "type": "url", "id": "social_ig", "label": "Instagram" },
+    { "type": "text", "id": "copyright_text", "label": "Copyright", "default": "© 2026 Divina Store." },
+    { "type": "image_picker", "id": "payment_icons_image", "label": "Iconos de Pago" }
+  ],
+  "presets": [{ "name": "Divina V11 Masterpiece" }]
+}
+{% endschema %}
