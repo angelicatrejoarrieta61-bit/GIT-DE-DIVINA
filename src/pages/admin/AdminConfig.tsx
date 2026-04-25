@@ -338,7 +338,7 @@ export const AdminConfig: React.FC = () => {
             title="Vista previa tienda"
             src={(() => {
               const sec = searchParams.get('section');
-              if (!sec || sec === 'home') return `/?preview=1&r=${previewRefreshKey}`;
+              if (!sec || sec === 'home' || sec === 'site-general' || sec === 'footer' || sec === 'checkout') return `/?preview=1&r=${previewRefreshKey}`;
               if (sec === 'catalogo') return `/catalogo?preview=1&r=${previewRefreshKey}`;
               if (sec === 'quienes-somos') return `/quienes-somos?preview=1&r=${previewRefreshKey}`;
               if (sec === 'contacto') return `/contacto?preview=1&r=${previewRefreshKey}`;
