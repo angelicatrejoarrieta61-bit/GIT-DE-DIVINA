@@ -23,10 +23,26 @@
   background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 70%);
 }
 
+.collection-page__bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 1;
+  transform: translate(var(--bg-x, 0px), var(--bg-y, 0px));
+}
+
 .collection-page__banner-content {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   padding-bottom: 36px;
+  max-width: 500px;
+  padding: 32px;
+  margin: auto 0 40px 0;
+  transform: translate(var(--card-x, 0px), var(--card-y, 0px)) scale(var(--card-scale, 1));
+  transform-origin: center;
 }
 
 .collection-page__title {
@@ -76,5 +92,50 @@
 }
 
 @media (max-width: 1024px) { .collection-page__grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 768px)  { .collection-page__grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } .collection-page__title { font-size: 28px; } }
+@media (max-width: 768px)  { 
+  .collection-page__grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } 
+  .collection-page__title { font-size: 28px; } 
+  
+  /* Reset general para evitar problemas */
+  .collection-page__banner {
+    --card-x: 0px !important;
+    --card-y: 0px !important;
+    --card-scale: 1 !important;
+    --bg-x: 0px !important;
+    --bg-y: 0px !important;
+  }
+  .collection-page__bg-img {
+    object-position: center top !important;
+  }
+  .collection-page__banner-content {
+    margin: auto auto 40px auto;
+  }
+
+  /* Exclusivo para colecciones (Cremas, Grooming) para imitar 'quienes-somos' */
+  .collection-page:not(.catalog-page) .collection-page__banner {
+    height: auto !important;
+    min-height: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    padding-bottom: 0 !important;
+  }
+  .collection-page:not(.catalog-page) .collection-page__bg-img {
+    position: relative !important;
+    height: auto !important;
+    display: block !important;
+    grid-area: 1 / 1 !important;
+  }
+  .collection-page:not(.catalog-page) .collection-page__banner-overlay {
+    grid-area: 1 / 1 !important;
+    position: relative !important;
+    height: 100% !important;
+    width: 100% !important;
+  }
+  .collection-page:not(.catalog-page) .collection-page__banner-content {
+    grid-area: 1 / 1 !important;
+    position: relative !important;
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+}
 @media (max-width: 480px)  { .collection-page__grid { gap: 12px; } }

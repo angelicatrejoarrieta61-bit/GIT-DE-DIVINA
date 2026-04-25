@@ -29,6 +29,7 @@ export const Header: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [homeIconUrl, setHomeIconUrl] = useState<string | null>(null);
   const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>(DEFAULT_HEADER_LINKS);
   const { itemCount, openCart } = useCartStore();
   const count = itemCount();
@@ -51,6 +52,7 @@ export const Header: React.FC = () => {
     getCollections().then(setCollections);
     getStoreConfig().then(cfg => {
       setLogoUrl(cfg.logo_url);
+      setHomeIconUrl(cfg.header_home_icon);
       if (cfg.header_links) {
         try {
           const links = JSON.parse(cfg.header_links);
@@ -64,6 +66,9 @@ export const Header: React.FC = () => {
         const payload = e.data.payload;
         if (payload.logo_url !== undefined) {
           setLogoUrl(payload.logo_url);
+        }
+        if (payload.header_home_icon !== undefined) {
+          setHomeIconUrl(payload.header_home_icon);
         }
         if (payload.header_links) {
           try {
@@ -83,6 +88,7 @@ export const Header: React.FC = () => {
         async () => {
           const cfg = await getStoreConfig();
           setLogoUrl(cfg.logo_url || null);
+          setHomeIconUrl(cfg.header_home_icon || null);
           if (cfg.header_links) {
             try {
               const links = JSON.parse(cfg.header_links);
@@ -103,6 +109,15 @@ export const Header: React.FC = () => {
     <>
       <header className={`header ${scrolled ? 'header--scrolled' : ''} ${!visible ? 'header--hidden' : ''}`}>
         <div className="header__inner page-width">
+          {/* Hamburger (Left on mobile) */}
+          <button
+            className={`header__hamburger ${mobileOpen ? 'open' : ''}`}
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Menú"
+          >
+            <span /><span /><span />
+          </button>
+
           {/* Logo */}
           <Link to="/" className="header__logo" aria-label="Divina Store MX">
             {logoUrl ? (
@@ -130,23 +145,21 @@ export const Header: React.FC = () => {
                 className={({ isActive }) => `header__nav-link ${isActive ? 'active' : ''}`} 
                 end={link.path === '/'}
               >
-                {link.label}
+                {link.path === '/' && homeIconUrl ? (
+                  <img 
+                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })} 
+                    alt="Inicio" 
+                    style={{ height: '2.8em', maxHeight: '36px', width: 'auto', objectFit: 'contain', display: 'block', filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))' }}
+                  />
+                ) : (
+                  link.label
+                )}
               </NavLink>
             ))}
           </nav>
 
           {/* Actions */}
           <div className="header__actions">
-            <Link
-              to="/admin"
-              className="header__cart-btn"
-              aria-label="Panel de Administración"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </Link>
 
             <button
               className="header__cart-btn"
@@ -160,15 +173,6 @@ export const Header: React.FC = () => {
               </svg>
               {count > 0 && <span className="header__cart-count">{count}</span>}
             </button>
-
-            {/* Hamburger */}
-            <button
-              className={`header__hamburger ${mobileOpen ? 'open' : ''}`}
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Menú"
-            >
-              <span /><span /><span />
-            </button>
           </div>
         </div>
 
@@ -180,8 +184,20 @@ export const Header: React.FC = () => {
               to={link.path} 
               onClick={() => setMobileOpen(false)}
               end={link.path === '/'}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              {link.label}
+              {link.path === '/' && homeIconUrl ? (
+                <>
+                  <img 
+                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })} 
+                    alt="Inicio" 
+                    style={{ height: '2.5em', maxHeight: '32px', width: 'auto', objectFit: 'contain' }}
+                  />
+                  <span>{link.label}</span>
+                </>
+              ) : (
+                link.label
+              )}
             </NavLink>
           ))}
         </div>

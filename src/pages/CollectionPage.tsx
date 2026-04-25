@@ -91,6 +91,7 @@ export const CollectionPage: React.FC = () => {
   const bgY = config[`col_${blockId}_hero_img_y`] || '0';
   const cardX = config[`col_${blockId}_hero_card_x`] || '0';
   const cardY = config[`col_${blockId}_hero_card_y`] || '0';
+  const cardScale = config[`col_${blockId}_hero_card_scale`] ? parseInt(config[`col_${blockId}_hero_card_scale`]) / 100 : 1;
 
   const catTitle = config[`col_${blockId}_hero_title`] || collection?.name || (slug?.toUpperCase().replace(/-/g, ' '));
   const catSub = config[`col_${blockId}_hero_subtitle`] || collection?.description;
@@ -105,24 +106,21 @@ export const CollectionPage: React.FC = () => {
           <img 
             src={bgImg} 
             alt="Hero Background" 
+            className="collection-page__bg-img"
             style={{ 
-              position: 'absolute', inset: 0, width: '100%', height: '100%', 
-              objectFit: 'cover', objectPosition: 'center', zIndex: 1,
-              transform: `translate(${bgX}px, ${bgY}px)`
-            }} 
+              '--bg-x': `${bgX}px`, 
+              '--bg-y': `${bgY}px`
+            } as React.CSSProperties} 
           />
         )}
         <div className="collection-page__banner-overlay" style={{ zIndex: 2 }} />
         <div 
           className="page-width collection-page__banner-content glass"
           style={{
-            maxWidth: 500,
-            padding: 32,
-            margin: 'auto 0 40px 0',
-            transform: `translate(${cardX}px, ${cardY}px)`,
-            position: 'relative',
-            zIndex: 3
-          }}
+            '--card-x': `${cardX}px`,
+            '--card-y': `${cardY}px`,
+            '--card-scale': cardScale
+          } as React.CSSProperties}
         >
           <div className="divider" style={{ marginBottom: 16 }} />
           <h1 className="collection-page__title">

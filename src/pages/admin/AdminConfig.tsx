@@ -341,6 +341,7 @@ export const AdminConfig: React.FC = () => {
               if (!sec || sec === 'home') return `/?preview=1&r=${previewRefreshKey}`;
               if (sec === 'catalogo') return `/catalogo?preview=1&r=${previewRefreshKey}`;
               if (sec === 'quienes-somos') return `/quienes-somos?preview=1&r=${previewRefreshKey}`;
+              if (sec === 'contacto') return `/contacto?preview=1&r=${previewRefreshKey}`;
               return `/coleccion/${sec}?preview=1&r=${previewRefreshKey}`;
             })()}
             style={{ width: '100%', height: '100%', border: 0, background: '#000' }}
@@ -432,7 +433,10 @@ export const AdminConfig: React.FC = () => {
 
               <section>
                 <h2 style={{ fontSize: 18, marginBottom: 20, color: 'var(--c-lime)' }}>🖼️ Header y Logo</h2>
-                <AssetUploader label="Logo del Sitio" configKey="logo_url" currentValue={configs.logo_url} onUpdate={v => updateConfig('logo_url', v)} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <AssetUploader label="Logo del Sitio" configKey="logo_url" currentValue={configs.logo_url} onUpdate={v => updateConfig('logo_url', v)} />
+                  <AssetUploader label="Ícono para Menú INICIO (opcional)" configKey="header_home_icon" currentValue={configs.header_home_icon} onUpdate={v => updateConfig('header_home_icon', v)} />
+                </div>
                 <div style={{ marginTop: 16, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>Altura del Logo: {configs.logo_height || '40'}px</label>
@@ -587,7 +591,7 @@ export const AdminConfig: React.FC = () => {
           )}
 
           {/* ── SEGMENTOS / COLLECTIONS ── */}
-          {(part === 'home-segmentos' || section === 'catalogo') && (
+          {(part === 'home-segmentos') && (
             <section>
               <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>📁 Colecciones y Portadas (Segmentos)</h2>
               <p className="muted-text" style={{ marginBottom: 24 }}>Sube la imagen de portada y personaliza el texto de cada colección. Activas en la página principal.</p>
@@ -650,7 +654,7 @@ export const AdminConfig: React.FC = () => {
           )}
 
           {/* ── ESPECIFICO COLECCION (HERO Y RELACIONADOS) ── */}
-          {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', ...customSections.map(s => s.key)].includes(section) && (() => {
+          {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', ...customSections.map(s => s.key)].includes(section) && (() => {
             const col = collections.find(c => c.slug === section);
             const blockId = col?.id || section;
             const blockName = col?.name || section.replace(/-/g, ' ');
@@ -683,6 +687,10 @@ export const AdminConfig: React.FC = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
                           <Sl label="Posición X Tarjeta" cfg={`col_${blockId}_hero_card_x`} min={-600} max={600} />
                           <Sl label="Posición Y Tarjeta" cfg={`col_${blockId}_hero_card_y`} min={-300} max={300} />
+                        </div>
+                        <div style={{ marginTop: 4 }}>
+                          <label style={lbl}>Tamaño Tarjeta (%): {configs[`col_${blockId}_hero_card_scale`] || '100'}%</label>
+                          <input type="range" min={50} max={150} step={1} value={configs[`col_${blockId}_hero_card_scale`] || '100'} onChange={e => updateConfig(`col_${blockId}_hero_card_scale`, e.target.value)} style={{ width: '100%', accentColor: 'var(--c-lime)' }} />
                         </div>
                       </div>
                     </div>
@@ -808,68 +816,81 @@ export const AdminConfig: React.FC = () => {
           {(part === 'home-footer' || section === 'contacto') && (
             <section>
               <h2 style={{ fontSize: 18, marginBottom: 20, color: 'var(--c-lime)' }}>💬 Contacto y WhatsApp (Footer)</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 420 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: section === 'contacto' ? 'none' : 420 }}>
                 {section === 'contacto' && (
-                  <div style={{ marginBottom: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 16, borderRadius: 8 }}>
-                    <AssetUploader
-                      label="Imagen o Video de Fondo (Cabecera Contacto)"
-                      configKey="contact_hero_img"
-                      currentValue={configs.contact_hero_img}
-                      onUpdate={(val) => updateConfig('contact_hero_img', val)}
-                    />
-                    <p className="muted-text" style={{ fontSize: 11, marginTop: 4 }}>Esta imagen aparecerá detrás del título principal en la página de Contacto. Si la imagen se recorta de forma horizontal, ajusta la posición.</p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-                      <div>
-                        <label style={lbl}>Posición Fondo X</label>
-                        <input type="range" min="-1000" max="1000" value={configs.contact_hero_bg_x || '0'} onChange={e => updateConfig('contact_hero_bg_x', e.target.value)} />
-                      </div>
-                      <div>
-                        <label style={lbl}>Posición Fondo Y</label>
-                        <input type="range" min="-1000" max="1000" value={configs.contact_hero_bg_y || '0'} onChange={e => updateConfig('contact_hero_bg_y', e.target.value)} />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 24, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
-                      <h4 style={{ fontSize: 13, marginBottom: 12, color: 'var(--c-white)' }}>Tarjeta de Texto (Frost Card)</h4>
-                      <div style={{ marginBottom: 12 }}>
-                        <label style={lbl}>Título (Opcional, usa &lt;span class="lime-text"&gt; para resaltar)</label>
-                        <input type="text" className="input-dark" value={configs.contact_hero_title ?? 'Ponte en <span class="lime-text">Contacto</span>'} onChange={e => updateConfig('contact_hero_title', e.target.value)} />
-                      </div>
-                      <div style={{ marginBottom: 16 }}>
-                        <label style={lbl}>Subtítulo (Opcional)</label>
-                        <textarea className="input-dark" rows={2} value={configs.contact_hero_subtitle ?? '¿Tienes alguna duda sobre nuestros productos o necesitas ayuda con tu pedido? Escríbenos.'} onChange={e => updateConfig('contact_hero_subtitle', e.target.value)} />
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <label style={lbl}>Mover Tarjeta X</label>
-                          <input type="range" min="-500" max="500" value={configs.contact_hero_card_x || '0'} onChange={e => updateConfig('contact_hero_card_x', e.target.value)} />
-                        </div>
-                        <div>
-                          <label style={lbl}>Mover Tarjeta Y</label>
-                          <input type="range" min="-500" max="500" value={configs.contact_hero_card_y || '0'} onChange={e => updateConfig('contact_hero_card_y', e.target.value)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: showPreview ? 'minmax(340px, 36%) minmax(680px, 64%)' : '1fr', gap: 24, alignItems: 'start' }}>
+                    <div className="admin-compact-controls" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      
+                      <div style={box}>
+                        <h3 style={{ fontSize: 14, marginBottom: 16 }}>Hero Image de Contacto</h3>
+                        <AssetUploader label="Imagen de Portada" configKey="contact_hero_img" currentValue={configs.contact_hero_img} onUpdate={(val) => updateConfig('contact_hero_img', val)} />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+                          <Sl label="Posición X Imagen" cfg="contact_hero_bg_x" min={-1000} max={1000} />
+                          <Sl label="Posición Y Imagen" cfg="contact_hero_bg_y" min={-1000} max={1000} />
                         </div>
                       </div>
-                      <p className="muted-text" style={{ fontSize: 11, marginTop: 12 }}>Si dejas el título y subtítulo vacíos, la tarjeta desaparecerá.</p>
+
+                      <div style={box}>
+                        <h3 style={{ fontSize: 14, marginBottom: 16 }}>Texto de la Tarjeta</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div>
+                            <label style={lbl}>Título</label>
+                            <input className="input-dark" type="text" value={configs.contact_hero_title ?? 'Ponte en <span class="lime-text">Contacto</span>'} onChange={e => updateConfig('contact_hero_title', e.target.value)} />
+                          </div>
+                          <div>
+                            <label style={lbl}>Subtítulo</label>
+                            <textarea className="input-dark" rows={2} value={configs.contact_hero_subtitle ?? '¿Tienes alguna duda sobre nuestros productos o necesitas ayuda con tu pedido? Escríbenos.'} onChange={e => updateConfig('contact_hero_subtitle', e.target.value)} />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <Sl label="Posición X Tarjeta" cfg="contact_hero_card_x" min={-1000} max={1000} />
+                            <Sl label="Posición Y Tarjeta" cfg="contact_hero_card_y" min={-1000} max={1000} />
+                          </div>
+                          <Sl label="% Tamaño Tarjeta" cfg="contact_hero_card_scale" min={30} max={150} />
+                        </div>
+                      </div>
+
+                      <div style={box}>
+                        <h3 style={{ fontSize: 14, marginBottom: 16 }}>Datos de Contacto (Footer / Formulario)</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div>
+                            <label style={lbl}>Teléfono WhatsApp (con código de país, sin +)</label>
+                            <input type="text" className="input-dark" value={configs.contact_whatsapp || '5215647438328'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 5215647438328" />
+                            <p className="muted-text" style={{ fontSize: 11, marginTop: 4 }}>Los clientes del formulario serán redirigidos a este número.</p>
+                          </div>
+                          <div>
+                            <label style={lbl}>Email de Contacto</label>
+                            <input type="email" className="input-dark" value={configs.contact_email || 'hola@divinastore.com.mx'} onChange={e => updateConfig('contact_email', e.target.value)} />
+                          </div>
+                          <div>
+                            <label style={lbl}>Dirección (Footer)</label>
+                            <input type="text" className="input-dark" value={configs.contact_address || 'Ciudad de México, CP 06100'} onChange={e => updateConfig('contact_address', e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 )}
-                <div>
-                  <label style={lbl}>Teléfono WhatsApp (con código de país, sin +)</label>
-                  <input type="text" className="input-dark" value={configs.contact_whatsapp || '5215647438328'}
-                    onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 5215647438328" />
-                  <p className="muted-text" style={{ fontSize: 11, marginTop: 4 }}>Los clientes del formulario serán redirigidos a este número.</p>
-                </div>
-                <div>
-                  <label style={lbl}>Email de Contacto</label>
-                  <input type="email" className="input-dark" value={configs.contact_email || 'hola@divinastore.com.mx'}
-                    onChange={e => updateConfig('contact_email', e.target.value)} />
-                </div>
-                <div>
-                  <label style={lbl}>Dirección (Footer)</label>
-                  <input type="text" className="input-dark" value={configs.contact_address || 'Ciudad de México, CP 06100'}
-                    onChange={e => updateConfig('contact_address', e.target.value)} />
-                </div>
+                {/* Fallback for footer part logic */}
+                {part === 'home-footer' && section !== 'contacto' && (
+                  <div style={box}>
+                    <h3 style={{ fontSize: 14, marginBottom: 16 }}>Datos de Contacto</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label style={lbl}>Teléfono WhatsApp (con código de país, sin +)</label>
+                        <input type="text" className="input-dark" value={configs.contact_whatsapp || '5215647438328'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 5215647438328" />
+                      </div>
+                      <div>
+                        <label style={lbl}>Email de Contacto</label>
+                        <input type="email" className="input-dark" value={configs.contact_email || 'hola@divinastore.com.mx'} onChange={e => updateConfig('contact_email', e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={lbl}>Dirección (Footer)</label>
+                        <input type="text" className="input-dark" value={configs.contact_address || 'Ciudad de México, CP 06100'} onChange={e => updateConfig('contact_address', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <h2 style={{ fontSize: 18, margin: '40px 0 20px', color: 'var(--c-lime)' }}>🏷️ Brand</h2>

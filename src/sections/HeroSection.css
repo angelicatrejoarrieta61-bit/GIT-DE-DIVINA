@@ -218,6 +218,12 @@
 /* ── Responsive — Mobile ─────────────────────────────────── */
 @media (max-width: 768px) {
   .hero {
+    --hero-x: 0px !important;
+    --hero-y: 0px !important;
+    --hero-scale: 1 !important;
+    --hero-img-x: 0px !important;
+    --hero-img-y: 0px !important;
+    --hero-img-scale: 1 !important;
     height: 85vh;
     min-height: 480px;
     max-height: 650px;
@@ -227,7 +233,8 @@
     padding-bottom: 40px;
   }
   .hero__bg-img {
-    object-position: top left !important;
+    object-fit: cover !important;
+    object-position: center top !important;
   }
   .hero__content {
     transform: translate(0, 0);

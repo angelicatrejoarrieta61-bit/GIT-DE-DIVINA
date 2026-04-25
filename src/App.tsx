@@ -11,6 +11,7 @@ import { ContactPage } from './pages/ContactPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentErrorPage } from './pages/PaymentErrorPage';
+import { GenericPage } from './pages/GenericPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminProducts } from './pages/admin/AdminProducts';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/checkout" element={<PublicLayout><CheckoutPage /></PublicLayout>} />
         <Route path="/pago-exitoso" element={<PublicLayout><PaymentSuccessPage /></PublicLayout>} />
         <Route path="/pago-error" element={<PublicLayout><PaymentErrorPage /></PublicLayout>} />
+        <Route path="/pages/:slug" element={<PublicLayout><GenericPage /></PublicLayout>} />
       </Routes>
     </BrowserRouter>
   );

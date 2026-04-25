@@ -195,4 +195,13 @@
 @media (max-width: 900px) {
   .header__nav { display: none; }
   .header__hamburger { display: flex; }
+  .header__inner {
+    justify-content: space-between;
+    gap: 0;
+  }
+  .header__logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
