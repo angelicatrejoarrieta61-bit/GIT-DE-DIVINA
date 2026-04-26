@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { CartDrawer } from './components/CartDrawer';
@@ -19,6 +20,20 @@ import { AdminImport } from './pages/admin/AdminImport';
 import { AdminConfig } from './pages/admin/AdminConfig';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 
+function RouteRedirector() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetPath = params.get('admin_path');
+    if (targetPath && location.pathname !== targetPath) {
+      navigate(targetPath, { replace: true });
+    }
+  }, [navigate, location]);
+  return null;
+}
+
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <StoreThemeProvider>
@@ -33,6 +48,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteRedirector />
       <Routes>
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<AdminLogin />} />

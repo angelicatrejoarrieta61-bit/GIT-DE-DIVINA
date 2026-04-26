@@ -339,10 +339,10 @@ export const AdminConfig: React.FC = () => {
             src={(() => {
               const sec = searchParams.get('section');
               if (!sec || sec === 'home' || sec === 'site-general' || sec === 'footer' || sec === 'checkout') return `/?preview=1&r=${previewRefreshKey}`;
-              if (sec === 'catalogo') return `/catalogo?preview=1&r=${previewRefreshKey}`;
-              if (sec === 'quienes-somos') return `/quienes-somos?preview=1&r=${previewRefreshKey}`;
-              if (sec === 'contacto') return `/contacto?preview=1&r=${previewRefreshKey}`;
-              return `/coleccion/${sec}?preview=1&r=${previewRefreshKey}`;
+              if (sec === 'catalogo') return `/?preview=1&admin_path=/catalogo&r=${previewRefreshKey}`;
+              if (sec === 'quienes-somos') return `/?preview=1&admin_path=/quienes-somos&r=${previewRefreshKey}`;
+              if (sec === 'contacto') return `/?preview=1&admin_path=/contacto&r=${previewRefreshKey}`;
+              return `/?preview=1&admin_path=/coleccion/${sec}&r=${previewRefreshKey}`;
             })()}
             style={{ width: '100%', height: '100%', border: 0, background: '#000' }}
             onLoad={() => {
