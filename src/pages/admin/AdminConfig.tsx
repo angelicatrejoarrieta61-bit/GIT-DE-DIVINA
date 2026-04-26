@@ -398,37 +398,37 @@ export const AdminConfig: React.FC = () => {
                 <h2 style={{ fontSize: 18, marginBottom: 20, color: 'var(--c-lime)' }}>🌐 Secciones del Header</h2>
                 <p className="muted-text" style={{ marginBottom: 16 }}>Agrega o quita secciones del menú de navegación principal de la tienda.</p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {headerLinks.map((link, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <button className="btn btn-outline admin-mini-btn" disabled={idx === 0} onClick={() => {
+                    <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <button style={{ background: 'transparent', border: 'none', color: idx === 0 ? '#333' : '#aaa', cursor: idx === 0 ? 'default' : 'pointer', padding: '0 4px', fontSize: 10 }} disabled={idx === 0} onClick={() => {
                         const next = [...headerLinks];
                         [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
                         void saveHeaderLinks(next);
-                      }}>↑</button>
-                      <button className="btn btn-outline admin-mini-btn" disabled={idx === headerLinks.length - 1} onClick={() => {
+                      }}>▲</button>
+                      <button style={{ background: 'transparent', border: 'none', color: idx === headerLinks.length - 1 ? '#333' : '#aaa', cursor: idx === headerLinks.length - 1 ? 'default' : 'pointer', padding: '0 4px', fontSize: 10 }} disabled={idx === headerLinks.length - 1} onClick={() => {
                         const next = [...headerLinks];
                         [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
                         void saveHeaderLinks(next);
-                      }}>↓</button>
-                      <input className="input-dark" type="text" placeholder="MENÚ (Ej: MIS CREMAS)" value={link.label} onChange={(e) => {
+                      }}>▼</button>
+                      <input type="text" placeholder="MENÚ" value={link.label} onChange={(e) => {
                         const next = [...headerLinks];
                         next[idx].label = e.target.value.toUpperCase();
                         void saveHeaderLinks(next);
-                      }} style={{ flex: 1, minWidth: 150 }} />
-                      <input className="input-dark" type="text" placeholder="Ruta (Ej: /catalogo)" value={link.path} onChange={(e) => {
+                      }} style={{ flex: 1, minWidth: 80, fontSize: 11, padding: '2px', height: '20px', background: 'transparent', border: 'none', color: '#fff', outline: 'none' }} />
+                      <input type="text" placeholder="/ruta" value={link.path} onChange={(e) => {
                         const next = [...headerLinks];
                         next[idx].path = e.target.value;
                         void saveHeaderLinks(next);
-                      }} style={{ flex: 1, minWidth: 150 }} />
-                      <button className="admin-mini-btn" onClick={() => {
+                      }} style={{ flex: 1.5, minWidth: 100, fontSize: 11, padding: '2px', height: '20px', background: 'transparent', border: 'none', color: '#aaa', outline: 'none' }} />
+                      <button onClick={() => {
                         const next = headerLinks.filter((_, i) => i !== idx);
                         void saveHeaderLinks(next);
-                      }} style={{ color: '#ffb3b3' }}>Quitar</button>
+                      }} style={{ background: 'transparent', border: 'none', color: '#ffb3b3', cursor: 'pointer', padding: '0 4px', fontSize: 11 }}>✕</button>
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-outline admin-mini-btn" style={{ marginTop: 16 }} onClick={() => saveHeaderLinks([...headerLinks, { label: 'NUEVA SECCIÓN', path: '/' }])}>+ Agregar Sección</button>
+                <button className="btn btn-outline admin-mini-btn" style={{ marginTop: 8, padding: '4px 10px', fontSize: 11 }} onClick={() => saveHeaderLinks([...headerLinks, { label: 'NUEVA SECCIÓN', path: '/' }])}>+ Agregar</button>
               </section>
 
               <section>
@@ -456,8 +456,8 @@ export const AdminConfig: React.FC = () => {
                   {([['font_heading', 'Títulos', 'Francois One'], ['font_sub', 'Subtítulos', 'Barlow Semi Condensed'], ['font_body', 'Cuerpo', 'Catamaran']] as const).map(([k, l, d]) => (
                     <div key={k}>
                       <label style={lbl}>{l}</label>
-                      <select className="input-dark" value={configs[k] || d} onChange={e => updateConfig(k, e.target.value)}>
-                        {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                      <select className="input-dark" value={configs[k] || d} onChange={e => updateConfig(k, e.target.value)} style={{ backgroundColor: '#111', color: '#fff' }}>
+                        {FONTS.map(f => <option key={f} value={f} style={{ backgroundColor: '#111', color: '#fff' }}>{f}</option>)}
                       </select>
                     </div>
                   ))}
