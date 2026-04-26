@@ -371,22 +371,8 @@ export const AdminConfig: React.FC = () => {
       {/* LEFT COLUMN: Controls */}
       <div style={{ height: '100%', overflowY: 'auto', padding: '24px 20px', borderRight: '1px solid rgba(255,255,255,0.05)', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
 
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, margin: 0, fontFamily: 'var(--f-heading)' }}>Configuración del CMS</h1>
-          <p style={{ color: '#aaa', fontSize: 13, marginTop: 4, marginBottom: 0 }}>Gestiona identidad visual y secciones.</p>
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 16 }}>
-          {['global', 'hero', 'secciones', 'pages', 'editor'].map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t as typeof tab)}
-              className={`admin-mini-btn ${tab === t ? 'active' : ''}`}
-              style={{ textTransform: 'capitalize' }}
-            >
-              {t}
-            </button>
-          ))}
+        <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ color: '#aaa', fontSize: 13, margin: 0 }}>Gestiona identidad visual y secciones.</p>
         </div>
 
         <div style={{ flex: 1 }}>
