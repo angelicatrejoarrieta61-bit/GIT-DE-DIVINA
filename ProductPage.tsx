@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { getProductBySlug } from '../lib/queries';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
 import { useCartStore } from '../store/cartStore';
@@ -13,15 +14,15 @@ export const ProductPage: React.FC = () => {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [activeImage, setActiveImage] = useState<string>('');
-  
+
   const addItem = useCartStore(s => s.addItem);
 
   useEffect(() => {
     if (!slug) return;
-    getProductBySlug(slug).then(p => { 
-      setProduct(p); 
+    getProductBySlug(slug).then(p => {
+      setProduct(p);
       if (p?.image_url) setActiveImage(p.image_url);
-      setLoading(false); 
+      setLoading(false);
     });
   }, [slug]);
 
@@ -31,6 +32,50 @@ export const ProductPage: React.FC = () => {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
+
+  const productSchema = product ? {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description
+      ? product.description.replace(/<[^>]*>/g, '').trim()
+      : `${product.name} — Skincare premium en Mexico. Disponible en Divina Store MX.`,
+    image: product.image_url ? getImageUrl(product.image_url, { width: 1200, quality: 80 }) : '',
+    brand: {
+      '@type': 'Brand',
+      name: product.brand || 'Divina Store MX'
+    },
+    sku: product.id,
+    offers: {
+      '@type': 'Offer',
+      url: `https://git-de-divina.vercel.app/producto/${slug}`,
+      price: product.price,
+      priceCurrency: 'MXN',
+      availability: product.in_stock
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'Organization',
+        name: 'Divina Store MX'
+      },
+      ...(product.compare_price && product.compare_price > product.price
+        ? { priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
+        : {})
+    },
+    ...(product.tags && product.tags.length > 0
+      ? { keywords: product.tags.join(', ') }
+      : {})
+  } : null;
+
+  const metaTitle = product
+    ? `${product.name}${product.brand ? ` | ${product.brand}` : ''} — Divina Store MX`
+    : 'Producto | Divina Store MX';
+
+  const metaDescription = product
+    ? `Compra ${product.name}${product.brand ? ` de ${product.brand}` : ''} en Mexico. $${product.price.toLocaleString('es-MX')} MXN. Envio a CDMX y toda la republica. Producto original en Divina Store MX.`
+    : 'Skincare premium en Mexico. Divina Store MX.';
+
+  const canonicalUrl = `https://git-de-divina.vercel.app/producto/${slug}`;
 
   if (loading) return (
     <div style={{ paddingTop: 'calc(var(--nav-h) + 60px)' }} className="page-width">
@@ -49,94 +94,119 @@ export const ProductPage: React.FC = () => {
     </div>
   );
 
-  const gallery = product.images && product.images.length > 0 ? product.images : (product.image_url ? [product.image_url] : []);
+  const gallery = product.images && product.images.length > 0
+    ? product.images
+    : (product.image_url ? [product.image_url] : []);
 
   return (
-    <div className="product-page" style={{ paddingTop: 'var(--nav-h)' }}>
-      <div className="page-width section">
-        <div className="product-page__grid">
-          {/* Gallery Area */}
-          <div className="product-page__gallery">
-            <div className="product-page__media">
-              {activeImage ? (
-                <img 
-                  src={getImageUrl(activeImage, { width: 1200, quality: 80 })} 
-                  srcSet={getImageSrcSet(activeImage, [600, 1200], { quality: 80 })}
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  alt={product.name} 
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <div className="product-page__placeholder">🌿</div>
+    <>
+      <Helmet>
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDescription} />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:type" content="product" />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        {product.image_url && (
+          <meta property="og:image" content={getImageUrl(product.image_url, { width: 1200, quality: 80 })} />
+        )}
+        <meta property="og:locale" content="es_MX" />
+        <meta property="og:site_name" content="Divina Store MX" />
+        <meta property="product:price:amount" content={String(product.price)} />
+        <meta property="product:price:currency" content="MXN" />
+        {productSchema && (
+          <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
+        )}
+      </Helmet>
+
+      <div className="product-page" style={{ paddingTop: 'var(--nav-h)' }}>
+        <div className="page-width section">
+          <div className="product-page__grid">
+
+            <div className="product-page__gallery">
+              <div className="product-page__media">
+                {activeImage ? (
+                  <img
+                    src={getImageUrl(activeImage, { width: 1200, quality: 80 })}
+                    srcSet={getImageSrcSet(activeImage, [600, 1200], { quality: 80 })}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    alt={`${product.name}${product.brand ? ` ${product.brand}` : ''} — Divina Store MX`}
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="product-page__placeholder">🌿</div>
+                )}
+              </div>
+
+              {gallery.length > 1 && (
+                <div className="product-page__thumbnails">
+                  {gallery.map((img, idx) => (
+                    <button
+                      key={idx}
+                      className={`product-page__thumb ${activeImage === img ? 'active' : ''}`}
+                      onClick={() => setActiveImage(img)}
+                    >
+                      <img
+                        src={getImageUrl(img, { width: 120, quality: 65 })}
+                        alt={`${product.name} vista ${idx + 1}`}
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            
-            {gallery.length > 1 && (
-              <div className="product-page__thumbnails">
-                {gallery.map((img, idx) => (
-                  <button 
-                    key={idx} 
-                    className={`product-page__thumb ${activeImage === img ? 'active' : ''}`}
-                    onClick={() => setActiveImage(img)}
-                  >
-                    <img src={getImageUrl(img, { width: 120, quality: 65 })} alt={`Thumbnail ${idx + 1}`} loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Info */}
-          <div className="product-page__info">
-            {product.brand && <p className="product-page__brand">{product.brand}</p>}
-            <h1 className="product-page__name">{product.name}</h1>
+            <div className="product-page__info">
+              {product.brand && <p className="product-page__brand">{product.brand}</p>}
+              <h1 className="product-page__name">{product.name}</h1>
 
-            <div className="product-page__price-row">
-              <span className="product-page__price">
-                ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
-              </span>
-              {product.compare_price && product.compare_price > product.price && (
-                <span className="product-page__compare">
-                  ${product.compare_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <div className="product-page__price-row">
+                <span className="product-page__price">
+                  ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
                 </span>
+                {product.compare_price && product.compare_price > product.price && (
+                  <span className="product-page__compare">
+                    ${product.compare_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+
+              {product.description && (
+                <div
+                  className="product-page__desc html-content"
+                  dangerouslySetInnerHTML={{ __html: product.description }}
+                />
+              )}
+
+              <div className="product-page__qty-row">
+                <label className="product-page__label">Cantidad</label>
+                <div className="product-page__qty">
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
+                  <span>{qty}</span>
+                  <button onClick={() => setQty(q => q + 1)}>+</button>
+                </div>
+              </div>
+
+              <button
+                className={`btn product-page__add-btn ${added ? 'added' : ''}`}
+                onClick={handleAdd}
+                disabled={!product.in_stock}
+              >
+                {!product.in_stock ? 'Sin inventario' : added ? '✓ Agregado al carrito' : 'Agregar al carrito'}
+              </button>
+
+              {product.tags && product.tags.length > 0 && (
+                <div className="product-page__tags">
+                  {product.tags.map(t => <span key={t} className="badge badge-dark">{t}</span>)}
+                </div>
               )}
             </div>
 
-            {product.description && (
-              <div 
-                className="product-page__desc html-content" 
-                dangerouslySetInnerHTML={{ __html: product.description }} 
-              />
-            )}
-
-            {/* Quantity */}
-            <div className="product-page__qty-row">
-              <label className="product-page__label">Cantidad</label>
-              <div className="product-page__qty">
-                <button onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
-                <span>{qty}</span>
-                <button onClick={() => setQty(q => q + 1)}>+</button>
-              </div>
-            </div>
-
-            {/* Add to cart */}
-            <button
-              className={`btn product-page__add-btn ${added ? 'added' : ''}`}
-              onClick={handleAdd}
-              disabled={!product.in_stock}
-            >
-              {!product.in_stock ? 'Sin inventario' : added ? '✓ Agregado al carrito' : 'Agregar al carrito'}
-            </button>
-
-            {/* Tags */}
-            {product.tags && product.tags.length > 0 && (
-              <div className="product-page__tags">
-                {product.tags.map(t => <span key={t} className="badge badge-dark">{t}</span>)}
-              </div>
-            )}
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
