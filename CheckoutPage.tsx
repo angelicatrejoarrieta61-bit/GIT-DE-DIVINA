@@ -59,7 +59,6 @@ export const CheckoutPage: React.FC = () => {
     setError('');
 
     try {
-      // Crear orden en Supabase con datos mínimos
       const order = await createOrder({
         customer_name: 'Cliente',
         customer_email: '',
@@ -70,9 +69,8 @@ export const CheckoutPage: React.FC = () => {
         status: 'pending',
       });
 
-      if (!order) throw new Error('No se pudo crear la orden. Intenta de nuevo.');
+      if (!order?.id) throw new Error('No se pudo crear la orden. Intenta de nuevo.');
 
-      // Llamar al API de Clip Checkout Redireccionado
       const res = await fetch('/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,10 +84,11 @@ export const CheckoutPage: React.FC = () => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al crear el pago. Intenta de nuevo.');
+
+      if (!res.ok) throw new Error(data.error || 'Error al crear el pago.');
+      if (!data.payment_url) throw new Error('No se recibió URL de pago de Clip.');
 
       clearCart();
-      // Redirigir a Clip — ahí el cliente llena sus datos y paga
       window.location.href = data.payment_url;
 
     } catch (err: unknown) {
@@ -116,7 +115,6 @@ export const CheckoutPage: React.FC = () => {
     <div className="checkout-page" style={{ paddingTop: 'var(--nav-h)' }}>
       <div className="page-width section">
 
-        {/* Header */}
         <div className="checkout-page__header">
           <h1 className="checkout-page__title">Finalizar <span className="lime-text">Compra</span></h1>
           <div className="checkout-page__secure-badge">
@@ -127,7 +125,6 @@ export const CheckoutPage: React.FC = () => {
 
         <div className="checkout-page__grid">
 
-          {/* IZQUIERDA — Info de pago */}
           <div className="checkout-page__left">
 
             <div className="checkout-accepted-cards">
@@ -211,7 +208,6 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
 
-          {/* DERECHA — Resumen del pedido */}
           <div className="checkout-page__summary">
             <div className="checkout-summary-card">
               <h2 className="checkout-summary-card__title">Tu pedido</h2>

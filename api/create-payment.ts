@@ -35,9 +35,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 currency: 'MXN',
                 purchase_description: description.slice(0, 250),
                 redirection_url: {
-                    success: redirect_url || `${process.env.VITE_SITE_URL || ''}/pago-exitoso?order=${orderId}`,
-                    error: error_url || `${process.env.VITE_SITE_URL || ''}/pago-error?order=${orderId}`,
-                    cancel: error_url || `${process.env.VITE_SITE_URL || ''}/pago-error?order=${orderId}`,
+                    success: redirect_url,
+                    error: error_url,
+                    cancel: error_url,
                 },
                 metadata: {
                     external_reference: String(orderId),
@@ -50,9 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!response.ok) {
             console.error('Clip API error:', JSON.stringify(data));
-            return res.status(response.status).json({
-                error: data.message || 'Error en Clip API',
-            });
+            return res.status(response.status).json({ error: data.message || 'Error en Clip API' });
         }
 
         return res.status(200).json({ payment_url: data.payment_link_url });
