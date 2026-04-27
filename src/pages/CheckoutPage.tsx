@@ -264,19 +264,20 @@ export const CheckoutPage: React.FC = () => {
             <div className="checkout-actions">
               <button
                 onClick={handlePagar}
-                className={`checkout-pagar-btn ${loading ? 'loading' : ''}`}
+                className={`checkout-pagar-btn-official ${loading ? 'loading' : ''}`}
                 disabled={loading}
               >
                 {loading ? (
                   <div className="btn-loading-state">
                     <span className="checkout-spinner" />
-                    Procesando...
+                    Procesando Pago Seguro...
                   </div>
                 ) : (
-                  <>
-                    Pagar con 
-                    <img src="https://clip.mx/static/images/logos/logo-clip.svg" alt="Clip" height="24" style={{ filter: 'brightness(0) invert(1)' }} />
-                  </>
+                  <img 
+                    src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/medios-de-pagos/svg/naranja_hover_con_sombra.svg" 
+                    alt="Paga con Clip"
+                    style={{ width: '100%', display: 'block' }}
+                  />
                 )}
               </button>
               <div className="checkout-mini-cards">
