@@ -1,48 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { createOrder } from '../lib/queries';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 
-// ─── Tipos para el SDK de Clip ────────────────────────────────────────────────
-declare global {
-  interface Window {
-    Clip?: {
-      create: (config: ClipSDKConfig) => ClipInstance;
-    };
-  }
-}
-
-interface ClipSDKConfig {
-  publicKey: string;
-  locale?: string;
-}
-
-interface ClipInstance {
-  mount: (selector: string) => void;
-  on: (event: string, callback: (data: ClipEventData) => void) => void;
-  unmount: () => void;
-}
-
-interface ClipEventData {
-  token?: string;
-  error?: string;
-  type?: string;
-}
-
-// ─── Íconos ───────────────────────────────────────────────────────────────────
 const IconLock = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <rect x="3" y="11" width="18" height="11" rx="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
 );
 
 const IconShield = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    <path d="m9 12 2 2 4-4" />
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
   </svg>
 );
 
@@ -69,154 +40,58 @@ const IconAmex = () => (
   </svg>
 );
 
-// Logo oficial de Clip como imagen SVG inline
 const ClipLogo = () => (
-  <svg viewBox="0 0 80 28" width="64" height="22" aria-label="Clip">
+  <svg viewBox="0 0 80 28" width="56" height="20" aria-label="Clip">
     <rect width="80" height="28" rx="5" fill="#FC4C02" />
     <text x="10" y="20" fill="white" fontSize="14" fontWeight="bold" fontFamily="Arial, sans-serif" letterSpacing="1">clip</text>
-    <circle cx="66" cy="14" r="6" fill="white" opacity="0.25" />
-    <path d="M63 14 a3 3 0 1 1 6 0 a3 3 0 1 1 -6 0" fill="white" opacity="0.6" />
   </svg>
 );
-
-// ─── Pasos del checkout ───────────────────────────────────────────────────────
-type Step = 1 | 2 | 3;
 
 export const CheckoutPage: React.FC = () => {
   const { items, total, clearCart } = useCartStore();
   const cartTotal = total();
   const navigate = useNavigate();
-
-  const [step, setStep] = useState<Step>(1);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [clipReady, setClipReady] = useState(false);
-  const clipInstanceRef = useRef<ClipInstance | null>(null);
 
-  // Cargar SDK de Clip dinámicamente
-  useEffect(() => {
-    if (step !== 2) return;
-
-    const scriptId = 'clip-sdk-script';
-    if (document.getElementById(scriptId)) {
-      setClipReady(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = scriptId;
-    // SDK oficial de Clip Checkout Transparente
-    script.src = 'https://sdk.payclip.com/clip.js';
-    script.async = true;
-    script.onload = () => setClipReady(true);
-    script.onerror = () => setError('No se pudo cargar el SDK de pago. Recarga la página.');
-    document.head.appendChild(script);
-  }, [step]);
-
-  // Montar el formulario de Clip cuando el SDK esté listo
-  useEffect(() => {
-    if (!clipReady || step !== 2) return;
-
-    const publicKey = import.meta.env.VITE_CLIP_PUBLIC_KEY;
-
-    if (!window.Clip || !publicKey) {
-      // Si no hay public key configurada, mostrar aviso
-      setError('Configura VITE_CLIP_PUBLIC_KEY en tus variables de entorno de Vercel.');
-      return;
-    }
-
-    try {
-      const instance = window.Clip.create({
-        publicKey,
-        locale: 'es',
-      });
-
-      instance.mount('#clip-card-element');
-
-      instance.on('tokenize', (data: ClipEventData) => {
-        if (data.token) {
-          handlePayWithToken(data.token);
-        }
-      });
-
-      instance.on('error', (data: ClipEventData) => {
-        setError(data.error || 'Error al tokenizar la tarjeta. Verifica los datos.');
-        setLoading(false);
-      });
-
-      clipInstanceRef.current = instance;
-    } catch (e) {
-      setError('Error al inicializar el formulario de pago.');
-    }
-
-    return () => {
-      clipInstanceRef.current?.unmount();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipReady, step]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
-  };
-
-  // PASO 1 → Guardar datos del cliente y crear orden en Supabase
-  const handleDataSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name || !form.email || !form.phone) {
-      setError('Por favor completa todos los campos requeridos.');
-      return;
-    }
+  const handlePagar = async () => {
     setLoading(true);
     setError('');
 
     try {
+      // Crear orden en Supabase con datos mínimos
       const order = await createOrder({
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_phone: form.phone,
-        customer_address: form.address,
+        customer_name: 'Cliente',
+        customer_email: '',
+        customer_phone: '',
+        customer_address: '',
         items,
         total: cartTotal,
         status: 'pending',
       });
 
       if (!order) throw new Error('No se pudo crear la orden. Intenta de nuevo.');
-      setOrderId(order.id);
-      setStep(2);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // PASO 2 → Pagar con el Card Token que devuelve el SDK de Clip
-  const handlePayWithToken = async (cardTokenId: string) => {
-    if (!orderId) return;
-    setLoading(true);
-    setError('');
-
-    try {
+      // Llamar al API de Clip Checkout Redireccionado
       const res = await fetch('/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cardTokenId,
           amount: cartTotal,
-          description: `Divina Store MX — Orden ${orderId}`,
-          orderId,
+          description: `Divina Store MX — Orden ${order.id}`,
+          orderId: order.id,
+          redirect_url: `${window.location.origin}/pago-exitoso?order=${order.id}`,
+          error_url: `${window.location.origin}/pago-error?order=${order.id}`,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al procesar el pago.');
+      if (!res.ok) throw new Error(data.error || 'Error al crear el pago. Intenta de nuevo.');
 
       clearCart();
-      setStep(3);
-      navigate(`/pago-exitoso?order=${orderId}`);
+      // Redirigir a Clip — ahí el cliente llena sus datos y paga
+      window.location.href = data.payment_url;
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       setError(msg);
@@ -224,8 +99,7 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  // Carrito vacío
-  if (items.length === 0 && step !== 3) {
+  if (items.length === 0) {
     return (
       <div className="checkout-empty" style={{ paddingTop: 'calc(var(--nav-h) + 80px)' }}>
         <div className="checkout-empty__icon">🛍️</div>
@@ -238,44 +112,24 @@ export const CheckoutPage: React.FC = () => {
     );
   }
 
-  const subtotal = cartTotal;
-
   return (
     <div className="checkout-page" style={{ paddingTop: 'var(--nav-h)' }}>
       <div className="page-width section">
 
         {/* Header */}
         <div className="checkout-page__header">
-          <h1 className="checkout-page__title">
-            Finalizar <span className="lime-text">Compra</span>
-          </h1>
+          <h1 className="checkout-page__title">Finalizar <span className="lime-text">Compra</span></h1>
           <div className="checkout-page__secure-badge">
             <IconLock />
             <span>Pago 100% seguro</span>
           </div>
         </div>
 
-        {/* Pasos */}
-        <div className="checkout-steps">
-          {(['Datos', 'Pago', 'Confirmación'] as const).map((label, i) => (
-            <React.Fragment key={label}>
-              <div className={`checkout-step ${step === i + 1 ? 'checkout-step--active' : ''} ${step > i + 1 ? 'checkout-step--done' : ''}`}>
-                <span className="checkout-step__num">
-                  {step > i + 1 ? '✓' : i + 1}
-                </span>
-                <span className="checkout-step__label">{label}</span>
-              </div>
-              {i < 2 && <div className={`checkout-step__line ${step > i + 1 ? 'checkout-step__line--done' : ''}`} />}
-            </React.Fragment>
-          ))}
-        </div>
-
         <div className="checkout-page__grid">
 
-          {/* ── IZQUIERDA ─────────────────────────────────────────────────── */}
+          {/* IZQUIERDA — Info de pago */}
           <div className="checkout-page__left">
 
-            {/* Métodos de pago aceptados */}
             <div className="checkout-accepted-cards">
               <span className="checkout-accepted-cards__label">Métodos de pago aceptados</span>
               <div className="checkout-accepted-cards__logos">
@@ -289,185 +143,75 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* ── PASO 1: Datos del cliente ──────────────────────────────── */}
-            {step === 1 && (
-              <form onSubmit={handleDataSubmit} className="checkout-page__form">
-                <div className="checkout-form-section">
-                  <h2 className="checkout-form-section__title">
-                    <span className="checkout-form-section__num">01</span>
-                    Información de contacto
-                  </h2>
+            <div className="checkout-clip-info">
+              <div className="checkout-clip-info__item">
+                <IconShield />
+                <span>Serás redirigido al sitio seguro de Clip donde podrás ingresar tus datos y pagar con tarjeta de crédito o débito.</span>
+              </div>
+              <div className="checkout-clip-info__item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Acepta Visa, Mastercard, American Express y tarjetas de débito.</span>
+              </div>
+              <div className="checkout-clip-info__item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+                <span>Meses sin intereses disponibles según tu banco.</span>
+              </div>
+            </div>
 
-                  <div className="checkout-page__field-row">
-                    <div className="checkout-page__field">
-                      <label htmlFor="name">Nombre completo <span className="required">*</span></label>
-                      <input
-                        id="name" name="name" type="text"
-                        className="input-dark"
-                        value={form.name}
-                        onChange={handleChange}
-                        placeholder="Angélica Trejo"
-                        required
-                        autoComplete="name"
-                      />
-                    </div>
-                    <div className="checkout-page__field">
-                      <label htmlFor="phone">Teléfono <span className="required">*</span></label>
-                      <input
-                        id="phone" name="phone" type="tel"
-                        className="input-dark"
-                        value={form.phone}
-                        onChange={handleChange}
-                        placeholder="55 1234 5678"
-                        required
-                        autoComplete="tel"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="checkout-page__field">
-                    <label htmlFor="email">Correo electrónico <span className="required">*</span></label>
-                    <input
-                      id="email" name="email" type="email"
-                      className="input-dark"
-                      value={form.email}
-                      onChange={handleChange}
-                      placeholder="tu@email.com"
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
-                </div>
-
-                <div className="checkout-form-section">
-                  <h2 className="checkout-form-section__title">
-                    <span className="checkout-form-section__num">02</span>
-                    Dirección de envío
-                  </h2>
-                  <div className="checkout-page__field">
-                    <label htmlFor="address">Dirección completa</label>
-                    <textarea
-                      id="address" name="address"
-                      className="input-dark"
-                      value={form.address}
-                      onChange={handleChange}
-                      placeholder="Calle, número, colonia, ciudad, CP"
-                      rows={3}
-                      style={{ resize: 'vertical' }}
-                      autoComplete="street-address"
-                    />
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="checkout-page__error">
-                    <span>⚠</span>
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className={`checkout-submit-btn ${loading ? 'loading' : ''}`}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <span className="checkout-submit-btn__loading">
-                      <span className="checkout-spinner" />
-                      Guardando datos...
-                    </span>
-                  ) : (
-                    <span className="checkout-submit-btn__content">
-                      <IconLock />
-                      Continuar al pago
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-
-                <div className="checkout-trust-row">
-                  <div className="checkout-trust-item">
-                    <IconShield />
-                    <span>Datos cifrados SSL</span>
-                  </div>
-                  <div className="checkout-trust-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
-                    <span>Pago procesado por Clip</span>
-                  </div>
-                  <div className="checkout-trust-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Compra garantizada</span>
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {/* ── PASO 2: Formulario de tarjeta (SDK Clip) ──────────────── */}
-            {step === 2 && (
-              <div className="checkout-page__form">
-                <div className="checkout-form-section">
-                  <h2 className="checkout-form-section__title">
-                    <span className="checkout-form-section__num">03</span>
-                    Datos de tu tarjeta
-                  </h2>
-
-                  <div className="checkout-clip-badge">
-                    <IconShield />
-                    <span>Formulario seguro — tus datos van directo a Clip, nunca los vemos nosotros</span>
-                  </div>
-
-                  {/* Aquí monta el SDK de Clip el formulario de tarjeta */}
-                  <div id="clip-card-element" className="checkout-clip-element">
-                    {!clipReady && (
-                      <div className="checkout-clip-loading">
-                        <span className="checkout-spinner" />
-                        <span>Cargando formulario de pago...</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="checkout-page__error">
-                    <span>⚠</span>
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <div className="checkout-trust-row">
-                  <div className="checkout-trust-item">
-                    <IconShield />
-                    <span>Cifrado SSL 256-bit</span>
-                  </div>
-                  <div className="checkout-trust-item">
-                    <IconVisa />
-                  </div>
-                  <div className="checkout-trust-item">
-                    <IconMastercard />
-                  </div>
-                  <div className="checkout-trust-item">
-                    <IconAmex />
-                  </div>
-                </div>
-
-                <button
-                  className="checkout-back-btn"
-                  onClick={() => { setStep(1); setError(''); }}
-                  type="button"
-                >
-                  ← Volver a mis datos
-                </button>
+            {error && (
+              <div className="checkout-page__error">
+                <span>⚠</span>
+                <span>{error}</span>
               </div>
             )}
+
+            <button
+              onClick={handlePagar}
+              className={`checkout-submit-btn ${loading ? 'loading' : ''}`}
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="checkout-submit-btn__loading">
+                  <span className="checkout-spinner" />
+                  Preparando pago...
+                </span>
+              ) : (
+                <span className="checkout-submit-btn__content">
+                  <IconLock />
+                  Pagar con Clip
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </span>
+              )}
+            </button>
+
+            <div className="checkout-trust-row">
+              <div className="checkout-trust-item">
+                <IconShield />
+                <span>Datos cifrados SSL</span>
+              </div>
+              <div className="checkout-trust-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Pago procesado por Clip</span>
+              </div>
+              <div className="checkout-trust-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Compra garantizada</span>
+              </div>
+            </div>
           </div>
 
-          {/* ── DERECHA: Resumen del pedido ───────────────────────────────── */}
+          {/* DERECHA — Resumen del pedido */}
           <div className="checkout-page__summary">
             <div className="checkout-summary-card">
               <h2 className="checkout-summary-card__title">Tu pedido</h2>
@@ -499,7 +243,7 @@ export const CheckoutPage: React.FC = () => {
               <div className="checkout-summary-lines">
                 <div className="checkout-summary-line">
                   <span>Subtotal</span>
-                  <span>${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</span>
+                  <span>${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</span>
                 </div>
                 <div className="checkout-summary-line">
                   <span>Envío</span>
