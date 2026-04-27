@@ -11,17 +11,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Faltan parametros requeridos' });
     }
 
+    const apiKey = process.env.CLIP_API_KEY;
+    const secret = process.env.CLIP_SECRET;
+
+    if (!apiKey || !secret) {
+        return res.status(500).json({ error: 'Credenciales de Clip no configuradas' });
+    }
+
+    const basicToken = Buffer.from(`${apiKey}:${secret}`).toString('base64');
+
     try {
         const response = await fetch('https://api.payclip.com/v2/checkout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.CLIP_API_KEY}`,
+                'Authorization': `Basic ${basicToken}`,
             },
             body: JSON.stringify({
-                amount: parseFloat(amount.toFixed(2)),
+                amount: parseFloat(Number(amount).toFixed(2)),
                 currency: 'MXN',
-                purchase_description: description,
+                purchase_description: description.slice(0, 250),
                 redirection_url: {
                     success: redirect_url,
                     error: error_url,
@@ -29,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 },
                 metadata: {
                     external_reference: String(orderId),
+                    customer_info: { order_id: String(orderId) }
                 },
             }),
         });
@@ -36,8 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Clip API error:', data);
-            return res.status(response.status).json({ error: data.message || 'Error en Clip' });
+            console.error('Clip API error:', JSON.stringify(data));
+            return res.status(response.status).json({ error: data.message || 'Error en Clip API' });
         }
 
         return res.status(200).json({ payment_url: data.payment_link_url });
