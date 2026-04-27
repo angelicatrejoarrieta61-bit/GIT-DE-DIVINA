@@ -40,6 +40,7 @@ export interface Order {
   customer_address?: string;
   customer_city?: string;
   customer_state?: string;
+  customer_neighborhood?: string;
   customer_zip?: string;
   customer_reference?: string;
   payment_info?: any;
