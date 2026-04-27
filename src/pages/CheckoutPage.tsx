@@ -52,6 +52,9 @@ export const CheckoutPage: React.FC = () => {
     reference: 'Casa'
   });
 
+  const [colonias, setColonias] = useState<string[]>([]);
+  const [isFetchingZip, setIsFetchingZip] = useState(false);
+
   // Clip SDK States
   const [clipLoaded, setClipLoaded] = useState(false);
   const [clipInstance, setClipInstance] = useState<any>(null);
@@ -60,6 +63,32 @@ export const CheckoutPage: React.FC = () => {
   React.useEffect(() => {
     getStoreConfig().then(setConfig);
   }, []);
+
+  // Fetch ZIP info (Mexico)
+  React.useEffect(() => {
+    if (form.zip.length === 5) {
+      setIsFetchingZip(true);
+      fetch(`https://api.zippopotam.us/mx/${form.zip}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.places && data.places.length > 0) {
+            const place = data.places[0];
+            const uniqueColonias = Array.from(new Set(data.places.map((p: any) => p['place name']))) as string[];
+            setColonias(uniqueColonias);
+            setForm(prev => ({
+              ...prev,
+              city: place['place name'],
+              state: place['state'],
+              neighborhood: uniqueColonias[0] || ''
+            }));
+          }
+        })
+        .catch(err => console.error('Error fetching zip:', err))
+        .finally(() => setIsFetchingZip(false));
+    } else {
+      setColonias([]);
+    }
+  }, [form.zip]);
 
   React.useEffect(() => {
     const initClip = () => {
@@ -186,16 +215,36 @@ export const CheckoutPage: React.FC = () => {
                 <div className="checkout-field full"><label>CELULAR</label><input type="tel" name="phone" value={form.phone} onChange={handleInputChange} className="input-glass" required /></div>
                 
                 <div className="checkout-section-divider">DOMICILIO (MÉXICO)</div>
-                <div className="checkout-field full"><label>CALLE Y NÚMERO</label><input type="text" name="address" value={form.address} onChange={handleInputChange} className="input-glass" required /></div>
-                <div className="checkout-field"><label>COLONIA</label><input type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} className="input-glass" required /></div>
-                <div className="checkout-field"><label>CIUDAD</label><input type="text" name="city" value={form.city} onChange={handleInputChange} className="input-glass" required /></div>
+                
+                <div className="checkout-field">
+                  <label>CÓDIGO POSTAL {isFetchingZip && '...'}</label>
+                  <input type="text" name="zip" value={form.zip} onChange={handleInputChange} className="input-glass" placeholder="00000" maxLength={5} />
+                </div>
                 <div className="checkout-field">
                   <label>ESTADO</label>
                   <select name="state" value={form.state} onChange={handleInputChange} className="input-glass">
+                    <option value="">Selecciona...</option>
                     {MEXICAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className="checkout-field"><label>CP</label><input type="text" name="zip" value={form.zip} onChange={handleInputChange} className="input-glass" /></div>
+
+                <div className="checkout-field">
+                  <label>CIUDAD / MUNICIPIO</label>
+                  <input type="text" name="city" value={form.city} onChange={handleInputChange} className="input-glass" required />
+                </div>
+                <div className="checkout-field">
+                  <label>COLONIA</label>
+                  {colonias.length > 0 ? (
+                    <select name="neighborhood" value={form.neighborhood} onChange={handleInputChange} className="input-glass">
+                      {colonias.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} className="input-glass" placeholder="Ingresa colonia" required />
+                  )}
+                </div>
+
+                <div className="checkout-field full"><label>CALLE Y NÚMERO</label><input type="text" name="address" value={form.address} onChange={handleInputChange} className="input-glass" required /></div>
+                
                 <div className="checkout-field full">
                   <label>REFERENCIA</label>
                   <select name="reference" value={form.reference} onChange={handleInputChange} className="input-glass">

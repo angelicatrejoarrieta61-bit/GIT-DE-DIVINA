@@ -88,7 +88,7 @@
 }
 
 .input-glass {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(20, 20, 20, 0.8) !important;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 10px 14px;
@@ -96,6 +96,13 @@
   font-size: 13.5px;
   transition: all 0.2s;
   width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.input-glass option {
+  background: #1a1a1a;
+  color: #fff;
 }
 
 .input-glass:focus {
