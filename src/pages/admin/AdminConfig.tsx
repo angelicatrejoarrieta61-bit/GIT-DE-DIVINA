@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AssetUploader } from '../../components/AssetUploader';
-import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProducts, updateProduct } from '../../lib/queries';
+import { ImageUploaderModal } from '../../components/ImageUploaderModal';
+import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProducts, updateProduct, createProduct, deleteProduct } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
 import type { Collection, Product, Order } from '../../types';
 import type { SectionBlock } from '../../sections/DynamicSections';
@@ -57,10 +57,11 @@ const DEFAULT_HOME_BLOCKS: SectionBlock[] = [
   },
 ];
 
-const SectionProductsConfig = ({ products, onSave }: { products: Product[], onSave: (items: Product[]) => void }) => {
+const SectionProductsConfig = ({ products, collections, onSave }: { products: Product[], collections: Collection[], onSave: (items: Product[]) => void }) => {
   const [items, setItems] = useState<Product[]>([]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [editingImages, setEditingImages] = useState<Product | null>(null);
 
   useEffect(() => {
     setItems([...products]);
@@ -70,32 +71,68 @@ const SectionProductsConfig = ({ products, onSave }: { products: Product[], onSa
     setItems(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
   };
 
+  const handleAddProduct = async () => {
+    const name = window.prompt('Nombre del nuevo producto:');
+    if (!name) return;
+    const slug = name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    const newProd: Partial<Product> = {
+      name,
+      slug,
+      price: 0,
+      in_stock: true,
+      brand: 'DIVINA',
+      image_status: 'pending'
+    };
+    const created = await createProduct(newProd);
+    if (created) {
+      setItems(prev => [created, ...prev]);
+      alert('Producto creado. Ahora puedes editar sus detalles.');
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
+    const ok = await deleteProduct(id);
+    if (ok) {
+      setItems(prev => prev.filter(p => p.id !== id));
+      alert('Producto eliminado.');
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       for (const item of items) {
         const original = products.find(p => p.id === item.id);
-        if (
+        const hasChanged = 
           item.name !== original?.name ||
           item.brand !== original?.brand ||
           item.price !== original?.price ||
-          item.old_price !== original?.old_price ||
-          item.sku !== original?.sku
-        ) {
+          item.compare_price !== original?.compare_price ||
+          item.sku !== original?.sku ||
+          item.in_stock !== original?.in_stock ||
+          item.category !== original?.category ||
+          JSON.stringify(item.tags) !== JSON.stringify(original?.tags);
+
+        if (hasChanged) {
           await updateProduct(item.id, {
             name: item.name,
             brand: item.brand,
             price: Number(item.price),
-            old_price: item.old_price ? Number(item.old_price) : null,
-            sku: item.sku
+            compare_price: item.compare_price ? Number(item.compare_price) : null,
+            sku: item.sku,
+            in_stock: item.in_stock,
+            category: item.category,
+            description: item.description,
+            tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? (item.tags as string).split(',').map(t => t.trim()).filter(Boolean) : [])
           });
         }
       }
       onSave(items);
-      alert('¡Productos actualizados correctamente!');
+      alert('¡Todos los cambios han sido guardados!');
     } catch (err) {
       console.error(err);
-      alert('Error al guardar algunos productos.');
+      alert('Ocurrió un error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -109,54 +146,103 @@ const SectionProductsConfig = ({ products, onSave }: { products: Product[], onSa
 
   return (
     <div className="products-config-table">
-      <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
         <input 
           type="text" 
           className="input-dark" 
-          placeholder="🔍 Buscar por SKU, nombre o marca..." 
+          placeholder="🔍 Filtrar por SKU, nombre, marca..." 
           value={search} 
           onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, height: '36px' }}
+          style={{ flex: 1, height: '40px' }}
         />
-        <button onClick={handleSave} className="btn btn--primary" disabled={saving} style={{ padding: '0 24px', height: '36px', fontSize: '11px' }}>
-          {saving ? 'Guardando...' : 'GUARDAR TODO'}
+        <button onClick={handleAddProduct} className="btn btn-outline" style={{ padding: '0 20px', height: '40px', fontSize: '12px' }}>
+          + AÑADIR PRODUCTO
+        </button>
+        <button onClick={handleSave} className="btn btn--primary" disabled={saving} style={{ padding: '0 32px', height: '40px', fontSize: '12px', fontWeight: 'bold' }}>
+          {saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
         </button>
       </div>
 
-      <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', maxHeight: '70vh', overflowY: 'auto' }}>
+      <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.01)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', maxHeight: '75vh', overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <tr style={{ background: '#111', textAlign: 'left' }}>
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>SKU</th>
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>MARCA</th>
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>TÍTULO PRODUCTO</th>
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>P. ANTERIOR</th>
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>P. ACTUAL</th>
+            <tr style={{ background: '#080808', textAlign: 'left' }}>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>IMG</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>ID / SKU</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>STOCK</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>MARCA</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>NOMBRE / TÍTULO</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>DESCRIPCIÓN</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>COLECCIÓN</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>PRECIO</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>OFERTA</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>ACCIONES</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                <td style={{ padding: '2px 8px', width: '100px' }}>
-                  <input type="text" value={p.sku || ''} onChange={e => updateItem(p.id, 'sku', e.target.value)} className="td-input" />
+              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: p.in_stock ? 'transparent' : 'rgba(255,0,0,0.03)' }}>
+                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                  <button 
+                    onClick={() => setEditingImages(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, position: 'relative' }}
+                    title="Gestionar imágenes"
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 6, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      {p.image_url ? <img src={getImageUrl(p.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14 }}>📷</span>}
+                    </div>
+                  </button>
                 </td>
-                <td style={{ padding: '2px 8px', width: '120px' }}>
+                <td style={{ padding: '4px 8px', width: '120px' }}>
+                  <p style={{ fontSize: 9, color: '#666', margin: 0 }}>ID: {p.id.slice(0,8)}</p>
+                  <input type="text" value={p.sku || ''} onChange={e => updateItem(p.id, 'sku', e.target.value)} className="td-input" placeholder="SKU" style={{ marginTop: 2 }} />
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                  <input type="checkbox" checked={p.in_stock} onChange={e => updateItem(p.id, 'in_stock', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--c-lime)' }} />
+                </td>
+                <td style={{ padding: '4px 8px', width: '90px' }}>
                   <input type="text" value={p.brand || ''} onChange={e => updateItem(p.id, 'brand', e.target.value)} className="td-input" />
                 </td>
-                <td style={{ padding: '2px 8px' }}>
-                  <input type="text" value={p.name} onChange={e => updateItem(p.id, 'name', e.target.value)} className="td-input" />
+                <td style={{ padding: '4px 8px' }}>
+                  <input type="text" value={p.name} onChange={e => updateItem(p.id, 'name', e.target.value)} className="td-input" style={{ fontWeight: '600' }} />
                 </td>
-                <td style={{ padding: '2px 8px', width: '90px' }}>
-                  <input type="number" value={p.old_price || ''} onChange={e => updateItem(p.id, 'old_price', e.target.value)} className="td-input" />
+                <td style={{ padding: '4px 8px', width: '200px' }}>
+                  <textarea value={p.description || ''} onChange={e => updateItem(p.id, 'description', e.target.value)} className="td-input" style={{ height: '32px', resize: 'vertical', fontSize: '10px' }} placeholder="Descripción..." />
                 </td>
-                <td style={{ padding: '2px 8px', width: '90px' }}>
-                  <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} className="td-input" />
+                <td style={{ padding: '4px 8px', width: '130px' }}>
+                  <select value={p.category || ''} onChange={e => updateItem(p.id, 'category', e.target.value)} className="td-input" style={{ background: '#111' }}>
+                    <option value="">Sin colección</option>
+                    {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '4px 8px', width: '80px' }}>
+                  <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} className="td-input" style={{ color: 'var(--c-lime)', fontWeight: 'bold' }} />
+                </td>
+                <td style={{ padding: '4px 8px', width: '80px' }}>
+                  <input type="number" value={p.compare_price || ''} onChange={e => updateItem(p.id, 'compare_price', e.target.value)} className="td-input" style={{ color: '#888', textDecoration: 'line-through' }} />
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                  <button onClick={() => handleDelete(p.id, p.name)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: 16 }} title="Eliminar producto">🗑️</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {editingImages && (
+        <ImageUploaderModal 
+          product={editingImages} 
+          onClose={() => setEditingImages(null)} 
+          onSuccess={async (urls) => {
+            const main = urls[0] || null;
+            await updateProduct(editingImages.id, { images: urls, image_url: main || undefined });
+            setItems(prev => prev.map(p => p.id === editingImages.id ? { ...p, images: urls, image_url: main || p.image_url } : p));
+            setEditingImages(null);
+            alert('Galería actualizada correctamente.');
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -511,6 +597,7 @@ export const AdminConfig: React.FC = () => {
               <p className="muted-text" style={{ marginBottom: 24 }}>Edita SKU, Marca, Título y Precios de forma masiva. Los cambios se aplicarán al guardar.</p>
               <SectionProductsConfig 
                 products={adminProducts} 
+                collections={collections}
                 onSave={(next) => {
                   setAdminProducts(next);
                   setProducts(next.filter(p => p.in_stock));
@@ -1155,10 +1242,11 @@ export const AdminConfig: React.FC = () => {
       </div>
 
       {/* THE RIGHT PANE: Always-on Live Preview */}
-      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#000' }}>
-        {renderLivePreview()}
-      </div>
-
+      {section !== 'products-config' && (
+        <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#000' }}>
+          {renderLivePreview()}
+        </div>
+      )}
     </div>
   );
 };

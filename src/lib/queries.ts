@@ -124,6 +124,25 @@ export const updateProduct = async (id: string, updates: Partial<Product>): Prom
   return true;
 };
 
+export const createProduct = async (product: Partial<Product>): Promise<Product | null> => {
+  const { data, error } = await supabase
+    .from('products')
+    .insert([product])
+    .select()
+    .single();
+  if (error) { console.error(error); return null; }
+  return data;
+};
+
+export const deleteProduct = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id);
+  if (error) { console.error(error); return false; }
+  return true;
+};
+
 export const getProductsWithoutImage = async (): Promise<Product[]> => {
   const { data } = await supabase
     .from('products')

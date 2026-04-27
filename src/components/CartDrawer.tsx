@@ -61,64 +61,36 @@ export const CartDrawer: React.FC = () => {
         <div className="cart-drawer__items">
           {items.length === 0 ? (
             <div className="cart-drawer__empty">
-              <p>Tu carrito está vacío</p>
-
-              <Link
-                to="/catalogo"
-                onClick={closeCart}
-                className="btn btn-lime"
-              >
+              <span style={{ fontSize: 48 }}>🛍️</span>
+              <p style={{ fontWeight: 600 }}>Tu carrito está vacío</p>
+              <Link to="/catalogo" onClick={closeCart} className="btn btn-lime" style={{ background: 'var(--c-black)', color: 'var(--c-lime)' }}>
                 Ver Productos
               </Link>
             </div>
           ) : (
             items.map(item => (
               <div key={`${item.product.id}-${item.variant}`} className="cart-item">
-
-                {/* Imagen */}
                 <div className="cart-item__img">
                   {item.product.image_url ? (
-                    <img
-                      src={getImageUrl(item.product.image_url)}
-                      alt={item.product.name}
-                    />
+                    <img src={getImageUrl(item.product.image_url)} alt={item.product.name} />
                   ) : (
                     <div className="cart-item__placeholder">📦</div>
                   )}
                 </div>
 
-                {/* Info */}
                 <div className="cart-item__info">
                   <p>{item.product.name}</p>
-                  <p>
-                    ${(item.product.price * item.quantity).toFixed(2)} MXN
-                  </p>
+                  <p>${(item.product.price * item.quantity).toFixed(2)} MXN</p>
                 </div>
 
-                {/* Acciones */}
-                <div className="cart-item__actions">
-                  <button
-                    onClick={() =>
-                      updateQty(item.product.id, Math.max(1, item.quantity - 1))
-                    }
-                  >
-                    −
-                  </button>
-
-                  <span>{item.quantity}</span>
-
-                  <button
-                    onClick={() =>
-                      updateQty(item.product.id, item.quantity + 1)
-                    }
-                  >
-                    +
-                  </button>
-
-                  <button
-                    onClick={() => removeItem(item.product.id)}
-                  >
-                    🗑
+                <div className="cart-item__actions-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <div className="cart-item__actions">
+                    <button onClick={() => updateQty(item.product.id, Math.max(1, item.quantity - 1))}>−</button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQty(item.product.id, item.quantity + 1)}>+</button>
+                  </div>
+                  <button onClick={() => removeItem(item.product.id)} style={{ color: 'rgba(0,0,0,0.3)', fontSize: 14 }}>
+                    Eliminar
                   </button>
                 </div>
               </div>
@@ -130,24 +102,13 @@ export const CartDrawer: React.FC = () => {
         {items.length > 0 && (
           <div className="cart-drawer__footer">
             <p>
-              Total: ${cartTotal.toFixed(2)} MXN
+              <span>Total:</span>
+              <span>${cartTotal.toFixed(2)} MXN</span>
             </p>
-
-            {errorMsg && <p style={{ color: 'red' }}>{errorMsg}</p>}
-
-            <button
-              onClick={handleCheckout}
-              disabled={checkoutState === 'loading'}
-              className="btn btn-lime"
-            >
-              {checkoutState === 'loading'
-                ? 'Procesando...'
-                : 'Finalizar Compra'}
+            <button onClick={handleCheckout} disabled={checkoutState === 'loading'} className="btn btn-lime">
+              {checkoutState === 'loading' ? 'Procesando...' : 'FINALIZAR COMPRA'}
             </button>
-
-            <button onClick={closeCart}>
-              Seguir comprando
-            </button>
+            <button onClick={closeCart}>Seguir comprando</button>
           </div>
         )}
       </aside>
