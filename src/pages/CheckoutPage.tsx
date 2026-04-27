@@ -87,8 +87,9 @@ export const CheckoutPage: React.FC = () => {
 
   React.useEffect(() => {
     if (clipLoaded && clipInstance && !cardElement) {
-      const elements = clipInstance.elements();
-      const card = elements.create('Card', {
+      // NOTA: En el SDK de Clip es .element.create (singular)
+      const card = clipInstance.element.create('Card', {
+        theme: 'light',
         style: {
           base: {
             color: '#ffffff',
@@ -98,7 +99,8 @@ export const CheckoutPage: React.FC = () => {
           },
         },
       });
-      card.mount('#clip-card-container');
+      // NOTA: mount recibe el ID del elemento sin el '#'
+      card.mount('clip-card-container');
       setCardElement(card);
     }
   }, [clipLoaded, clipInstance, cardElement]);
@@ -127,7 +129,8 @@ export const CheckoutPage: React.FC = () => {
       if (!order) throw new Error('No se pudo generar la orden en el sistema.');
 
       // 2. Generar Token de Clip
-      const result = await clipInstance.createToken(cardElement);
+      // NOTA: Se usa cardElement.cardToken() directamente
+      const result = await cardElement.cardToken();
       
       if (result.error) {
         throw new Error(result.error.message || 'Error al procesar la tarjeta');
