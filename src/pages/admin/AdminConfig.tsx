@@ -424,6 +424,7 @@ export const AdminConfig: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <AssetUploader label="Logo del Sitio" configKey="logo_url" currentValue={configs.logo_url} onUpdate={v => updateConfig('logo_url', v)} />
                   <AssetUploader label="Ícono para Menú INICIO (opcional)" configKey="header_home_icon" currentValue={configs.header_home_icon} onUpdate={v => updateConfig('header_home_icon', v)} />
+                  <AssetUploader label="Logotipos de Pasarela (Checkout)" configKey="checkout_payment_logos" currentValue={configs.checkout_payment_logos} onUpdate={v => updateConfig('checkout_payment_logos', v)} />
                 </div>
                 <div style={{ marginTop: 16, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
