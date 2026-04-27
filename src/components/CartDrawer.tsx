@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useCartStore } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { getImageUrl } from '../lib/supabase';
+import { getImageUrl, supabase } from '../lib/supabase';
+import { getStoreConfig } from '../lib/queries';
 import './CartDrawer.css';
 
 type CheckoutState = 'idle' | 'loading' | 'error';
@@ -10,7 +11,6 @@ export const CartDrawer: React.FC = () => {
   const {
     items,
     isOpen,
-    openCart,
     closeCart,
     removeItem,
     updateQty,
@@ -20,6 +20,17 @@ export const CartDrawer: React.FC = () => {
 
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [footerImg, setFooterImg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const config = await getStoreConfig();
+      if (config?.cart_footer_img) {
+        setFooterImg(config.cart_footer_img);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   const cartTotal = total();
 
@@ -110,6 +121,14 @@ export const CartDrawer: React.FC = () => {
         {/* Footer */}
         {items.length > 0 && (
           <div className="cart-drawer__footer">
+            
+            {/* ── Banner Promocional ── */}
+            {footerImg && (
+              <div className="cart-drawer__promo" style={{ marginBottom: 12, borderRadius: 20, overflow: 'hidden', aspectRation: '16/9' }}>
+                <img src={getImageUrl(footerImg)} alt="Promoción" style={{ width: '100%', display: 'block' }} />
+              </div>
+            )}
+
             <div className="cart-drawer__total-row">
               <span>Total:</span>
               <span>{formatCurrency(cartTotal)}</span>

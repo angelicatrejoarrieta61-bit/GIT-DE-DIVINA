@@ -1034,6 +1034,17 @@ export const AdminConfig: React.FC = () => {
             <section>
               <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>💳 Métricas de Pagos Clip</h2>
               <p className="muted-text" style={{ marginBottom: 24 }}>Lista de transacciones procesadas a través de Clip Transparent Checkout.</p>
+
+              <div style={{ ...box, marginBottom: 24, padding: 20 }}>
+                <h3 style={{ fontSize: 15, marginBottom: 12, color: '#fff' }}>Imagen Promocional en Carrito</h3>
+                <p className="muted-text" style={{ fontSize: 12, marginBottom: 16 }}>Esta imagen aparecerá en la parte inferior del carrito (Recomendado: 16:9 con degradado).</p>
+                <AssetUploader 
+                  label="Banner Carrito (16:9)" 
+                  configKey="cart_footer_img" 
+                  currentValue={configs.cart_footer_img} 
+                  onUpdate={(val) => updateConfig('cart_footer_img', val)} 
+                />
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {orders.filter(o => o.payment_info).length === 0 ? (
