@@ -7,42 +7,42 @@ import './CheckoutPage.css';
 
 const IconLock = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
   </svg>
 );
 
 const IconShield = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
   </svg>
 );
 
 const IconVisa = () => (
   <svg viewBox="0 0 48 32" width="42" height="28">
-    <rect width="48" height="32" rx="4" fill="#1A1F71" />
+    <rect width="48" height="32" rx="4" fill="#1A1F71"/>
     <text x="8" y="22" fill="white" fontSize="14" fontWeight="bold" fontFamily="Arial">VISA</text>
   </svg>
 );
 
 const IconMastercard = () => (
   <svg viewBox="0 0 48 32" width="42" height="28">
-    <rect width="48" height="32" rx="4" fill="#252525" />
-    <circle cx="18" cy="16" r="9" fill="#EB001B" />
-    <circle cx="30" cy="16" r="9" fill="#F79E1B" />
-    <path d="M24 9.5a9 9 0 0 1 0 13A9 9 0 0 1 24 9.5z" fill="#FF5F00" />
+    <rect width="48" height="32" rx="4" fill="#252525"/>
+    <circle cx="18" cy="16" r="9" fill="#EB001B"/>
+    <circle cx="30" cy="16" r="9" fill="#F79E1B"/>
+    <path d="M24 9.5a9 9 0 0 1 0 13A9 9 0 0 1 24 9.5z" fill="#FF5F00"/>
   </svg>
 );
 
 const IconAmex = () => (
   <svg viewBox="0 0 48 32" width="42" height="28">
-    <rect width="48" height="32" rx="4" fill="#2E77BC" />
+    <rect width="48" height="32" rx="4" fill="#2E77BC"/>
     <text x="5" y="22" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial">AMEX</text>
   </svg>
 );
 
 const ClipLogo = () => (
   <svg viewBox="0 0 80 28" width="56" height="20" aria-label="Clip">
-    <rect width="80" height="28" rx="5" fill="#FC4C02" />
+    <rect width="80" height="28" rx="5" fill="#FC4C02"/>
     <text x="10" y="20" fill="white" fontSize="14" fontWeight="bold" fontFamily="Arial, sans-serif" letterSpacing="1">clip</text>
   </svg>
 );
@@ -147,14 +147,14 @@ export const CheckoutPage: React.FC = () => {
               </div>
               <div className="checkout-clip-info__item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <span>Acepta Visa, Mastercard, American Express y tarjetas de débito.</span>
               </div>
               <div className="checkout-clip-info__item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <path d="M2 10h20" />
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                  <path d="M2 10h20"/>
                 </svg>
                 <span>Meses sin intereses disponibles según tu banco.</span>
               </div>
@@ -182,7 +182,7 @@ export const CheckoutPage: React.FC = () => {
                   <IconLock />
                   Pagar con Clip
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
                   </svg>
                 </span>
               )}
@@ -195,13 +195,13 @@ export const CheckoutPage: React.FC = () => {
               </div>
               <div className="checkout-trust-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
                 <span>Pago procesado por Clip</span>
               </div>
               <div className="checkout-trust-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <span>Compra garantizada</span>
               </div>
