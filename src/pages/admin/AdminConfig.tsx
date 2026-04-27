@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { AssetUploader } from '../../components/AssetUploader';
 import { ImageUploaderModal } from '../../components/ImageUploaderModal';
 import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProducts, updateProduct, createProduct, deleteProduct } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
