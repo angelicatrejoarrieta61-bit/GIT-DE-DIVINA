@@ -1,13 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    // CORS headers para que el frontend pueda llamar a este endpoint
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    const { amount, description, orderId, redirect_url, error_url } = req.body;
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    if (!amount || !description || !orderId) {
+    const { cardTokenId, amount, description, orderId } = req.body;
+
+    if (!cardTokenId || !amount || !description || !orderId) {
         return res.status(400).json({ error: 'Faltan parametros requeridos' });
     }
 
@@ -21,7 +25,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const basicToken = Buffer.from(`${apiKey}:${secret}`).toString('base64');
 
     try {
-        const response = await fetch('https://api.payclip.com/v2/checkout', {
+        // Paso: Realizar el cargo con el Card Token ID que viene del SDK de Clip
+        const response = await fetch('https://api.payclip.com/v2/payments', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -30,15 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: JSON.stringify({
                 amount: parseFloat(Number(amount).toFixed(2)),
                 currency: 'MXN',
-                purchase_description: description.slice(0, 250),
-                redirection_url: {
-                    success: redirect_url,
-                    error: error_url,
-                    cancel: error_url,
-                },
+                description: description.slice(0, 250),
+                card_token_id: cardTokenId,
                 metadata: {
                     external_reference: String(orderId),
-                    customer_info: { order_id: String(orderId) }
+                    order_id: String(orderId),
                 },
             }),
         });
@@ -47,10 +48,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!response.ok) {
             console.error('Clip API error:', JSON.stringify(data));
-            return res.status(response.status).json({ error: data.message || 'Error en Clip API' });
+            return res.status(response.status).json({
+                error: data.message || data.error || 'Error al procesar el pago con Clip',
+            });
         }
 
-        return res.status(200).json({ payment_url: data.payment_link_url });
+        // Devolver el resultado del pago
+        return res.status(200).json({
+            success: true,
+            paymentId: data.id || data.payment_id,
+            status: data.status,
+        });
 
     } catch (err) {
         console.error('Server error:', err);

@@ -530,3 +530,77 @@
     align-items: flex-start;
   }
 }
+
+/* ── Agrega esto al final de tu CheckoutPage.css ── */
+
+/* Contenedor del formulario de Clip */
+.checkout-clip-element {
+  min-height: 200px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px;
+  margin-top: 12px;
+}
+
+/* Estado de carga del SDK */
+.checkout-clip-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 200px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+/* Badge de seguridad sobre el form de Clip */
+.checkout-clip-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(161, 214, 0, 0.08);
+  border: 1px solid rgba(161, 214, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.checkout-clip-badge svg {
+  color: #a1d600;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Botón volver */
+.checkout-back-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.2s;
+}
+
+.checkout-back-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Paso completado */
+.checkout-step--done .checkout-step__num {
+  background: #a1d600;
+  color: #000;
+}
+
+.checkout-step__line--done {
+  background: #a1d600 !important;
+  opacity: 1 !important;
+}
