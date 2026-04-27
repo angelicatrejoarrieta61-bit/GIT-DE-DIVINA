@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AssetUploader } from '../../components/AssetUploader';
-import { getStoreConfig, getCollections, getProducts } from '../../lib/queries';
+import { getStoreConfig, getCollections, getProducts, getOrders } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
-import type { Collection, Product } from '../../types';
+import type { Collection, Product, Order } from '../../types';
 import type { SectionBlock } from '../../sections/DynamicSections';
 import './AdminConfig.css';
 
@@ -70,6 +70,7 @@ export const AdminConfig: React.FC = () => {
   const [configs, setConfigs] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'global' | 'hero' | 'secciones' | 'editor' | 'cols' | 'pages'>('global');
   const [search, setSearch] = useState('');
@@ -154,10 +155,11 @@ export const AdminConfig: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [c, col, prods] = await Promise.all([getStoreConfig(), getCollections(), getProducts(300)]);
+      const [c, col, prods, ords] = await Promise.all([getStoreConfig(), getCollections(), getProducts(300), getOrders()]);
       setConfigs(c);
       setCollections(col);
       setProducts(prods);
+      setOrders(ords);
       if (c.frost_cards_data) {
         try { const p = JSON.parse(c.frost_cards_data); if (p?.cards) setFrost({ ...DEFAULT_FROST, ...p }); } catch { }
       }
@@ -794,6 +796,67 @@ export const AdminConfig: React.FC = () => {
                     <AssetUploader label="Imagen de Esencia" configKey="about_essence_img" currentValue={configs.about_essence_img} onUpdate={(val) => updateConfig('about_essence_img', val)} />
                   </div>
                 </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── CLIP PAYMENTS ── */}
+          {section === 'clip-payments' && (
+            <section>
+              <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>💳 Métricas de Pagos Clip</h2>
+              <p className="muted-text" style={{ marginBottom: 24 }}>Lista de transacciones procesadas a través de Clip Transparent Checkout.</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {orders.filter(o => o.payment_info).length === 0 ? (
+                  <p style={{ padding: 20, textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: 12 }}>No hay pagos registrados aún.</p>
+                ) : (
+                  orders.filter(o => o.payment_info).map(order => (
+                    <div key={order.id} style={{ ...box, padding: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Orden #{order.id.slice(0, 8)}</p>
+                          <p style={{ fontSize: 11, color: 'var(--c-text-muted)', margin: 0 }}>{new Date(order.created_at || '').toLocaleString()}</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-lime)', margin: 0 }}>${order.total.toFixed(2)} MXN</p>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(161,214,0,0.1)', color: '#a1d600', fontWeight: 700 }}>
+                            {order.status?.toUpperCase() || 'PAGADO'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                        <div>
+                          <p style={{ ...lbl, color: 'var(--c-lime)' }}>CLIENTE</p>
+                          <p style={{ fontSize: 13, margin: '2px 0' }}>{order.customer_name}</p>
+                          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>{order.customer_email}</p>
+                          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>{order.customer_phone}</p>
+                        </div>
+                        <div>
+                          <p style={{ ...lbl, color: 'var(--c-lime)' }}>MÉTRICAS CLIP</p>
+                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>ID Transacción:</strong> {order.payment_info?.id || '—'}</p>
+                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Referencia:</strong> {order.payment_info?.receipt_no || '—'}</p>
+                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Tarjeta:</strong> {order.payment_info?.payment_method?.brand || '—'} {order.payment_info?.payment_method?.last4 ? `**** ${order.payment_info.payment_method.last4}` : ''}</p>
+                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Auth Code:</strong> {order.payment_info?.payment_details?.auth_code || '—'}</p>
+                        </div>
+                      </div>
+
+                      {order.customer_address && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                          <p style={lbl}>DIRECCIÓN DE ENVÍO</p>
+                          <p style={{ fontSize: 12, margin: 0, color: '#aaa' }}>
+                            {order.customer_address}, {order.customer_city || ''}, {order.customer_state || ''}, CP {order.customer_zip || ''}
+                          </p>
+                          {order.customer_reference && (
+                            <p style={{ fontSize: 11, marginTop: 4, fontStyle: 'italic', color: 'var(--c-lime)' }}>
+                              Ref: {order.customer_reference}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           )}

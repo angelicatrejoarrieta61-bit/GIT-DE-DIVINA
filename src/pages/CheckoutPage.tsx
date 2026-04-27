@@ -60,6 +60,18 @@ export const CheckoutPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // Form state
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    reference: 'Casa'
+  });
+
   // Clip SDK States
   const [clipLoaded, setClipLoaded] = useState(false);
   const [clipInstance, setClipInstance] = useState<any>(null);
@@ -68,7 +80,6 @@ export const CheckoutPage: React.FC = () => {
   React.useEffect(() => {
     const initClip = () => {
       if (window.ClipSDK && !clipInstance) {
-        // Usamos la API KEY de Clip (pública)
         const clip = new window.ClipSDK('3f2d18b8-2ff4-453e-a243-b078daa507e2');
         setClipInstance(clip);
         setClipLoaded(true);
@@ -87,7 +98,6 @@ export const CheckoutPage: React.FC = () => {
 
   React.useEffect(() => {
     if (clipLoaded && clipInstance && !cardElement) {
-      // NOTA: En el SDK de Clip es .element.create (singular)
       const card = clipInstance.element.create('Card', {
         theme: 'light',
         style: {
@@ -99,13 +109,22 @@ export const CheckoutPage: React.FC = () => {
           },
         },
       });
-      // NOTA: mount recibe el ID del elemento sin el '#'
       card.mount('clip-card-container');
       setCardElement(card);
     }
   }, [clipLoaded, clipInstance, cardElement]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
   const handlePagar = async () => {
+    if (!form.name || !form.email || !form.address || !form.city) {
+      setError('Por favor completa los campos de envío antes de pagar.');
+      return;
+    }
+
     if (!clipInstance || !cardElement) {
       setError('El sistema de pagos no ha terminado de cargar. Por favor espera un momento.');
       return;
@@ -115,48 +134,59 @@ export const CheckoutPage: React.FC = () => {
     setError('');
 
     try {
-      // 1. Crear orden en Supabase
-      const order = await createOrder({
-        customer_name: 'Cliente Online',
-        customer_email: 'pago@pendiente.com',
-        customer_phone: '',
-        customer_address: 'Entrega por coordinar',
-        items,
-        total: cartTotal,
-        status: 'pending',
-      });
-
-      if (!order) throw new Error('No se pudo generar la orden en el sistema.');
-
-      // 2. Generar Token de Clip
-      // NOTA: Se usa cardElement.cardToken() directamente
+      // 1. Generar Token de Clip PRIMERO para asegurar que el pago puede proceder
       const result = await cardElement.cardToken();
       
       if (result.error) {
         throw new Error(result.error.message || 'Error al procesar la tarjeta');
       }
 
-      // 3. Enviar token al backend para realizar el cargo real
-      const res = await fetch('/api/charge-clip', {
+      // 2. Realizar el cargo en el backend
+      const chargeRes = await fetch('/api/charge-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: result.token,
           amount: cartTotal,
-          description: `Divina Store — Orden ${order.id}`,
-          orderId: order.id,
+          description: `Divina Store — Compra de ${form.name}`,
+          customer: {
+            name: form.name,
+            email: form.email,
+            phone: form.phone
+          }
         }),
       });
 
-      const data = await res.json();
+      const chargeData = await chargeRes.json();
       
-      if (!res.ok) {
-        throw new Error(data.error || 'El pago fue rechazado o hubo un error.');
+      if (!chargeRes.ok) {
+        throw new Error(chargeData.error || 'El pago fue rechazado por el banco.');
+      }
+
+      // 3. Crear orden en Supabase CON toda la info y la métrica de Clip
+      const order = await createOrder({
+        customer_name: form.name,
+        customer_email: form.email,
+        customer_phone: form.phone,
+        customer_address: form.address,
+        customer_city: form.city,
+        customer_state: form.state,
+        customer_zip: form.zip,
+        customer_reference: form.reference,
+        items,
+        total: cartTotal,
+        status: 'paid',
+        payment_info: chargeData // Guardamos toda la respuesta de Clip
+      });
+
+      if (!order) {
+        console.error('Error al guardar orden, pero el pago se realizó:', chargeData);
+        // Podríamos redirigir igual o mostrar un aviso
       }
 
       // 4. Éxito
       clearCart();
-      navigate(`/pago-exitoso?order=${order.id}`);
+      navigate(`/pago-exitoso?order=${order?.id || 'new'}`);
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al procesar el pago';
@@ -193,39 +223,74 @@ export const CheckoutPage: React.FC = () => {
 
         <div className="checkout-page__grid">
 
-          {/* IZQUIERDA — Info de pago */}
+          {/* IZQUIERDA — Datos y Pago */}
           <div className="checkout-page__left">
 
-            <div className="checkout-accepted-cards">
-              <span className="checkout-accepted-cards__label">Métodos de pago aceptados</span>
-              <div className="checkout-accepted-cards__logos">
-                <IconVisa />
-                <IconMastercard />
-                <IconAmex />
-                <div className="checkout-accepted-cards__clip">
-                  <span>Procesado por</span>
-                  <ClipLogo />
+            {/* Datos de Envío */}
+            <div className="checkout-form-section">
+              <h2 className="checkout-form-section__title">
+                <span className="checkout-form-section__num">01</span>
+                Datos de Envío
+              </h2>
+              
+              <div className="checkout-grid-fields">
+                <div className="checkout-field">
+                  <label>Nombre Completo *</label>
+                  <input type="text" name="name" value={form.name} onChange={handleInputChange} className="input-dark" placeholder="Ej. Ana García" required />
+                </div>
+                <div className="checkout-field">
+                  <label>Correo Electrónico *</label>
+                  <input type="email" name="email" value={form.email} onChange={handleInputChange} className="input-dark" placeholder="ana@ejemplo.com" required />
+                </div>
+                <div className="checkout-field">
+                  <label>Teléfono *</label>
+                  <input type="tel" name="phone" value={form.phone} onChange={handleInputChange} className="input-dark" placeholder="55 1234 5678" required />
+                </div>
+                <div className="checkout-field full">
+                  <label>Calle y Número *</label>
+                  <input type="text" name="address" value={form.address} onChange={handleInputChange} className="input-dark" placeholder="Av. Siempre Viva 123" required />
+                </div>
+                <div className="checkout-field">
+                  <label>Ciudad *</label>
+                  <input type="text" name="city" value={form.city} onChange={handleInputChange} className="input-dark" placeholder="Ej. CDMX" required />
+                </div>
+                <div className="checkout-field">
+                  <label>Estado</label>
+                  <input type="text" name="state" value={form.state} onChange={handleInputChange} className="input-dark" placeholder="Ej. CDMX" />
+                </div>
+                <div className="checkout-field">
+                  <label>Código Postal</label>
+                  <input type="text" name="zip" value={form.zip} onChange={handleInputChange} className="input-dark" placeholder="00000" />
+                </div>
+                <div className="checkout-field">
+                  <label>Referencia (Tipo de lugar)</label>
+                  <select name="reference" value={form.reference} onChange={handleInputChange} className="input-dark">
+                    <option value="Casa">Casa</option>
+                    <option value="Oficina">Oficina</option>
+                    <option value="Local Comercial">Local Comercial</option>
+                    <option value="Otro">Otro</option>
+                  </select>
                 </div>
               </div>
             </div>
 
             <div className="checkout-form-section">
               <h2 className="checkout-form-section__title">
-                <span className="checkout-form-section__num">01</span>
+                <span className="checkout-form-section__num">02</span>
                 Información de Pago
               </h2>
 
               <div className="checkout-clip-badge">
                 <IconShield />
                 <span>
-                  Tus datos están protegidos. El formulario de pago es proporcionado de forma segura por <strong>Clip México</strong>.
+                  Tus datos están protegidos por el cifrado de seguridad de <strong>Clip México</strong>.
                 </span>
               </div>
 
               {!clipLoaded && (
                 <div className="checkout-clip-loading">
                   <div className="checkout-spinner" />
-                  Cargando pasarela de pagos...
+                  Cargando pasarela...
                 </div>
               )}
 
@@ -234,21 +299,7 @@ export const CheckoutPage: React.FC = () => {
                 className="checkout-clip-element"
                 style={{ display: clipLoaded ? 'block' : 'none' }}
               >
-                {/* Aquí el SDK de Clip montará el formulario */}
-              </div>
-            </div>
-
-            <div className="checkout-clip-info">
-              <div className="checkout-clip-info__item">
-                <IconShield />
-                <span>Pago procesado con tecnología de cifrado SSL para tu seguridad.</span>
-              </div>
-              <div className="checkout-clip-info__item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <path d="M2 10h20" />
-                </svg>
-                <span>Aceptamos todas las tarjetas de crédito y débito Visa, Mastercard y Amex.</span>
+                {/* SDK de Clip */}
               </div>
             </div>
 
@@ -261,63 +312,53 @@ export const CheckoutPage: React.FC = () => {
 
             <button
               onClick={handlePagar}
-              className={`checkout-submit-btn ${loading ? 'loading' : ''}`}
+              className={`checkout-submit-btn-new ${loading ? 'loading' : ''}`}
               disabled={loading}
+              style={{ padding: 0, overflow: 'hidden', border: 'none', background: 'transparent' }}
             >
               {loading ? (
-                <span className="checkout-submit-btn__loading">
+                <div className="btn-loading-state">
                   <span className="checkout-spinner" />
-                  Preparando pago...
-                </span>
+                  Procesando...
+                </div>
               ) : (
-                <span className="checkout-submit-btn__content">
-                  <IconLock />
-                  Pagar con Clip
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </span>
+                <div className="clip-btn-wrapper">
+                  <img 
+                    src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/estandar/svg/blanco_neutral_con_sombra.svg" 
+                    alt="Paga con Clip"
+                    style={{ width: '100%', display: 'block' }}
+                  />
+                </div>
               )}
             </button>
 
             <div className="checkout-trust-row">
               <div className="checkout-trust-item">
                 <IconShield />
-                <span>Datos cifrados SSL</span>
+                <span>SSL Encrypted</span>
               </div>
               <div className="checkout-trust-item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span>Pago procesado por Clip</span>
-              </div>
-              <div className="checkout-trust-item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Compra garantizada</span>
+                <img src="https://clip.mx/favicon.ico" width="16" height="16" alt="Clip" />
+                <span>Partner Clip</span>
               </div>
             </div>
           </div>
 
-          {/* DERECHA — Resumen del pedido */}
+          {/* DERECHA — Resumen */}
           <div className="checkout-page__summary">
             <div className="checkout-summary-card">
-              <h2 className="checkout-summary-card__title">Tu pedido</h2>
+              <h2 className="checkout-summary-card__title">Resumen de Compra</h2>
 
               <div className="checkout-page__items">
                 {items.map(item => (
                   <div key={item.product.id} className="checkout-page__item">
                     <div className="checkout-page__item-img">
                       {item.product.image_url
-                        ? <img src={getImageUrl(item.product.image_url)} alt={item.product.name} loading="lazy" />
+                        ? <img src={getImageUrl(item.product.image_url)} alt={item.product.name} />
                         : <span>🌿</span>}
                       <span className="checkout-page__item-qty-badge">{item.quantity}</span>
                     </div>
                     <div className="checkout-page__item-info">
-                      {item.product.brand && (
-                        <p className="checkout-page__item-brand">{item.product.brand}</p>
-                      )}
                       <p className="checkout-page__item-name">{item.product.name}</p>
                     </div>
                     <p className="checkout-page__item-price">
@@ -329,35 +370,23 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="checkout-summary-divider" />
 
-              <div className="checkout-summary-lines">
-                <div className="checkout-summary-line">
-                  <span>Subtotal</span>
-                  <span>${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</span>
-                </div>
-                <div className="checkout-summary-line">
-                  <span>Envío</span>
-                  <span className="lime-text">Gratis</span>
-                </div>
-              </div>
-
-              <div className="checkout-summary-divider" />
-
               <div className="checkout-page__total">
-                <span>Total</span>
+                <span>Total a Pagar</span>
                 <span className="lime-text">
                   ${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
                 </span>
               </div>
 
               <div className="checkout-summary-cards-row">
-                <IconVisa />
-                <IconMastercard />
-                <IconAmex />
+                <img src="https://clip.mx/static/images/metodos-pago/visa.svg" alt="Visa" height="20" />
+                <img src="https://clip.mx/static/images/metodos-pago/mastercard.svg" alt="Mastercard" height="20" />
+                <img src="https://clip.mx/static/images/metodos-pago/amex.svg" alt="Amex" height="20" />
+                <img src="https://clip.mx/static/images/metodos-pago/carnet.svg" alt="Carnet" height="20" />
               </div>
 
               <div className="checkout-summary-clip-note">
-                <ClipLogo />
-                <span>Pagos procesados de forma segura por Clip México</span>
+                <img src="https://clip.mx/static/images/logos/logo-clip.svg" alt="Clip" height="16" />
+                <span>Checkout seguro impulsado por Clip México</span>
               </div>
             </div>
           </div>

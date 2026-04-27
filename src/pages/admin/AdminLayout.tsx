@@ -167,6 +167,13 @@ export const AdminLayout: React.FC = () => {
             Configuración general del sitio
           </NavLink>
 
+          <NavLink
+            to="/admin/config?section=clip-payments"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            Pagos Clip (Métricas)
+          </NavLink>
+
           <p className="admin-sidebar__label admin-sidebar__label--tight">SECCIONES</p>
 
           <Link

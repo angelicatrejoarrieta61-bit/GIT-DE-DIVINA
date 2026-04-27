@@ -38,4 +38,9 @@ export interface Order {
   customer_email?: string;
   customer_phone?: string;
   customer_address?: string;
+  customer_city?: string;
+  customer_state?: string;
+  customer_zip?: string;
+  customer_reference?: string;
+  payment_info?: any;
 }
