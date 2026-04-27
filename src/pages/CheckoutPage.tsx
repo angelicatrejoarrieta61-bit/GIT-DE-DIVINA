@@ -314,17 +314,17 @@ export const CheckoutPage: React.FC = () => {
               onClick={handlePagar}
               className={`checkout-submit-btn-new ${loading ? 'loading' : ''}`}
               disabled={loading}
-              style={{ padding: 0, overflow: 'hidden', border: 'none', background: 'transparent' }}
+              style={{ padding: 0, overflow: 'hidden', border: 'none', background: 'transparent', width: '100%' }}
             >
               {loading ? (
                 <div className="btn-loading-state">
                   <span className="checkout-spinner" />
-                  Procesando...
+                  Procesando Pago Seguro...
                 </div>
               ) : (
                 <div className="clip-btn-wrapper">
                   <img 
-                    src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/estandar/svg/blanco_neutral_con_sombra.svg" 
+                    src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/medios-de-pagos/svg/naranja_neutral_con_sombra.svg" 
                     alt="Paga con Clip"
                     style={{ width: '100%', display: 'block' }}
                   />
@@ -332,14 +332,23 @@ export const CheckoutPage: React.FC = () => {
               )}
             </button>
 
-            <div className="checkout-trust-row">
-              <div className="checkout-trust-item">
-                <IconShield />
-                <span>SSL Encrypted</span>
+            <div className="checkout-trust-badges">
+              <div className="checkout-trust-badge">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="lime-text">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <div className="checkout-trust-text">
+                  <strong>PAGO 100% SEGURO</strong>
+                  <span>Encriptación SSL de 256 bits</span>
+                </div>
               </div>
-              <div className="checkout-trust-item">
-                <img src="https://clip.mx/favicon.ico" width="16" height="16" alt="Clip" />
-                <span>Partner Clip</span>
+              <div className="checkout-trust-divider" />
+              <div className="checkout-trust-badge">
+                <img src="https://clip.mx/favicon.ico" width="20" height="20" alt="Clip" />
+                <div className="checkout-trust-text">
+                  <strong>PARTNER OFICIAL</strong>
+                  <span>Tecnología Clip México</span>
+                </div>
               </div>
             </div>
           </div>

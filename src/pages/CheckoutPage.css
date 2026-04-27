@@ -377,6 +377,50 @@
   font-size: 24px;
 }
 
+/* Security Badges */
+.checkout-trust-badges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 32px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+.checkout-trust-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkout-trust-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.checkout-trust-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.checkout-trust-text strong {
+  font-size: 11px;
+  color: #fff;
+  font-family: var(--f-sub);
+  letter-spacing: 0.05em;
+}
+
+.checkout-trust-text span {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  font-family: var(--f-sub);
+}
+
 /* Cards row in summary */
 .checkout-summary-cards-row {
   display: flex;
