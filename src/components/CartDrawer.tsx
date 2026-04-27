@@ -23,6 +23,14 @@ export const CartDrawer: React.FC = () => {
 
   const cartTotal = total();
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
   const handleCheckout = useCallback(() => {
     if (!items.length) return;
     closeCart();
@@ -62,8 +70,8 @@ export const CartDrawer: React.FC = () => {
           {items.length === 0 ? (
             <div className="cart-drawer__empty">
               <span style={{ fontSize: 48 }}>🛍️</span>
-              <p style={{ fontWeight: 600 }}>Tu carrito está vacío</p>
-              <Link to="/catalogo" onClick={closeCart} className="btn btn-lime" style={{ background: 'var(--c-black)', color: 'var(--c-lime)' }}>
+              <p style={{ fontWeight: 600, color: '#000' }}>Tu carrito está vacío</p>
+              <Link to="/catalogo" onClick={closeCart} className="btn btn-lime" style={{ background: '#000', color: '#fff' }}>
                 Ver Productos
               </Link>
             </div>
@@ -79,18 +87,19 @@ export const CartDrawer: React.FC = () => {
                 </div>
 
                 <div className="cart-item__info">
-                  <p>{item.product.name}</p>
-                  <p>${(item.product.price * item.quantity).toFixed(2)} MXN</p>
+                  <span className="cart-item__brand">{item.product.brand || 'DIVINA'}</span>
+                  <h3 className="cart-item__name">{item.product.name}</h3>
+                  <p className="cart-item__price">{formatCurrency(item.product.price * item.quantity)}</p>
                 </div>
 
-                <div className="cart-item__actions-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                  <div className="cart-item__actions">
+                <div className="cart-item__controls">
+                  <div className="cart-item__qty-box">
                     <button onClick={() => updateQty(item.product.id, Math.max(1, item.quantity - 1))}>−</button>
-                    <span>{item.quantity}</span>
+                    <span className="cart-item__qty-num">{item.quantity}</span>
                     <button onClick={() => updateQty(item.product.id, item.quantity + 1)}>+</button>
                   </div>
-                  <button onClick={() => removeItem(item.product.id)} style={{ color: 'rgba(0,0,0,0.3)', fontSize: 14 }}>
-                    Eliminar
+                  <button className="cart-item__delete" onClick={() => removeItem(item.product.id)} title="Eliminar">
+                    🗑️
                   </button>
                 </div>
               </div>
@@ -101,14 +110,22 @@ export const CartDrawer: React.FC = () => {
         {/* Footer */}
         {items.length > 0 && (
           <div className="cart-drawer__footer">
-            <p>
+            <div className="cart-drawer__total-row">
               <span>Total:</span>
-              <span>${cartTotal.toFixed(2)} MXN</span>
-            </p>
-            <button onClick={handleCheckout} disabled={checkoutState === 'loading'} className="btn btn-lime">
-              {checkoutState === 'loading' ? 'Procesando...' : 'FINALIZAR COMPRA'}
+              <span>{formatCurrency(cartTotal)}</span>
+            </div>
+            
+            <button 
+              onClick={handleCheckout} 
+              disabled={checkoutState === 'loading'} 
+              className="btn-checkout-main"
+            >
+              {checkoutState === 'loading' ? 'PROCESANDO...' : 'FINALIZAR COMPRA'}
             </button>
-            <button onClick={closeCart}>Seguir comprando</button>
+            
+            <button onClick={closeCart} className="btn-continue-shopping">
+              Seguir comprando
+            </button>
           </div>
         )}
       </aside>
