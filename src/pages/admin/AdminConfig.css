@@ -25,6 +25,43 @@
   line-height: 1;
 }
 
+/* Products Config Table */
+.products-config-table {
+  margin-top: 10px;
+}
+
+.td-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  padding: 4px 6px;
+  width: 100%;
+  font-size: 11px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.td-input:hover {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.td-input:focus {
+  background: #111;
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(196,252,21,0.1);
+}
+
+.products-config-table table th {
+  font-family: var(--f-sub);
+  letter-spacing: 0.05em;
+  color: var(--c-lime);
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
 .admin-mini-btn.active {
   border-color: rgba(196, 252, 21, 0.55) !important;
   color: var(--c-lime) !important;

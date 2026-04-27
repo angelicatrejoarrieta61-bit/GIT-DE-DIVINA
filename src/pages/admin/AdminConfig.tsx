@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AssetUploader } from '../../components/AssetUploader';
-import { getStoreConfig, getCollections, getProducts, getOrders } from '../../lib/queries';
+import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProducts, updateProduct } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
 import type { Collection, Product, Order } from '../../types';
 import type { SectionBlock } from '../../sections/DynamicSections';
@@ -57,6 +57,110 @@ const DEFAULT_HOME_BLOCKS: SectionBlock[] = [
   },
 ];
 
+const SectionProductsConfig = ({ products, onSave }: { products: Product[], onSave: (items: Product[]) => void }) => {
+  const [items, setItems] = useState<Product[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setItems([...products]);
+  }, [products]);
+
+  const updateItem = (id: string, key: keyof Product, val: any) => {
+    setItems(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      for (const item of items) {
+        const original = products.find(p => p.id === item.id);
+        if (
+          item.name !== original?.name ||
+          item.brand !== original?.brand ||
+          item.price !== original?.price ||
+          item.old_price !== original?.old_price ||
+          item.sku !== original?.sku
+        ) {
+          await updateProduct(item.id, {
+            name: item.name,
+            brand: item.brand,
+            price: Number(item.price),
+            old_price: item.old_price ? Number(item.old_price) : null,
+            sku: item.sku
+          });
+        }
+      }
+      onSave(items);
+      alert('¡Productos actualizados correctamente!');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar algunos productos.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = items.filter(p => 
+    p.name.toLowerCase().includes(search.toLowerCase()) || 
+    (p.brand || '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.sku || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="products-config-table">
+      <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <input 
+          type="text" 
+          className="input-dark" 
+          placeholder="🔍 Buscar por SKU, nombre o marca..." 
+          value={search} 
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, height: '36px' }}
+        />
+        <button onClick={handleSave} className="btn btn--primary" disabled={saving} style={{ padding: '0 24px', height: '36px', fontSize: '11px' }}>
+          {saving ? 'Guardando...' : 'GUARDAR TODO'}
+        </button>
+      </div>
+
+      <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', maxHeight: '70vh', overflowY: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <tr style={{ background: '#111', textAlign: 'left' }}>
+              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>SKU</th>
+              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>MARCA</th>
+              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>TÍTULO PRODUCTO</th>
+              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>P. ANTERIOR</th>
+              <th style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>P. ACTUAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <td style={{ padding: '2px 8px', width: '100px' }}>
+                  <input type="text" value={p.sku || ''} onChange={e => updateItem(p.id, 'sku', e.target.value)} className="td-input" />
+                </td>
+                <td style={{ padding: '2px 8px', width: '120px' }}>
+                  <input type="text" value={p.brand || ''} onChange={e => updateItem(p.id, 'brand', e.target.value)} className="td-input" />
+                </td>
+                <td style={{ padding: '2px 8px' }}>
+                  <input type="text" value={p.name} onChange={e => updateItem(p.id, 'name', e.target.value)} className="td-input" />
+                </td>
+                <td style={{ padding: '2px 8px', width: '90px' }}>
+                  <input type="number" value={p.old_price || ''} onChange={e => updateItem(p.id, 'old_price', e.target.value)} className="td-input" />
+                </td>
+                <td style={{ padding: '2px 8px', width: '90px' }}>
+                  <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} className="td-input" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const Sl = ({ label, cfg, min, max, step, configs, updateConfig }: any) => (
   <div>
     <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>{label}: {configs[cfg] || 0}</label>
@@ -70,6 +174,7 @@ export const AdminConfig: React.FC = () => {
   const [configs, setConfigs] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [adminProducts, setAdminProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'global' | 'hero' | 'secciones' | 'editor' | 'cols' | 'pages'>('global');
@@ -155,11 +260,18 @@ export const AdminConfig: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [c, col, prods, ords] = await Promise.all([getStoreConfig(), getCollections(), getProducts(300), getOrders()]);
+      const [c, col, prods, ords, aProds] = await Promise.all([
+        getStoreConfig(), 
+        getCollections(), 
+        getProducts(300), 
+        getOrders(),
+        getAdminProducts()
+      ]);
       setConfigs(c);
       setCollections(col);
       setProducts(prods);
       setOrders(ords);
+      setAdminProducts(aProds);
       if (c.frost_cards_data) {
         try { const p = JSON.parse(c.frost_cards_data); if (p?.cards) setFrost({ ...DEFAULT_FROST, ...p }); } catch { }
       }
@@ -368,16 +480,44 @@ export const AdminConfig: React.FC = () => {
   );
 
   return (
-    <div style={{ height: '100vh', display: 'grid', gridTemplateColumns: 'minmax(350px, 450px) 1fr', overflow: 'hidden' }}>
+    <div style={{ 
+      height: '100vh', 
+      display: 'grid', 
+      gridTemplateColumns: section === 'products-config' ? '1fr' : 'minmax(350px, 450px) 1fr', 
+      overflow: 'hidden' 
+    }}>
 
       {/* LEFT COLUMN: Controls */}
-      <div style={{ height: '100%', overflowY: 'auto', padding: '24px 20px', borderRight: '1px solid rgba(255,255,255,0.05)', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        height: '100%', 
+        overflowY: 'auto', 
+        padding: '24px 20px', 
+        borderRight: '1px solid rgba(255,255,255,0.05)', 
+        background: '#0a0a0a', 
+        display: 'flex', 
+        flexDirection: 'column' 
+      }}>
 
         <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ color: '#aaa', fontSize: 13, margin: 0 }}>Gestiona identidad visual y secciones.</p>
         </div>
 
         <div style={{ flex: 1 }}>
+
+          {/* ── PRODUCTS CONFIG ── */}
+          {section === 'products-config' && (
+            <section style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+              <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>📦 Configuración Maestra de Productos</h2>
+              <p className="muted-text" style={{ marginBottom: 24 }}>Edita SKU, Marca, Título y Precios de forma masiva. Los cambios se aplicarán al guardar.</p>
+              <SectionProductsConfig 
+                products={adminProducts} 
+                onSave={(next) => {
+                  setAdminProducts(next);
+                  setProducts(next.filter(p => p.in_stock));
+                }} 
+              />
+            </section>
+          )}
 
           {/* ── GLOBAL ── */}
           {(section === 'site-general' || part === 'global' || part === 'header' || part === 'imagen') && (

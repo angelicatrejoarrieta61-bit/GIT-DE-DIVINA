@@ -105,7 +105,25 @@ export const getBestSellers = async (limit = 8): Promise<Product[]> => {
   }
 };
 
-// ─── PRODUCTS WITHOUT IMAGE (for admin) ─────────────────────────
+// ─── ADMIN PRODUCTS ─────────────────────────────────────────────
+export const getAdminProducts = async (): Promise<Product[]> => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*, collection:collections(id,name,slug)')
+    .order('name');
+  if (error) { console.error(error); return []; }
+  return data ?? [];
+};
+
+export const updateProduct = async (id: string, updates: Partial<Product>): Promise<boolean> => {
+  const { error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', id);
+  if (error) { console.error(error); return false; }
+  return true;
+};
+
 export const getProductsWithoutImage = async (): Promise<Product[]> => {
   const { data } = await supabase
     .from('products')
