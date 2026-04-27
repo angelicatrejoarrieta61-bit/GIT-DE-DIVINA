@@ -2,7 +2,13 @@
 .cart-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,.cart-drawer {
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1490;
+  animation: fadeUp 0.2s ease;
+}
+
+.cart-drawer {
   position: fixed;
   top: 10px; right: 10px; bottom: 10px;
   width: 440px;
