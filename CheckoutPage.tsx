@@ -47,53 +47,116 @@ const ClipLogo = () => (
   </svg>
 );
 
+declare global {
+  interface Window {
+    ClipSDK: any;
+  }
+}
+
 export const CheckoutPage: React.FC = () => {
   const { items, total, clearCart } = useCartStore();
   const cartTotal = total();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Clip SDK States
+  const [clipLoaded, setClipLoaded] = useState(false);
+  const [clipInstance, setClipInstance] = useState<any>(null);
+  const [cardElement, setCardElement] = useState<any>(null);
+
+  React.useEffect(() => {
+    const initClip = () => {
+      if (window.ClipSDK && !clipInstance) {
+        // Usamos la API KEY de Clip (pública)
+        const clip = new window.ClipSDK('3f2d18b8-2ff4-453e-a243-b078daa507e2');
+        setClipInstance(clip);
+        setClipLoaded(true);
+      }
+    };
+
+    const timer = setInterval(() => {
+      if (window.ClipSDK) {
+        initClip();
+        clearInterval(timer);
+      }
+    }, 500);
+    
+    return () => clearInterval(timer);
+  }, [clipInstance]);
+
+  React.useEffect(() => {
+    if (clipLoaded && clipInstance && !cardElement) {
+      const elements = clipInstance.elements();
+      const card = elements.create('Card', {
+        style: {
+          base: {
+            color: '#ffffff',
+            fontFamily: 'Catamaran, sans-serif',
+            fontSize: '16px',
+            '::placeholder': { color: '#666666' },
+          },
+        },
+      });
+      card.mount('#clip-card-container');
+      setCardElement(card);
+    }
+  }, [clipLoaded, clipInstance, cardElement]);
 
   const handlePagar = async () => {
+    if (!clipInstance || !cardElement) {
+      setError('El sistema de pagos no ha terminado de cargar. Por favor espera un momento.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      // Crear orden en Supabase con datos mínimos
+      // 1. Crear orden en Supabase
       const order = await createOrder({
-        customer_name: 'Cliente',
-        customer_email: '',
+        customer_name: 'Cliente Online',
+        customer_email: 'pago@pendiente.com',
         customer_phone: '',
-        customer_address: '',
+        customer_address: 'Entrega por coordinar',
         items,
         total: cartTotal,
         status: 'pending',
       });
 
-      if (!order) throw new Error('No se pudo crear la orden. Intenta de nuevo.');
+      if (!order) throw new Error('No se pudo generar la orden en el sistema.');
 
-      // Llamar al API de Clip Checkout Redireccionado
-      const res = await fetch('/api/create-payment', {
+      // 2. Generar Token de Clip
+      const result = await clipInstance.createToken(cardElement);
+      
+      if (result.error) {
+        throw new Error(result.error.message || 'Error al procesar la tarjeta');
+      }
+
+      // 3. Enviar token al backend para realizar el cargo real
+      const res = await fetch('/api/charge-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          token: result.token,
           amount: cartTotal,
-          description: `Divina Store MX — Orden ${order.id}`,
+          description: `Divina Store — Orden ${order.id}`,
           orderId: order.id,
-          redirect_url: `${window.location.origin}/pago-exitoso?order=${order.id}`,
-          error_url: `${window.location.origin}/pago-error?order=${order.id}`,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al crear el pago. Intenta de nuevo.');
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'El pago fue rechazado o hubo un error.');
+      }
 
+      // 4. Éxito
       clearCart();
-      // Redirigir a Clip — ahí el cliente llena sus datos y paga
-      window.location.href = data.payment_url;
+      navigate(`/pago-exitoso?order=${order.id}`);
 
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      const msg = err instanceof Error ? err.message : 'Error al procesar el pago';
       setError(msg);
       setLoading(false);
     }
@@ -143,23 +206,46 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
+            <div className="checkout-form-section">
+              <h2 className="checkout-form-section__title">
+                <span className="checkout-form-section__num">01</span>
+                Información de Pago
+              </h2>
+
+              <div className="checkout-clip-badge">
+                <IconShield />
+                <span>
+                  Tus datos están protegidos. El formulario de pago es proporcionado de forma segura por <strong>Clip México</strong>.
+                </span>
+              </div>
+
+              {!clipLoaded && (
+                <div className="checkout-clip-loading">
+                  <div className="checkout-spinner" />
+                  Cargando pasarela de pagos...
+                </div>
+              )}
+
+              <div 
+                id="clip-card-container" 
+                className="checkout-clip-element"
+                style={{ display: clipLoaded ? 'block' : 'none' }}
+              >
+                {/* Aquí el SDK de Clip montará el formulario */}
+              </div>
+            </div>
+
             <div className="checkout-clip-info">
               <div className="checkout-clip-info__item">
                 <IconShield />
-                <span>Serás redirigido al sitio seguro de Clip donde podrás ingresar tus datos y pagar con tarjeta de crédito o débito.</span>
-              </div>
-              <div className="checkout-clip-info__item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Acepta Visa, Mastercard, American Express y tarjetas de débito.</span>
+                <span>Pago procesado con tecnología de cifrado SSL para tu seguridad.</span>
               </div>
               <div className="checkout-clip-info__item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="2" y="5" width="20" height="14" rx="2" />
                   <path d="M2 10h20" />
                 </svg>
-                <span>Meses sin intereses disponibles según tu banco.</span>
+                <span>Aceptamos todas las tarjetas de crédito y débito Visa, Mastercard y Amex.</span>
               </div>
             </div>
 
