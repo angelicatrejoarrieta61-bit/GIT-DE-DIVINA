@@ -279,12 +279,6 @@ export const CheckoutPage: React.FC = () => {
                   <img src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/medios-de-pagos/svg/naranja_hover_con_sombra.svg" alt="Paga con Clip" style={{ width: '100%' }} />
                 }
               </button>
-              <div className="checkout-mini-cards">
-                <img src="https://clip.mx/static/images/metodos-pago/visa.svg" alt="Visa" height="14" />
-                <img src="https://clip.mx/static/images/metodos-pago/mastercard.svg" alt="Mastercard" height="14" />
-                <img src="https://clip.mx/static/images/metodos-pago/amex.svg" alt="Amex" height="14" />
-                <img src="https://clip.mx/static/images/metodos-pago/carnet.svg" alt="Carnet" height="14" />
-              </div>
             </div>
 
             <div className="checkout-footer-badges">
