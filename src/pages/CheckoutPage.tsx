@@ -199,19 +199,23 @@ export const CheckoutPage: React.FC = () => {
 
   return (
     <div className="checkout-page" style={{ paddingTop: 'var(--nav-h)' }}>
-      <div className="page-width section">
-        <div className="checkout-page__header">
-          <h1 className="checkout-page__title">Finalizar <span className="lime-text">Compra</span></h1>
-          <div className="checkout-page__secure-badge-top"><IconLock /> <span>PAGO SEGURO</span></div>
-        </div>
-
-        {/* ── HERO BANNER ── */}
-        {config.cart_footer_img && (
-          <div className="checkout-hero-banner" style={{ marginBottom: 32, borderRadius: 24, overflow: 'hidden', aspectRatio: '16/9', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <img src={getImageUrl(config.cart_footer_img)} alt="Divina Promo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {/* ── HERO BANNER HEADER ── */}
+      <div className="checkout-hero-header" style={{ 
+        backgroundImage: config.cart_footer_img ? `url(${getImageUrl(config.cart_footer_img)})` : 'none',
+      }}>
+        <div className="checkout-hero-header__overlay" />
+        <div className="page-width checkout-hero-header__content">
+          <div className="checkout-hero-header__left">
+            <h1 className="checkout-page__title">Finalizar <span className="lime-text">Compra</span></h1>
+            <div className="checkout-page__secure-badge-top"><IconLock /> <span>PAGO SEGURO</span></div>
           </div>
-        )}
+          <div className="checkout-hero-header__right">
+             <div className="checkout-notice"><IconShield /> <span>Pago procesado por <strong>Clip México</strong>.</span></div>
+          </div>
+        </div>
+      </div>
 
+      <div className="page-width section" style={{ marginTop: 32 }}>
         <div className="checkout-page__grid">
           <div className="checkout-page__left">
             <div className="checkout-card glass compact">
@@ -260,8 +264,6 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            <div className="checkout-notice"><IconShield /> <span>Pago procesado por <strong>Clip México</strong>.</span></div>
 
             <div className="checkout-card glass payment-card">
               <div id="clip-card-container" className="checkout-clip-mount">
