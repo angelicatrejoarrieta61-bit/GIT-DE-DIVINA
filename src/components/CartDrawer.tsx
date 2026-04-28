@@ -122,13 +122,6 @@ export const CartDrawer: React.FC = () => {
         {items.length > 0 && (
           <div className="cart-drawer__footer">
             
-            {/* ── Banner Promocional ── */}
-            {footerImg && (
-              <div className="cart-drawer__promo" style={{ marginBottom: 12, borderRadius: 20, overflow: 'hidden', aspectRation: '16/9' }}>
-                <img src={getImageUrl(footerImg)} alt="Promoción" style={{ width: '100%', display: 'block' }} />
-              </div>
-            )}
-
             <div className="cart-drawer__total-row">
               <span>Total:</span>
               <span>{formatCurrency(cartTotal)}</span>

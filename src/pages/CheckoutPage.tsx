@@ -205,6 +205,13 @@ export const CheckoutPage: React.FC = () => {
           <div className="checkout-page__secure-badge-top"><IconLock /> <span>PAGO SEGURO</span></div>
         </div>
 
+        {/* ── HERO BANNER ── */}
+        {config.cart_footer_img && (
+          <div className="checkout-hero-banner" style={{ marginBottom: 32, borderRadius: 24, overflow: 'hidden', aspectRatio: '16/9', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <img src={getImageUrl(config.cart_footer_img)} alt="Divina Promo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+
         <div className="checkout-page__grid">
           <div className="checkout-page__left">
             <div className="checkout-card glass compact">
