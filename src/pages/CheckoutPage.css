@@ -72,7 +72,7 @@
 .checkout-page__grid {
   display: grid;
   grid-template-columns: 1fr 380px;
-  gap: 24px; /* Reduced gap */
+  gap: 16px; /* Reduced gap */
   align-items: start;
 }
 
@@ -83,7 +83,7 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 20px; /* Reduced padding */
+  padding: 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -103,13 +103,13 @@
 .checkout-compact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px; /* Reduced gap between rows */
+  gap: 8px;
 }
 
 .checkout-field {
   display: flex;
   flex-direction: column;
-  gap: 2px; /* Reduced gap between label and input */
+  gap: 2px;
 }
 
 .checkout-field.full {
@@ -128,9 +128,9 @@
   background: rgba(20, 20, 20, 0.8) !important;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px 12px; /* Compressed padding */
+  padding: 8px 12px;
   color: #fff;
-  font-size: 13px; /* Slightly smaller */
+  font-size: 13px;
   transition: all 0.2s;
   width: 100%;
   appearance: none;
@@ -154,7 +154,7 @@
   font-weight: 800;
   color: #fff;
   letter-spacing: 0.1em;
-  margin: 8px 0 2px; /* Compressed margins */
+  margin: 8px 0 2px;
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -163,8 +163,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
-  padding: 12px 20px;
+  margin-top: 12px;
+  padding: 10px 16px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 12px;
   font-size: 12px;
@@ -177,8 +177,8 @@
 
 /* Payment Section */
 .payment-card {
-  margin-top: 24px;
-  padding: 24px;
+  margin-top: 12px; /* Reduced margin */
+  padding: 20px;
 }
 
 .checkout-clip-mount {
@@ -202,8 +202,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin-top: 32px;
+  gap: 12px;
+  margin-top: 16px; /* Reduced margin */
 }
 
 .checkout-pagar-btn-official {

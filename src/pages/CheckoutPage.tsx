@@ -215,7 +215,7 @@ export const CheckoutPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="page-width section" style={{ marginTop: 32 }}>
+      <div className="page-width section" style={{ marginTop: 16 }}>
         <div className="checkout-page__grid">
           <div className="checkout-page__left">
             <div className="checkout-card glass compact">
