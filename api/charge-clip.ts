@@ -21,7 +21,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const response = await fetch('https://api.payclip.com/payments', {
+        // Clip acepta Bearer token para API keys
+        const response = await fetch('https://api-gw.payclip.com/payments', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -30,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: JSON.stringify({
                 amount: parseFloat(Number(amount).toFixed(2)),
                 currency: 'MXN',
-                token: token,
+                source: token,
                 description: description || `Orden ${orderId}`,
                 reference: String(orderId),
             }),
@@ -39,14 +40,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Clip Payments API error:', JSON.stringify(data));
+            console.error('Clip Payments API error:', response.status, JSON.stringify(data));
             return res.status(response.status).json({ 
-                error: data.message || 'Error al procesar el pago con Clip',
-                details: data
+                error: data.message || data.error || 'Error al procesar el pago con Clip',
+                details: data,
+                clipStatus: response.status,
             });
         }
 
-        // El pago fue exitoso
         return res.status(200).json({ 
             success: true, 
             payment_id: data.id,

@@ -13,38 +13,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
     }
 
-    // Test: hacer una petición de lectura a la API de Clip para verificar autenticación
-    try {
-        const response = await fetch('https://api.payclip.com/payments?limit=1', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${secretKey}`,
-            },
-        });
+    // Probar ambos endpoints de Clip
+    const endpoints = [
+        'https://api-gw.payclip.com/payments?limit=1',
+        'https://api.payclip.com/payments?limit=1',
+    ];
 
-        if (response.ok) {
-            return res.status(200).json({
-                status: '✅ ÉXITO',
-                message: 'La API Key de Clip es válida y funciona correctamente',
-                keyPreview: secretKey.slice(0, 8) + '...' + secretKey.slice(-4),
+    const results = [];
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${secretKey}`,
+                },
             });
-        } else {
-            const data = await response.json().catch(() => ({}));
-            return res.status(401).json({
-                status: '❌ FALLO',
-                error: 'Clip rechazó la llave — probablemente es incorrecta',
-                clipStatus: response.status,
-                clipResponse: data,
-                keyPreview: secretKey.slice(0, 8) + '...' + secretKey.slice(-4),
-                fix: 'Verifica que CLIP_SECRET sea tu API Key SECRETA (no la pública)',
+            const data = await response.json().catch(() => ({ raw: await response.text().catch(() => '') }));
+            results.push({
+                url,
+                status: response.status,
+                ok: response.ok,
+                response: data,
             });
+        } catch (err) {
+            results.push({ url, status: 'ERROR', error: String(err) });
         }
-    } catch (err) {
-        return res.status(500).json({
-            status: '❌ FALLO',
-            error: 'No se pudo conectar con Clip',
-            details: String(err),
-        });
     }
+
+    const anyOk = results.some(r => r.ok);
+
+    return res.status(anyOk ? 200 : 401).json({
+        status: anyOk ? '✅ ÉXITO — La API Key funciona' : '❌ FALLO — Ambos endpoints rechazaron la llave',
+        keyPreview: secretKey.slice(0, 8) + '...' + secretKey.slice(-4),
+        keyLength: secretKey.length,
+        results,
+        fix: anyOk ? null : 'Verifica que CLIP_SECRET sea tu API Key SECRETA de Clip (Panel de desarrolladores)',
+    });
 }
