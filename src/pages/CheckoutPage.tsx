@@ -123,8 +123,8 @@ export const CheckoutPage: React.FC = () => {
   React.useEffect(() => {
     const initClip = () => {
       if (window.ClipSDK && !clipInstance) {
-        // Usamos la llave de pruebas (Test Key) del archivo .env
-        const clipKey = import.meta.env.VITE_CLIP_API_TEST_KEY || 'test_02f2b0d9-70c7-4599-86df-56033d6adf03';
+        // Usamos la llave REAL del archivo .env
+        const clipKey = import.meta.env.VITE_CLIP_API_KEY || '5736d7d0-296c-4e91-a769-f78b364d72cc';
         const clip = new window.ClipSDK(clipKey);
         setClipInstance(clip);
         setClipLoaded(true);
