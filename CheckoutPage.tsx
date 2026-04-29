@@ -132,7 +132,9 @@ export const CheckoutPage: React.FC = () => {
   React.useEffect(() => {
     const timer = setInterval(() => {
       if (window.ClipSDK && !clipInstance) {
-        const clip = new window.ClipSDK('3f2d18b8-2ff4-453e-a243-b078daa507e2');
+        // Usamos la llave de pruebas (Test Key) del archivo .env
+        const clipKey = import.meta.env.VITE_CLIP_API_TEST_KEY || 'test_02f2b0d9-70c7-4599-86df-56033d6adf03';
+        const clip = new window.ClipSDK(clipKey);
         setClipInstance(clip);
         setClipLoaded(true);
         clearInterval(timer);

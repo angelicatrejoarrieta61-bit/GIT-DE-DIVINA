@@ -14,7 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, token, orderId)' });
     }
 
-    const secretKey = process.env.CLIP_SECRET;
+    // Usamos el secret de prueba (Test Secret) del .env para poder probar
+    const secretKey = process.env.CLIP_TEST_SECRET || 'a5b17576-a44e-4986-8a7e-e77ce548b76a';
 
     if (!secretKey) {
         return res.status(500).json({ error: 'Clip Secret Key no configurada en el servidor' });
