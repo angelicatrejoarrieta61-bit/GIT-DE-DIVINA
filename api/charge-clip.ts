@@ -8,51 +8,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { amount, description, orderId, token } = req.body;
+    const { amount, description, orderId } = req.body;
 
-    if (!amount || !token || !orderId) {
-        return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, token, orderId)' });
+    if (!amount || !orderId) {
+        return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, orderId)' });
     }
 
-    // Usamos el secret REAL del .env
-    const secretKey = process.env.CLIP_SECRET || 'cf23db53-7f82-4174-a4e1-58164268b238';
+    // Clip Checkout usa la API KEY principal
+    const apiKey = process.env.CLIP_API_KEY || '5736d7d0-296c-4e91-a769-f78b364d72cc';
 
-    if (!secretKey) {
-        return res.status(500).json({ error: 'Clip Secret Key no configurada en el servidor' });
+    if (!apiKey) {
+        return res.status(500).json({ error: 'Clip API Key no configurada en el servidor' });
     }
 
     try {
-        // Clip acepta Bearer token para API keys
-        const response = await fetch('https://api-gw.payclip.com/payments', {
+        const baseUrl = req.headers.origin || 'https://git-de-divina.vercel.app';
+        const response = await fetch('https://api.clip.mx/v1/checkout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${secretKey}`,
+                'x-api-key': apiKey,
             },
             body: JSON.stringify({
                 amount: parseFloat(Number(amount).toFixed(2)),
                 currency: 'MXN',
-                source: token,
-                description: description || `Orden ${orderId}`,
-                reference: String(orderId),
+                purchase_description: description || `Orden ${orderId}`,
+                custom_id: String(orderId),
+                redirection_url: {
+                    success: `${baseUrl}/pago-exitoso?order=${orderId}`,
+                    error: `${baseUrl}/checkout?error=pago_rechazado`,
+                    default: `${baseUrl}/pago-exitoso?order=${orderId}`
+                }
             }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Clip Payments API error:', response.status, JSON.stringify(data));
+            console.error('Clip Checkout error:', response.status, data);
             return res.status(response.status).json({ 
-                error: data.message || data.error || 'Error al procesar el pago con Clip',
-                details: data,
-                clipStatus: response.status,
+                error: data.message || data.error || 'Error al generar el link de pago',
             });
         }
 
         return res.status(200).json({ 
             success: true, 
-            payment_id: data.id,
-            status: data.status 
+            payment_url: data.payment_request_url
         });
 
     } catch (err) {

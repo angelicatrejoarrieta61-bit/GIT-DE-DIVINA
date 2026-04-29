@@ -17,9 +17,7 @@ const IconShield = () => (
   </svg>
 );
 
-declare global {
-  interface Window { ClipSDK: any; }
-}
+// No global window.ClipSDK anymore
 
 /* ── Security Badges ── */
 const PCIBadge = () => (
@@ -85,12 +83,9 @@ export const CheckoutPage: React.FC = () => {
   const [colonias, setColonias] = useState<string[]>([]);
   const [isFetchingZip, setIsFetchingZip] = useState(false);
 
-  // Clip SDK States
-  const [clipLoaded, setClipLoaded] = useState(false);
-  const [clipInstance, setClipInstance] = useState<any>(null);
-  const [cardElement, setCardElement] = useState<any>(null);
-
   React.useEffect(() => {
+    getStoreConfig().then(setConfig);
+  }, []);
     getStoreConfig().then(setConfig);
   }, []);
 
@@ -120,47 +115,7 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [form.zip]);
 
-  React.useEffect(() => {
-    const initClip = () => {
-      if (window.ClipSDK && !clipInstance) {
-        // Usamos la llave REAL del archivo .env
-        const clipKey = import.meta.env.VITE_CLIP_API_KEY || '5736d7d0-296c-4e91-a769-f78b364d72cc';
-        const clip = new window.ClipSDK(clipKey);
-        setClipInstance(clip);
-        setClipLoaded(true);
-      }
-    };
-
-    const timer = setInterval(() => {
-      if (window.ClipSDK) {
-        initClip();
-        clearInterval(timer);
-      }
-    }, 500);
-    
-    return () => clearInterval(timer);
-  }, [clipInstance]);
-
-  React.useEffect(() => {
-    if (clipLoaded && clipInstance && !cardElement) {
-      try {
-        // API REAL del SDK de Clip: clip.element.create() (NO clip.elements())
-        const card = clipInstance.element.create('Card', {
-          locale: 'es',
-          paymentAmount: cartTotal,
-        });
-        // mount() recibe el ID sin '#' (usa document.getElementById internamente)
-        card.mount('clip-card-container');
-        // Enviar el monto al iframe (fix para amount=undefined)
-        setTimeout(() => {
-          try { card.setAmount(cartTotal); } catch (e) { /* ok */ }
-        }, 800);
-        setCardElement(card);
-      } catch (e) {
-        console.error('[Clip] Error al montar el formulario de tarjeta:', e);
-      }
-    }
-  }, [clipLoaded, clipInstance, cardElement]);
+  // Fetch ZIP info (Mexico)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -173,16 +128,11 @@ export const CheckoutPage: React.FC = () => {
       return;
     }
 
-    if (!clipInstance || !cardElement) {
-      setError('El sistema de pagos aún está cargando. Espera un momento e intenta de nuevo.');
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
-      // PASO 1: Crear la orden PRIMERO para tener el orderId
+      // PASO 1: Crear la orden
       const order = await createOrder({
         customer_name: form.name,
         customer_email: form.email,
@@ -201,23 +151,13 @@ export const CheckoutPage: React.FC = () => {
 
       if (!order) throw new Error('No se pudo registrar la orden. Intenta de nuevo.');
 
-      // PASO 2: Generar token con Clip
-      // API REAL: card.cardToken() devuelve Promise<{ id: string }>
-      const tokenResult = await cardElement.cardToken();
-
-      // tokenResult es { id: 'tok_xxx' } o lanza excepción con el error
-      if (!tokenResult || !tokenResult.id) {
-        throw new Error('No se obtuvo token de pago. Verifica los datos de tu tarjeta.');
-      }
-
-      const clipToken = tokenResult.id;
+      // PASO 2: Generar link de pago en Clip
       const chargeRes = await fetch('/api/charge-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: clipToken,           // token ID string de Clip
-          amount: cartTotal,          // monto en pesos MXN (float)
-          orderId: order.id,          // requerido por nuestro endpoint
+          amount: cartTotal,
+          orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
         }),
       });
@@ -225,13 +165,14 @@ export const CheckoutPage: React.FC = () => {
       const chargeData = await chargeRes.json();
 
       if (!chargeRes.ok) {
-        // Marcar la orden como fallida para registro
-        throw new Error(chargeData.error || 'El pago fue rechazado por el banco. Verifica tus datos.');
+        throw new Error(chargeData.error || 'Error al generar el pago. Intenta de nuevo.');
       }
 
-      // PASO 4: Éxito — limpiar carrito y redirigir
+      // Limpiar carrito
       clearCart();
-      navigate(`/pago-exitoso?order=${order.id}`);
+      
+      // Redirigir a Clip para pagar de forma segura
+      window.location.href = chargeData.payment_url;
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el pago.';
@@ -355,8 +296,14 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             <div className="checkout-card glass payment-card">
-              <div id="clip-card-container" className="checkout-clip-mount">
-                {!clipLoaded && <div className="clip-skeleton">Cargando pasarela...</div>}
+              <div className="checkout-clip-mount" style={{ textAlign: 'center', padding: '30px 10px' }}>
+                <p style={{ color: '#aaa', fontSize: 13, marginBottom: 15 }}>Serás redirigido a la plataforma oficial de Clip para completar tu pago de forma 100% segura.</p>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 64 24" width="80" height="30">
+                    <rect width="64" height="24" rx="4" fill="#FC4C02" />
+                    <text x="12" y="17" fill="white" fontSize="14" fontWeight="bold" fontFamily="Arial">clip</text>
+                  </svg>
+                </div>
               </div>
             </div>
 
