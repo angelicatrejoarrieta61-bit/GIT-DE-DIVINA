@@ -44,4 +44,5 @@ export interface Order {
   customer_zip?: string;
   customer_reference?: string;
   payment_info?: any;
+  accepts_marketing?: boolean;
 }
