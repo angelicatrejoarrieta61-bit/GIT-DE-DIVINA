@@ -18,10 +18,39 @@ const IconShield = () => (
 );
 
 declare global {
-  interface Window {
-    ClipSDK: any;
-  }
+  interface Window { ClipSDK: any; }
 }
+
+/* ── Security Badges ── */
+const PCIBadge = () => (
+  <svg viewBox="0 0 64 32" width="64" height="32" aria-label="PCI DSS Compliant">
+    <rect width="64" height="32" rx="4" fill="#003087" />
+    <text x="4" y="13" fill="white" fontSize="8" fontWeight="bold" fontFamily="Arial">PCI DSS</text>
+    <text x="4" y="24" fill="#FFD700" fontSize="7" fontFamily="Arial">COMPLIANT</text>
+    <path d="M52 8l4 4-7 7-4-4z" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+    <path d="M49 14l-2 8 8-8z" fill="#FFD700" />
+  </svg>
+);
+
+const SSLBadge = () => (
+  <svg viewBox="0 0 64 32" width="64" height="32" aria-label="SSL Secure">
+    <rect width="64" height="32" rx="4" fill="#1a7c1a" />
+    <text x="4" y="14" fill="white" fontSize="9" fontWeight="bold" fontFamily="Arial">🔒 SSL</text>
+    <text x="4" y="25" fill="#90EE90" fontSize="7" fontFamily="Arial">256-BIT</text>
+  </svg>
+);
+
+const IconShieldGreen = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 
 const MEXICAN_STATES = [
   'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas', 'Chihuahua', 
@@ -49,7 +78,8 @@ export const CheckoutPage: React.FC = () => {
     city: '',
     state: 'CDMX',
     zip: '',
-    reference: 'Casa'
+    reference: 'Casa',
+    accepts_marketing: true,   // opt-in newsletter por defecto
   });
 
   const [colonias, setColonias] = useState<string[]>([]);
@@ -111,19 +141,22 @@ export const CheckoutPage: React.FC = () => {
 
   React.useEffect(() => {
     if (clipLoaded && clipInstance && !cardElement) {
-      const card = clipInstance.element.create('Card', {
-        theme: 'light',
-        style: {
-          base: {
-            color: '#111111',
-            fontFamily: 'Catamaran, sans-serif',
-            fontSize: '15px',
-            '::placeholder': { color: '#999999' },
-          },
-        },
-      });
-      card.mount('clip-card-container');
-      setCardElement(card);
+      try {
+        // API REAL del SDK de Clip: clip.element.create() (NO clip.elements())
+        const card = clipInstance.element.create('Card', {
+          locale: 'es',
+          paymentAmount: cartTotal,
+        });
+        // mount() recibe el ID sin '#' (usa document.getElementById internamente)
+        card.mount('clip-card-container');
+        // Enviar el monto al iframe (fix para amount=undefined)
+        setTimeout(() => {
+          try { card.setAmount(cartTotal); } catch (e) { /* ok */ }
+        }, 800);
+        setCardElement(card);
+      } catch (e) {
+        console.error('[Clip] Error al montar el formulario de tarjeta:', e);
+      }
     }
   }, [clipLoaded, clipInstance, cardElement]);
 
@@ -133,13 +166,13 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handlePagar = async () => {
-    if (!form.name || !form.email || !form.address || !form.city || !form.neighborhood) {
-      setError('Por favor completa todos los campos de envío.');
+    if (!form.name || !form.email || !form.address || !form.city) {
+      setError('Por favor completa todos los campos de envío obligatorios.');
       return;
     }
 
     if (!clipInstance || !cardElement) {
-      setError('Cargando sistema de pagos...');
+      setError('El sistema de pagos aún está cargando. Espera un momento e intenta de nuevo.');
       return;
     }
 
@@ -147,28 +180,12 @@ export const CheckoutPage: React.FC = () => {
     setError('');
 
     try {
-      const result = await cardElement.cardToken();
-      if (result.error) throw new Error(result.error.message || 'Error en la tarjeta');
-
-      const chargeRes = await fetch('/api/charge-clip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: result.token,
-          amount: cartTotal,
-          description: `Divina Store — ${form.name}`,
-          customer: { name: form.name, email: form.email, phone: form.phone }
-        }),
-      });
-
-      const chargeData = await chargeRes.json();
-      if (!chargeRes.ok) throw new Error(chargeData.error || 'Pago rechazado.');
-
+      // PASO 1: Crear la orden PRIMERO para tener el orderId
       const order = await createOrder({
         customer_name: form.name,
         customer_email: form.email,
         customer_phone: form.phone,
-        customer_address: form.address,
+        customer_address: `${form.address}, ${form.neighborhood}`,
         customer_neighborhood: form.neighborhood,
         customer_city: form.city,
         customer_state: form.state,
@@ -176,14 +193,48 @@ export const CheckoutPage: React.FC = () => {
         customer_reference: form.reference,
         items,
         total: cartTotal,
-        status: 'paid',
-        payment_info: chargeData
+        status: 'pending',
+        accepts_marketing: form.accepts_marketing,
       });
 
+      if (!order) throw new Error('No se pudo registrar la orden. Intenta de nuevo.');
+
+      // PASO 2: Generar token con Clip
+      // API REAL: card.cardToken() devuelve Promise<{ id: string }>
+      const tokenResult = await cardElement.cardToken();
+
+      // tokenResult es { id: 'tok_xxx' } o lanza excepción con el error
+      if (!tokenResult || !tokenResult.id) {
+        throw new Error('No se obtuvo token de pago. Verifica los datos de tu tarjeta.');
+      }
+
+      const clipToken = tokenResult.id;
+      const chargeRes = await fetch('/api/charge-clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: clipToken,           // token ID string de Clip
+          amount: cartTotal,          // monto en pesos MXN (float)
+          orderId: order.id,          // requerido por nuestro endpoint
+          description: `Divina Store — ${form.name} — Orden ${order.id}`,
+        }),
+      });
+
+      const chargeData = await chargeRes.json();
+
+      if (!chargeRes.ok) {
+        // Marcar la orden como fallida para registro
+        throw new Error(chargeData.error || 'El pago fue rechazado por el banco. Verifica tus datos.');
+      }
+
+      // PASO 4: Éxito — limpiar carrito y redirigir
       clearCart();
-      navigate(`/pago-exitoso?order=${order?.id || 'new'}`);
+      navigate(`/pago-exitoso?order=${order.id}`);
+
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al pagar');
+      const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el pago.';
+      console.error('[Checkout] Error en pago:', msg);
+      setError(msg);
       setLoading(false);
     }
   };
@@ -218,6 +269,28 @@ export const CheckoutPage: React.FC = () => {
       <div className="page-width section" style={{ marginTop: 16 }}>
         <div className="checkout-page__grid">
           <div className="checkout-page__left">
+
+            {/* PCI/SSL trust bar */}
+            <div className="checkout-pci-bar">
+              <div className="checkout-pci-bar__badges">
+                <PCIBadge />
+                <SSLBadge />
+              </div>
+              <div className="checkout-pci-bar__text">
+                <IconShieldGreen />
+                Datos protegidos con cifrado de 256-bit · Pago seguro por Clip México
+              </div>
+            </div>
+
+            {/* MSI Banner */}
+            <div className="checkout-msi-banner">
+              <div className="checkout-msi-banner__icon">💳</div>
+              <div className="checkout-msi-banner__text">
+                <strong>¿Meses sin intereses disponibles?</strong>
+                <p>Hasta 12 MSI según tu banco. Visa, Mastercard y Amex participantes. Consúltalo con tu banco emisor al momento del pago.</p>
+              </div>
+            </div>
+
             <div className="checkout-card glass compact">
               <h2 className="checkout-card__title"><span className="lime-text">01</span> DATOS DE ENVÍO</h2>
               <div className="checkout-compact-grid">
@@ -262,6 +335,20 @@ export const CheckoutPage: React.FC = () => {
                     <option value="Casa">Casa</option><option value="Oficina">Oficina</option><option value="Local">Local</option><option value="Otro">Otro</option>
                   </select>
                 </div>
+
+                {/* Newsletter opt-in */}
+                <div className="checkout-field full" style={{ marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textTransform: 'none', fontSize: 12, color: '#aaa', fontWeight: 400 }}>
+                    <input
+                      type="checkbox"
+                      name="accepts_marketing"
+                      checked={form.accepts_marketing}
+                      onChange={e => setForm(prev => ({ ...prev, accepts_marketing: e.target.checked }))}
+                      style={{ width: 15, height: 15, accentColor: 'var(--c-lime)', marginTop: 2, flexShrink: 0 }}
+                    />
+                    <span>Quiero recibir ofertas exclusivas, descuentos y novedades de Divina Store MX por correo electrónico. Puedo darme de baja en cualquier momento.</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -274,17 +361,38 @@ export const CheckoutPage: React.FC = () => {
             {error && <div className="checkout-page__error"><span>⚠</span><span>{error}</span></div>}
 
             <div className="checkout-actions">
-              <button onClick={handlePagar} className={`checkout-pagar-btn-official ${loading ? 'loading' : ''}`} disabled={loading}>
-                {loading ? <div className="btn-loading-state"><span className="checkout-spinner" /> Procesando...</div> :
-                  <img src="https://prod-ses-email-templates-assets.s3.amazonaws.com/payment/pay-with-clip/button-logos/es/medios-de-pagos/svg/naranja_hover_con_sombra.svg" alt="Paga con Clip" style={{ width: '100%' }} />
-                }
+              <button
+                onClick={handlePagar}
+                className={`checkout-pagar-btn-official ${loading ? 'loading' : ''}`}
+                disabled={loading}
+                id="checkout-pay-btn"
+              >
+                {loading ? (
+                  <div className="btn-loading-state">
+                    <span className="checkout-spinner" />
+                    Procesando pago...
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '14px 24px', background: 'var(--c-lime)', borderRadius: 12, fontFamily: 'var(--f-sub)', fontSize: 15, fontWeight: 800, color: '#000', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Pagar ${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                  </div>
+                )}
               </button>
             </div>
 
             <div className="checkout-footer-badges">
               <div className="checkout-trust-badge"><IconShield /> <div className="trust-text"><strong>PAGO SEGURO</strong><span>Encriptación SSL 256 bits</span></div></div>
               <div className="trust-divider" />
-              <div className="checkout-trust-badge partner-badge"><img src="https://clip.mx/static/images/logos/logo-clip.svg" alt="Clip" /><div className="trust-text"><strong>PARTNER OFICIAL</strong><span>Clip México</span></div></div>
+              <div className="checkout-trust-badge">
+                <svg viewBox="0 0 48 20" width="48" height="20">
+                  <rect width="48" height="20" rx="4" fill="#FC4C02" />
+                  <text x="6" y="14" fill="white" fontSize="10" fontWeight="bold" fontFamily="Arial">clip</text>
+                </svg>
+                <div className="trust-text"><strong>PARTNER OFICIAL</strong><span>Clip México</span></div>
+              </div>
             </div>
           </div>
 
@@ -301,7 +409,18 @@ export const CheckoutPage: React.FC = () => {
                 ))}
               </div>
               <div className="summary-total-row"><span>TOTAL</span><span className="total-amount">${cartTotal.toLocaleString('es-MX')} <small>MXN</small></span></div>
-              <div className="summary-clip-secure"><img src="https://clip.mx/favicon.ico" alt="Clip" height="14" /> <span>Checkout impulsado por Clip</span></div>
+              <div className="checkout-msi-mini">💳 Hasta 12 MSI según tu banco</div>
+              <div className="summary-clip-secure">
+                <svg viewBox="0 0 32 14" width="32" height="14">
+                  <rect width="32" height="14" rx="3" fill="#FC4C02" />
+                  <text x="4" y="10" fill="white" fontSize="7" fontWeight="bold" fontFamily="Arial">clip</text>
+                </svg>
+                <span>Checkout impulsado por Clip</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                <PCIBadge />
+                <SSLBadge />
+              </div>
             </div>
 
             <div className="checkout-payment-logos-box">

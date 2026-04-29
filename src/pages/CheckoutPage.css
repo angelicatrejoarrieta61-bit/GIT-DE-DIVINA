@@ -208,22 +208,24 @@
 
 .checkout-pagar-btn-official {
   width: 100%;
-  max-width: 320px;
+  max-width: 420px;
   background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 20px rgba(196, 252, 21, 0.25);
 }
 
-.checkout-pagar-btn-official:hover {
-  transform: translateY(-2px) scale(1.02);
+.checkout-pagar-btn-official:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 28px rgba(196, 252, 21, 0.35);
 }
 
-.checkout-pagar-btn-official:active {
-  transform: translateY(0) scale(0.98);
+.checkout-pagar-btn-official:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
 }
 
 .checkout-pagar-btn-official:disabled {
@@ -490,4 +492,134 @@
   .trust-divider {
     display: none;
   }
+}
+
+/* ── PCI / SSL / MSI additions ── */
+
+.checkout-pci-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+}
+
+.checkout-pci-bar__badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkout-pci-bar__text {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  font-family: var(--f-sub);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255,255,255,0.1);
+}
+
+.checkout-pci-bar__text svg {
+  color: var(--c-lime);
+  flex-shrink: 0;
+}
+
+.checkout-msi-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(30,60,100,0.3), rgba(20,40,80,0.2));
+  border: 1px solid rgba(100,160,255,0.2);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+
+.checkout-msi-banner__icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.checkout-msi-banner__text strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  display: block;
+  margin-bottom: 3px;
+}
+
+.checkout-msi-banner__text p {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  margin: 0;
+  line-height: 1.5;
+  font-family: var(--f-sub);
+}
+
+.checkout-msi-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: rgba(100,160,255,0.9);
+  font-family: var(--f-sub);
+  font-weight: 600;
+  background: rgba(100,160,255,0.06);
+  border: 1px solid rgba(100,160,255,0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.checkout-security-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 4px;
+}
+
+.checkout-security-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.checkout-security-item svg {
+  color: var(--c-lime);
+}
+
+.checkout-security-item span {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+  font-family: var(--f-sub);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+.btn-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 14px;
 }
