@@ -27,17 +27,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const baseUrl = req.headers.origin || 'https://git-de-divina.vercel.app';
-        const response = await fetch('https://api.clip.mx/v1/checkout', {
+        const response = await fetch('https://api-gw.payclip.com/checkout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/vnd.com.payclip.v2+json',
                 'Authorization': `Basic ${authString}`,
             },
             body: JSON.stringify({
                 amount: parseFloat(Number(amount).toFixed(2)),
                 currency: 'MXN',
                 purchase_description: description || `Orden ${orderId}`,
-                custom_id: String(orderId),
                 redirection_url: {
                     success: `${baseUrl}/pago-exitoso?order=${orderId}`,
                     error: `${baseUrl}/checkout?error=pago_rechazado`,
