@@ -8,34 +8,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { amount, description, orderId, cardTokenId, userAgent, sessionId } = req.body;
+    const { amount, description, orderId, cardTokenId, userAgent, sessionId, customerEmail } = req.body;
 
     if (!amount || !orderId || !cardTokenId) {
         return res.status(400).json({ error: `Faltan parámetros. amount=${amount} orderId=${orderId} cardTokenId=${cardTokenId}` });
     }
 
-    // La API Key de producción del backend (secret key)
     const apiKey = process.env.CLIP_API_KEY;
-
     if (!apiKey) {
         return res.status(500).json({ error: 'CLIP_API_KEY no configurada en Vercel' });
     }
 
     try {
+        const clientIp = (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim() || '127.0.0.1';
+
         const payload: Record<string, any> = {
             amount: parseFloat(Number(amount).toFixed(2)),
             currency: 'MXN',
             description: description || `Divina Store - Orden ${orderId}`,
-            card_token: cardTokenId,
-        };
-
-        // Datos antifraude requeridos por Clip
-        if (userAgent || sessionId) {
-            payload.prevention_data = {
+            payment_method: {
+                token: cardTokenId,
+            },
+            customer: {
+                ...(customerEmail && { email: customerEmail }),
+            },
+            installments: 1,
+            location: { ip: clientIp },
+            prevention_data: {
+                user_agent: userAgent || 'unknown',
                 ...(sessionId && { session_id: sessionId }),
-                ...(userAgent && { user_agent: userAgent }),
-            };
-        }
+            },
+        };
 
         console.log('[charge-clip] Payload to Clip:', JSON.stringify(payload));
 

@@ -201,6 +201,7 @@ export const CheckoutPage: React.FC = () => {
           orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
           cardTokenId,
+          customerEmail: form.email,
           userAgent: navigator.userAgent,
         }),
       });
