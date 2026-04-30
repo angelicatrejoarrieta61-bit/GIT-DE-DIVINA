@@ -60,7 +60,7 @@ const DEFAULT_HOME_BLOCKS: SectionBlock[] = [
 
 const SectionProductsConfig = ({ products, collections, onSave }: { products: Product[], collections: Collection[], onSave: (items: Product[]) => void }) => {
   const [items, setItems] = useState<Product[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [savingItem, setSavingItem] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [editingImages, setEditingImages] = useState<Product | null>(null);
 
@@ -72,6 +72,26 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
     setItems(prev => prev.map(p => p.id === id ? { ...p, [key]: val } : p));
   };
 
+  const updateItemAndSave = async (id: string, key: keyof Product, val: any) => {
+    let finalVal = val;
+    let updates: Partial<Product> = {};
+
+    if (key === 'stock') {
+      finalVal = Number(val);
+      updates = { stock: finalVal, in_stock: finalVal > 0 };
+    } else if (key === 'price' || key === 'compare_price') {
+      finalVal = val ? Number(val) : null;
+      updates = { [key]: finalVal };
+    } else {
+      updates = { [key]: finalVal };
+    }
+
+    setItems(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    setSavingItem(id);
+    await updateProduct(id, updates);
+    setSavingItem(null);
+  };
+
   const handleAddProduct = async () => {
     const name = window.prompt('Nombre del nuevo producto:');
     if (!name) return;
@@ -80,6 +100,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
       name,
       slug,
       price: 0,
+      stock: 2,
       in_stock: true,
       brand: 'DIVINA',
       image_status: 'pending'
@@ -101,7 +122,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
   };
 
   const handleSave = async () => {
-    setSaving(true);
+    setSavingItem('all');
     try {
       for (const item of items) {
         const original = products.find(p => p.id === item.id);
@@ -112,6 +133,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
           item.compare_price !== original?.compare_price ||
           item.sku !== original?.sku ||
           item.in_stock !== original?.in_stock ||
+          item.stock !== original?.stock ||
           item.category !== original?.category ||
           JSON.stringify(item.tags) !== JSON.stringify(original?.tags);
 
@@ -122,6 +144,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
             price: Number(item.price),
             compare_price: item.compare_price ? Number(item.compare_price) : null,
             sku: item.sku,
+            stock: item.stock,
             in_stock: item.in_stock,
             category: item.category,
             description: item.description,
@@ -135,7 +158,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
       console.error(err);
       alert('Ocurrió un error al guardar.');
     } finally {
-      setSaving(false);
+      setSavingItem(null);
     }
   };
 
@@ -159,8 +182,8 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
         <button onClick={handleAddProduct} className="btn btn-outline" style={{ padding: '0 20px', height: '40px', fontSize: '12px' }}>
           + AÑADIR PRODUCTO
         </button>
-        <button onClick={handleSave} className="btn btn--primary" disabled={saving} style={{ padding: '0 32px', height: '40px', fontSize: '12px', fontWeight: 'bold' }}>
-          {saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
+        <button onClick={handleSave} className="btn btn--primary" disabled={savingItem === 'all'} style={{ padding: '0 32px', height: '40px', fontSize: '12px', fontWeight: 'bold' }}>
+          {savingItem === 'all' ? 'GUARDANDO...' : 'FORZAR GUARDADO TOTAL'}
         </button>
       </div>
 
@@ -182,7 +205,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
           </thead>
           <tbody>
             {filtered.map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: p.in_stock ? 'transparent' : 'rgba(255,0,0,0.03)' }}>
+              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: p.in_stock ? 'transparent' : 'rgba(255,0,0,0.03)', opacity: savingItem === p.id ? 0.5 : 1 }}>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                   <button 
                     onClick={() => setEditingImages(p)}
@@ -196,31 +219,34 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
                 </td>
                 <td style={{ padding: '4px 8px', width: '120px' }}>
                   <p style={{ fontSize: 9, color: '#666', margin: 0 }}>ID: {p.id.slice(0,8)}</p>
-                  <input type="text" value={p.sku || ''} onChange={e => updateItem(p.id, 'sku', e.target.value)} className="td-input" placeholder="SKU" style={{ marginTop: 2 }} />
+                  <input type="text" value={p.sku || ''} onChange={e => updateItem(p.id, 'sku', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'sku', e.target.value)} className="td-input" placeholder="SKU" style={{ marginTop: 2 }} />
                 </td>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                  <input type="checkbox" checked={p.in_stock} onChange={e => updateItem(p.id, 'in_stock', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--c-lime)' }} />
+                  <input type="number" min="0" value={p.stock ?? (p.in_stock ? 2 : 0)} 
+                    onChange={e => updateItem(p.id, 'stock', e.target.value)} 
+                    onBlur={e => updateItemAndSave(p.id, 'stock', e.target.value)} 
+                    className="td-input" style={{ width: 44, textAlign: 'center' }} title="Al guardar, si es > 0 se mostrará en la tienda" />
                 </td>
                 <td style={{ padding: '4px 8px', width: '90px' }}>
-                  <input type="text" value={p.brand || ''} onChange={e => updateItem(p.id, 'brand', e.target.value)} className="td-input" />
+                  <input type="text" value={p.brand || ''} onChange={e => updateItem(p.id, 'brand', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'brand', e.target.value)} className="td-input" />
                 </td>
                 <td style={{ padding: '4px 8px' }}>
-                  <input type="text" value={p.name} onChange={e => updateItem(p.id, 'name', e.target.value)} className="td-input" style={{ fontWeight: '600' }} />
+                  <input type="text" value={p.name} onChange={e => updateItem(p.id, 'name', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'name', e.target.value)} className="td-input" style={{ fontWeight: '600' }} />
                 </td>
                 <td style={{ padding: '4px 8px', width: '200px' }}>
-                  <textarea value={p.description || ''} onChange={e => updateItem(p.id, 'description', e.target.value)} className="td-input" style={{ height: '32px', resize: 'vertical', fontSize: '10px' }} placeholder="Descripción..." />
+                  <textarea value={p.description || ''} onChange={e => updateItem(p.id, 'description', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'description', e.target.value)} className="td-input" style={{ height: '32px', resize: 'vertical', fontSize: '10px' }} placeholder="Descripción..." />
                 </td>
                 <td style={{ padding: '4px 8px', width: '130px' }}>
-                  <select value={p.category || ''} onChange={e => updateItem(p.id, 'category', e.target.value)} className="td-input" style={{ background: '#111' }}>
+                  <select value={p.category || ''} onChange={e => updateItemAndSave(p.id, 'category', e.target.value)} className="td-input" style={{ background: '#111' }}>
                     <option value="">Sin colección</option>
                     {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </td>
                 <td style={{ padding: '4px 8px', width: '80px' }}>
-                  <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} className="td-input" style={{ color: 'var(--c-lime)', fontWeight: 'bold' }} />
+                  <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'price', e.target.value)} className="td-input" style={{ color: 'var(--c-lime)', fontWeight: 'bold' }} />
                 </td>
                 <td style={{ padding: '4px 8px', width: '80px' }}>
-                  <input type="number" value={p.compare_price || ''} onChange={e => updateItem(p.id, 'compare_price', e.target.value)} className="td-input" style={{ color: '#888', textDecoration: 'line-through' }} />
+                  <input type="number" value={p.compare_price || ''} onChange={e => updateItem(p.id, 'compare_price', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'compare_price', e.target.value)} className="td-input" style={{ color: '#888', textDecoration: 'line-through' }} />
                 </td>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                   <button onClick={() => handleDelete(p.id, p.name)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: 16 }} title="Eliminar producto">🗑️</button>

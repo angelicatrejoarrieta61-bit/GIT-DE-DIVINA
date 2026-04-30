@@ -174,12 +174,7 @@ export const AdminLayout: React.FC = () => {
             📊 Reportes de Pedidos
           </NavLink>
 
-          <NavLink
-            to="/admin/config?section=clip-payments"
-            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
-          >
-            💳 Pagos Clip (Config)
-          </NavLink>
+
 
           <NavLink
             to="/admin/config?section=products-config"

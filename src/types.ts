@@ -7,6 +7,7 @@ export interface Product {
   image_url?: string;
   images?: string[];
   in_stock: boolean;
+  stock?: number;
   brand?: string;
   tags?: string[];
   description?: string;
