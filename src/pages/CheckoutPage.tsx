@@ -163,12 +163,15 @@ export const CheckoutPage: React.FC = () => {
       let cardToken;
       try {
         cardToken = await sdkCardRef.current.cardToken();
+        console.log('[Clip] cardToken response:', JSON.stringify(cardToken));
       } catch (sdkErr: any) {
+        console.error('[Clip] cardToken error:', sdkErr);
         throw new Error('Datos de tarjeta inválidos. Verifica los campos e intenta de nuevo.');
       }
 
-      const cardTokenId = cardToken.id;
-      if (!cardTokenId) throw new Error('No se pudo obtener el token de la tarjeta.');
+      const cardTokenId = cardToken?.id;
+      console.log('[Clip] cardTokenId:', cardTokenId);
+      if (!cardTokenId) throw new Error(`No se obtuvo token de tarjeta. Respuesta: ${JSON.stringify(cardToken)}`);
 
       // PASO 2: Crear la orden en la base de datos
       const order = await createOrder({
@@ -205,7 +208,9 @@ export const CheckoutPage: React.FC = () => {
       const chargeData = await chargeRes.json();
 
       if (!chargeRes.ok) {
-        throw new Error(chargeData.error || 'Error al procesar el pago. Intenta de nuevo.');
+        const errMsg = chargeData.error || chargeData.message || chargeData.description || JSON.stringify(chargeData);
+        console.error('[Clip] Backend error:', errMsg, chargeData);
+        throw new Error(`Error Clip: ${errMsg}`);
       }
 
       // PASO 4: Pago exitoso
