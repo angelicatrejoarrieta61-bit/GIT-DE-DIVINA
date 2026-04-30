@@ -8,61 +8,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { amount, description, orderId } = req.body;
+    const { amount, description, orderId, cardTokenId } = req.body;
 
-    if (!amount || !orderId) {
-        return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, orderId)' });
+    if (!amount || !orderId || !cardTokenId) {
+        return res.status(400).json({ error: 'Faltan parámetros: amount, orderId, cardTokenId' });
     }
 
+    // La API Key de producción del backend (secret key)
     const apiKey = process.env.CLIP_API_KEY;
-    const secretKey = process.env.CLIP_SECRET;
 
-    if (!apiKey || !secretKey) {
-        return res.status(500).json({ error: 'Faltan llaves de Clip en el servidor' });
+    if (!apiKey) {
+        return res.status(500).json({ error: 'CLIP_API_KEY no configurada en Vercel' });
     }
-
-    const authString = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
 
     try {
-        const baseUrl = req.headers.origin || 'https://git-de-divina.vercel.app';
-        
-        const payload = {
-            amount: parseFloat(Number(amount).toFixed(2)),
-            currency: 'MXN',
-            purchase_description: description || `Orden ${orderId}`,
-            redirection_url: {
-                success: `${baseUrl}/pago-exitoso?order=${orderId}`,
-                error: `${baseUrl}/checkout?error=pago_rechazado`,
-                default: `${baseUrl}/pago-exitoso?order=${orderId}`
-            }
-        };
-
-        const response = await fetch('https://api.payclip.com/v2/checkout', {
+        const response = await fetch('https://api.payclip.com/payments', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/vnd.com.payclip.v2+json',
-                'Authorization': `Basic ${authString}`,
+                'Accept': 'application/vnd.com.payclip.v1+json',
+                'Authorization': `Bearer ${apiKey}`,
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                amount: parseFloat(Number(amount).toFixed(2)),
+                currency: 'MXN',
+                description: description || `Divina Store - Orden ${orderId}`,
+                card_token: cardTokenId,
+            }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Clip Checkout error:', response.status, data);
-            return res.status(response.status).json({ 
-                error: data.message || data.error || 'Error al generar el link de pago',
+            console.error('[charge-clip] Clip error:', response.status, JSON.stringify(data));
+            return res.status(response.status).json({
+                error: data.message || data.error_description || data.error || `Error de Clip (${response.status})`,
+                clip_response: data,
             });
         }
 
-        return res.status(200).json({ 
-            success: true, 
-            payment_url: data.payment_request_url
+        return res.status(200).json({
+            success: true,
+            transaction_id: data.transaction_id || data.id,
+            status: data.status,
         });
 
-    } catch (err) {
-        console.error('Server error charge-clip:', err);
-        return res.status(500).json({ error: 'Error interno al procesar el cargo' });
+    } catch (err: any) {
+        console.error('[charge-clip] Server error:', err.message);
+        return res.status(500).json({ error: `Error interno: ${err.message}` });
     }
 }
