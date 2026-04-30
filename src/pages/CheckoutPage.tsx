@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
-import { createOrder, getStoreConfig } from '../lib/queries';
+import { createOrder, updateOrderStatus, getStoreConfig } from '../lib/queries';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 
@@ -214,10 +214,10 @@ export const CheckoutPage: React.FC = () => {
         throw new Error(`Error Clip: ${errMsg}`);
       }
 
-      // PASO 4: Pago exitoso
+      // PASO 4: Pago exitoso — actualizar orden a 'paid'
+      await updateOrderStatus(order.id, 'paid');
       clearCart();
       navigate(`/pago-exitoso?order=${order.id}`);
-
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el pago.';
       console.error('[Checkout] Error en pago:', msg);
