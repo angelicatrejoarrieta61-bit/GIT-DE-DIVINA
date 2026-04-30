@@ -8,10 +8,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { amount, description, orderId, cardTokenId } = req.body;
+    const { amount, description, orderId, cardTokenId, userAgent, sessionId } = req.body;
 
     if (!amount || !orderId || !cardTokenId) {
-        return res.status(400).json({ error: 'Faltan parámetros: amount, orderId, cardTokenId' });
+        return res.status(400).json({ error: `Faltan parámetros. amount=${amount} orderId=${orderId} cardTokenId=${cardTokenId}` });
     }
 
     // La API Key de producción del backend (secret key)
@@ -22,19 +22,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+        const payload: Record<string, any> = {
+            amount: parseFloat(Number(amount).toFixed(2)),
+            currency: 'MXN',
+            description: description || `Divina Store - Orden ${orderId}`,
+            card_token: cardTokenId,
+        };
+
+        // Datos antifraude requeridos por Clip
+        if (userAgent || sessionId) {
+            payload.prevention_data = {
+                ...(sessionId && { session_id: sessionId }),
+                ...(userAgent && { user_agent: userAgent }),
+            };
+        }
+
+        console.log('[charge-clip] Payload to Clip:', JSON.stringify(payload));
+
         const response = await fetch('https://api.payclip.com/payments', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/vnd.com.payclip.v1+json',
                 'Authorization': `Bearer ${apiKey}`,
             },
-            body: JSON.stringify({
-                amount: parseFloat(Number(amount).toFixed(2)),
-                currency: 'MXN',
-                description: description || `Divina Store - Orden ${orderId}`,
-                card_token: cardTokenId,
-            }),
+            body: JSON.stringify(payload),
         });
 
         const data = await response.json();
@@ -42,8 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!response.ok) {
             console.error('[charge-clip] Clip error:', response.status, JSON.stringify(data));
             return res.status(response.status).json({
-                error: data.message || data.error_description || data.error || `Error de Clip (${response.status})`,
-                clip_response: data,
+                error: data.message || data.error_description || data.description || data.error || `Error de Clip (${response.status})`,
+                clip_raw: data,
             });
         }
 
