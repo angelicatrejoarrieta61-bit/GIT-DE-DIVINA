@@ -14,12 +14,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, orderId)' });
     }
 
-    // Clip Checkout usa la API KEY principal
-    const apiKey = process.env.CLIP_API_KEY || '5736d7d0-296c-4e91-a769-f78b364d72cc';
+    // Usamos las claves reales tal como están en Vercel
+    const apiKey = process.env.CLIP_API_KEY;
+    const secretKey = process.env.CLIP_SECRET;
 
-    if (!apiKey) {
-        return res.status(500).json({ error: 'Clip API Key no configurada en el servidor' });
+    if (!apiKey || !secretKey) {
+        return res.status(500).json({ error: 'Clip API Key o Secret no configuradas en el servidor' });
     }
+
+    // Generamos el token de autenticación Basic en Base64 (API_KEY:SECRET)
+    const authString = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
 
     try {
         const baseUrl = req.headers.origin || 'https://git-de-divina.vercel.app';
@@ -27,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': apiKey,
+                'Authorization': `Basic ${authString}`,
             },
             body: JSON.stringify({
                 amount: parseFloat(Number(amount).toFixed(2)),
