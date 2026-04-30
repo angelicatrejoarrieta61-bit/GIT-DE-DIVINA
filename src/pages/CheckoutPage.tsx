@@ -149,28 +149,14 @@ export const CheckoutPage: React.FC = () => {
 
       if (!order) throw new Error('No se pudo registrar la orden. Intenta de nuevo.');
 
-      // PASO 2: Generar link de pago en Clip
-      const chargeRes = await fetch('/api/charge-clip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: cartTotal,
-          orderId: order.id,
-          description: `Divina Store — ${form.name} — Orden ${order.id}`,
-        }),
-      });
-
-      const chargeData = await chargeRes.json();
-
-      if (!chargeRes.ok) {
-        throw new Error(chargeData.error || 'Error al generar el pago. Intenta de nuevo.');
-      }
-
       // Limpiar carrito
       clearCart();
       
-      // Redirigir a Clip para pagar de forma segura
-      window.location.href = chargeData.payment_url;
+      // Mostrar alerta con instrucciones críticas para el cliente
+      alert(`¡Tu orden ha sido registrada! (Folio: ${order.id})\n\nIMPORTANTE: Serás redirigido a nuestra terminal oficial de Clip.\nPor favor, ingresa manualmente el monto exacto de $${cartTotal.toLocaleString('es-MX')} MXN para completar tu compra.`);
+
+      // Redirigir directamente al Link de Negocio de Clip
+      window.location.href = "https://linkdenegocio.mx/@creaciones_artisticas/pagar";
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el pago.';
