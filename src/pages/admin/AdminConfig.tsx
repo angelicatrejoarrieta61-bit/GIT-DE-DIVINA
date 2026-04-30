@@ -582,14 +582,15 @@ export const AdminConfig: React.FC = () => {
         borderRight: '1px solid rgba(255,255,255,0.05)', 
         background: '#0a0a0a', 
         display: 'flex', 
-        flexDirection: 'column' 
+        flexDirection: 'column',
+        minHeight: 0
       }}>
 
         <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ color: '#aaa', fontSize: 13, margin: 0 }}>Gestiona identidad visual y secciones.</p>
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minHeight: 0, paddingBottom: 60 }}>
 
           {/* ── PRODUCTS CONFIG ── */}
           {section === 'products-config' && (
