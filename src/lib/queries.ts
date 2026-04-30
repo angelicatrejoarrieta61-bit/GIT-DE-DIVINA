@@ -49,14 +49,23 @@ export const getProducts = async (limit = 48): Promise<Product[]> => {
 
 export const getProductsByCollection = async (collectionSlug: string): Promise<Product[]> => {
   try {
+    const { data: col } = await supabase
+      .from('collections')
+      .select('id,name,slug')
+      .eq('slug', collectionSlug)
+      .single();
+      
+    if (!col) return [];
+
     const { data, error } = await supabase
       .from('products')
-      .select('*, collection:collections!inner(id,name,slug)')
-      .eq('collection.slug', collectionSlug)
+      .select('*')
+      .eq('category', col.id)
       .eq('in_stock', true)
       .order('created_at', { ascending: false });
+      
     if (error) { console.error(error); return []; }
-    return data ?? [];
+    return (data ?? []).map(p => ({ ...p, collection: col }));
   } catch (err) {
     console.error('getProductsByCollection error:', err);
     return [];

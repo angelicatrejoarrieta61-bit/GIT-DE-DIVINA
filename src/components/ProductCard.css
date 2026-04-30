@@ -159,3 +159,13 @@
   text-decoration: line-through;
   font-family: var(--f-body);
 }
+
+/* Featured Styling */
+.product-card.is-featured {
+  border-color: rgba(196, 252, 21, 0.5);
+  box-shadow: 0 0 20px rgba(196, 252, 21, 0.15);
+  background: rgba(196, 252, 21, 0.05);
+}
+.product-card.is-featured:hover {
+  box-shadow: 0 24px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(196,252,21,0.6), 0 0 30px rgba(196,252,21,0.25);
+}

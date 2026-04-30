@@ -137,7 +137,7 @@ export const CatalogPage: React.FC = () => {
               Destacados
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 24 }}>
-              {related.map(p => <ProductCard key={p.id} product={p} />)}
+              {related.map(p => <ProductCard key={p.id} product={p} featured={true} />)}
             </div>
           </div>
         </div>

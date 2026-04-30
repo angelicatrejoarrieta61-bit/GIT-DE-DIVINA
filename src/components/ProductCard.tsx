@@ -7,9 +7,10 @@ import './ProductCard.css';
 
 interface Props {
   product: Product;
+  featured?: boolean;
 }
 
-export const ProductCard: React.FC<Props> = ({ product }) => {
+export const ProductCard: React.FC<Props> = ({ product, featured }) => {
   const addItem = useCartStore(s => s.addItem);
 
   const handleAdd = (e: React.MouseEvent) => {
@@ -23,7 +24,7 @@ export const ProductCard: React.FC<Props> = ({ product }) => {
     : null;
 
   return (
-    <Link to={`/producto/${product.slug}`} className="product-card" aria-label={product.name}>
+    <Link to={`/producto/${product.slug}`} className={`product-card ${featured ? 'is-featured' : ''}`} aria-label={product.name}>
       {/* Image */}
       <div className="product-card__media">
         {product.image_url ? (
