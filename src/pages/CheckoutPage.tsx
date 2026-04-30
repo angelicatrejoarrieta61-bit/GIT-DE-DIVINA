@@ -86,8 +86,6 @@ export const CheckoutPage: React.FC = () => {
   React.useEffect(() => {
     getStoreConfig().then(setConfig);
   }, []);
-    getStoreConfig().then(setConfig);
-  }, []);
 
   // Fetch ZIP info (Mexico)
   React.useEffect(() => {
