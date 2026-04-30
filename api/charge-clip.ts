@@ -14,31 +14,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Faltan parámetros requeridos (amount, orderId)' });
     }
 
-    const clipApiKey = process.env.CLIP_API_KEY || process.env.VITE_CLIP_API_KEY;
+    const apiKey = process.env.CLIP_API_KEY;
+    const secretKey = process.env.CLIP_SECRET;
 
-    if (!clipApiKey) {
-        return res.status(500).json({ error: 'Clip API Key no configurada en el servidor' });
+    if (!apiKey || !secretKey) {
+        return res.status(500).json({ error: 'Faltan llaves de Clip en el servidor' });
     }
+
+    const authString = Buffer.from(`${apiKey}:${secretKey}`).toString('base64');
 
     try {
         const baseUrl = req.headers.origin || 'https://git-de-divina.vercel.app';
-        const response = await fetch('https://api.clip.mx/v1/checkout', {
+        
+        const payload = {
+            amount: parseFloat(Number(amount).toFixed(2)),
+            currency: 'MXN',
+            purchase_description: description || `Orden ${orderId}`,
+            redirection_url: {
+                success: `${baseUrl}/pago-exitoso?order=${orderId}`,
+                error: `${baseUrl}/checkout?error=pago_rechazado`,
+                default: `${baseUrl}/pago-exitoso?order=${orderId}`
+            }
+        };
+
+        const response = await fetch('https://api.payclip.com/v2/checkout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': clipApiKey,
+                'Accept': 'application/vnd.com.payclip.v2+json',
+                'Authorization': `Basic ${authString}`,
             },
-            body: JSON.stringify({
-                amount: parseFloat(Number(amount).toFixed(2)),
-                currency: 'MXN',
-                purchase_description: description || `Orden ${orderId}`,
-                custom_id: String(orderId),
-                redirection_url: {
-                    success: `${baseUrl}/pago-exitoso?order=${orderId}`,
-                    error: `${baseUrl}/checkout?error=pago_rechazado`,
-                    default: `${baseUrl}/pago-exitoso?order=${orderId}`
-                }
-            }),
+            body: JSON.stringify(payload),
         });
 
         const data = await response.json();
