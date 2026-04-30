@@ -570,7 +570,7 @@ export const AdminConfig: React.FC = () => {
     <div style={{ 
       height: '100vh', 
       display: 'grid', 
-      gridTemplateColumns: section === 'products-config' ? '1fr' : 'minmax(350px, 450px) 1fr', 
+      gridTemplateColumns: (section === 'products-config' || section === 'clip-payments') ? '1fr' : 'minmax(350px, 450px) 1fr', 
       overflow: 'hidden' 
     }}>
 
@@ -1031,72 +1031,61 @@ export const AdminConfig: React.FC = () => {
 
           {/* ── CLIP PAYMENTS ── */}
           {section === 'clip-payments' && (
-            <section>
-              <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>💳 Métricas de Pagos Clip</h2>
-              <p className="muted-text" style={{ marginBottom: 24 }}>Lista de transacciones procesadas a través de Clip Transparent Checkout.</p>
-
-              <div style={{ ...box, marginBottom: 24, padding: 20 }}>
-                <h3 style={{ fontSize: 15, marginBottom: 12, color: '#fff' }}>Imagen Promocional en Carrito</h3>
-                <p className="muted-text" style={{ fontSize: 12, marginBottom: 16 }}>Esta imagen aparecerá en la parte inferior del carrito (Recomendado: 16:9 con degradado).</p>
-                <AssetUploader 
-                  label="Banner Carrito (16:9)" 
-                  configKey="cart_footer_img" 
-                  currentValue={configs.cart_footer_img} 
-                  onUpdate={(val) => updateConfig('cart_footer_img', val)} 
-                />
+            <section style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+                <div>
+                  <h2 style={{ fontSize: 22, marginBottom: 8, color: 'var(--c-lime)' }}>💳 Transacciones Clip</h2>
+                  <p className="muted-text">Historial de pagos y estado de transacciones procesadas.</p>
+                </div>
               </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {orders.filter(o => o.payment_info).length === 0 ? (
-                  <p style={{ padding: 20, textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: 12 }}>No hay pagos registrados aún.</p>
-                ) : (
-                  orders.filter(o => o.payment_info).map(order => (
-                    <div key={order.id} style={{ ...box, padding: 20 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Orden #{order.id.slice(0, 8)}</p>
-                          <p style={{ fontSize: 11, color: 'var(--c-text-muted)', margin: 0 }}>{new Date(order.created_at || '').toLocaleString()}</p>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-lime)', margin: 0 }}>${order.total.toFixed(2)} MXN</p>
-                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(161,214,0,0.1)', color: '#a1d600', fontWeight: 700 }}>
-                            {order.status?.toUpperCase() || 'PAGADO'}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
-                        <div>
-                          <p style={{ ...lbl, color: 'var(--c-lime)' }}>CLIENTE</p>
-                          <p style={{ fontSize: 13, margin: '2px 0' }}>{order.customer_name}</p>
-                          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>{order.customer_email}</p>
-                          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>{order.customer_phone}</p>
-                        </div>
-                        <div>
-                          <p style={{ ...lbl, color: 'var(--c-lime)' }}>MÉTRICAS CLIP</p>
-                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>ID Transacción:</strong> {order.payment_info?.id || '—'}</p>
-                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Referencia:</strong> {order.payment_info?.receipt_no || '—'}</p>
-                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Tarjeta:</strong> {order.payment_info?.payment_method?.brand || '—'} {order.payment_info?.payment_method?.last4 ? `**** ${order.payment_info.payment_method.last4}` : ''}</p>
-                          <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Auth Code:</strong> {order.payment_info?.payment_details?.auth_code || '—'}</p>
-                        </div>
-                      </div>
-
-                      {order.customer_address && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                          <p style={lbl}>DIRECCIÓN DE ENVÍO</p>
-                          <p style={{ fontSize: 12, margin: 0, color: '#aaa' }}>
-                            {order.customer_address}, {order.customer_city || ''}, {order.customer_state || ''}, CP {order.customer_zip || ''}
-                          </p>
-                          {order.customer_reference && (
-                            <p style={{ fontSize: 11, marginTop: 4, fontStyle: 'italic', color: 'var(--c-lime)' }}>
-                              Ref: {order.customer_reference}
-                            </p>
-                          )}
-                        </div>
+              <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#080808', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>ORDEN</th>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>FECHA</th>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>CLIENTE</th>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>DIRECCIÓN</th>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>TOTAL</th>
+                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>ESTADO</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#666' }}>No hay transacciones registradas.</td>
+                        </tr>
+                      ) : (
+                        orders.map((o, i) => (
+                          <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                            <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#aaa', fontSize: 12 }}>{o.id.slice(0, 8).toUpperCase()}</td>
+                            <td style={{ padding: '12px 16px', color: '#888', fontSize: 12 }}>{new Date(o.created_at || '').toLocaleDateString('es-MX')}</td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <p style={{ margin: 0, fontWeight: 600 }}>{o.customer_name || '—'}</p>
+                              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888' }}>{o.customer_email || '—'}</p>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#aaa', fontSize: 12 }}>
+                              <p style={{ margin: 0 }}>{o.customer_address || '—'}</p>
+                              <p style={{ margin: '2px 0 0', fontSize: 11 }}>{o.customer_city || ''} {o.customer_state || ''}</p>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--c-lime)', fontWeight: 700 }}>
+                              ${o.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              {o.status === 'paid' ? (
+                                <span style={{ background: 'rgba(76,175,80,0.15)', color: '#4CAF50', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, display: 'inline-block' }}>PAGADO</span>
+                              ) : (
+                                <span style={{ background: 'rgba(255,193,7,0.15)', color: '#FFC107', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, display: 'inline-block' }}>{o.status === 'pending' ? 'PENDIENTE' : o.status?.toUpperCase() || '—'}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
                       )}
-                    </div>
-                  ))
-                )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           )}
