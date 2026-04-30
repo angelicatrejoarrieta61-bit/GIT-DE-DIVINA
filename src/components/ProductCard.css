@@ -162,10 +162,14 @@
 
 /* Featured Styling */
 .product-card.is-featured {
-  border-color: rgba(196, 252, 21, 0.5);
-  box-shadow: 0 0 20px rgba(196, 252, 21, 0.15);
-  background: rgba(196, 252, 21, 0.05);
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.15);
+  background: linear-gradient(145deg, rgba(255, 215, 0, 0.05) 0%, rgba(200, 160, 0, 0.02) 100%);
 }
 .product-card.is-featured:hover {
-  box-shadow: 0 24px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(196,252,21,0.6), 0 0 30px rgba(196,252,21,0.25);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255, 215, 0, 0.8), 0 0 25px rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 215, 0, 0.8);
+}
+.product-card.is-featured .product-card__name {
+  color: #FFD700;
 }
