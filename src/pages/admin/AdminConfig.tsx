@@ -961,8 +961,8 @@ export const AdminConfig: React.FC = () => {
                     </div>
 
                     <div style={box}>
-                      <h3 style={{ fontSize: 14, marginBottom: 16 }}>Productos Relacionados</h3>
-                      <p style={{ fontSize: 11, color: '#aaa', marginBottom: 10 }}>Selecciona qué productos destacar en esta sección especial de la colección.</p>
+                      <h3 style={{ fontSize: 14, marginBottom: 16 }}>Destacados</h3>
+                      <p style={{ fontSize: 11, color: '#aaa', marginBottom: 10 }}>Selecciona qué productos destacar (estos aparecerán en la fila dorada superior de la colección). Los productos generales se asignan en la Configuración Maestra.</p>
                       <input className="input-dark" type="text" placeholder="🔍 Buscar producto..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: 16 }} />
                       <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 4 }}>
                         {filtered.map(p => {
