@@ -247,12 +247,12 @@ h4, h5, h6 { font-family: var(--f-sub); }
 }
 
 /* ─── Section spacing ───────────────────────────────────── */
-.section { padding-block: 80px; }
+.section { padding-block: 20px; }
 
 
-.section-sm { padding-block: 48px; }
+.section-sm { padding-block: 24px; }
 
 @media (max-width: 768px) {
-  .section { padding-block: 52px; }
-  .section-sm { padding-block: 32px; }
+  .section { padding-block: 16px; }
+  .section-sm { padding-block: 20px; }
 }

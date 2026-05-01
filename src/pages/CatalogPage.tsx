@@ -131,7 +131,7 @@ export const CatalogPage: React.FC = () => {
       </div>
 
       {related.length > 0 && (
-        <div style={{ background: '#0a0a0a', padding: '60px 0' }}>
+        <div style={{ background: '#0a0a0a', padding: '24px 0 32px' }}>
           <div className="page-width">
             <h2 style={{ fontFamily: 'var(--f-heading)', fontSize: 24, marginBottom: 24, paddingLeft: 10, borderLeft: '2px solid var(--c-lime)' }}>
               Destacados
@@ -145,7 +145,7 @@ export const CatalogPage: React.FC = () => {
 
       <div className="page-width section-sm">
         {/* Search */}
-        <div className="catalog-page__search" style={{ marginBottom: 32, display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="catalog-page__search" style={{ marginBottom: 20, display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             type="search"
             value={search}
