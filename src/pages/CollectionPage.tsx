@@ -54,9 +54,12 @@ export const CollectionPage: React.FC = () => {
         getProductsByCollection(slug),
         getCollectionBySlug(slug)
       ]);
+      
+      const finalCol = col || (prods.length > 0 ? prods[0].collection : null);
+      
       setProducts(prods);
-      setCollection(col);
-      const blockId = col?.id || slug;
+      setCollection(finalCol);
+      const blockId = finalCol?.id || slug;
       const { data } = await supabase
         .from('products')
         .select('*, collection:collections!category(id,name,slug)')

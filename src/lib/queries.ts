@@ -57,19 +57,36 @@ export const getProducts = async (limit = 48): Promise<Product[]> => {
 
 export const getProductsByCollection = async (collectionSlug: string): Promise<Product[]> => {
   try {
+    // 1. Intentar obtener la colección primero (falla si hay RLS en collections)
     const col = await getCollectionBySlug(collectionSlug);
       
-    if (!col) return [];
-
+    // 2. Traer productos con su colección anidada
     const { data, error } = await supabase
       .from('products')
-      .select('*')
-      .eq('category', col.id)
+      .select('*, collection:collections!category(id,name,slug)')
       .eq('in_stock', true)
       .order('created_at', { ascending: false });
       
     if (error) { console.error(error); return []; }
-    return (data ?? []).map(p => ({ ...p, collection: col }));
+    
+    const allProducts = data ?? [];
+    
+    // 3. Filtrar localmente
+    const lowerSlug = collectionSlug.toLowerCase();
+    
+    return allProducts.filter(p => {
+      // Si la base de datos nos dio la colección, la usamos
+      if (col && p.category === col.id) return true;
+      
+      // Si RLS bloqueó collections pero el join funcionó:
+      if (p.collection) {
+        const c: any = p.collection;
+        if ((c.slug || '').toLowerCase() === lowerSlug) return true;
+        if ((c.name || '').toLowerCase().replace(/\s+/g, '-') === lowerSlug) return true;
+      }
+      
+      return false;
+    }).map(p => ({ ...p, collection: p.collection || col }));
   } catch (err) {
     console.error('getProductsByCollection error:', err);
     return [];
