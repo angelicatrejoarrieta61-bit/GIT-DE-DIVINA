@@ -985,18 +985,7 @@ export const AdminConfig: React.FC = () => {
                       <p style={{ fontSize: 11, color: '#aaa', marginBottom: 10 }}>Selecciona qué productos destacar (estos aparecerán en la fila dorada superior de la colección). Los productos generales se asignan en la Configuración Maestra.</p>
                       <input className="input-dark" type="text" placeholder="🔍 Buscar producto..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: 16 }} />
                       <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 4 }}>
-                        {(() => {
-                          const activeCol = collections.find(c => (c.slug || '').toLowerCase() === section.toLowerCase() || (c.name || '').toLowerCase().replace(/\s+/g, '-') === section.toLowerCase());
-                          const selectionList = products.filter(p => {
-                            const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || '').toLowerCase().includes(search.toLowerCase());
-                            if (['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming'].includes(section)) {
-                              return matchesSearch && p.category === activeCol?.id;
-                            }
-                            return matchesSearch;
-                          });
-                          
-                          return selectionList.map(p => {
-                          // Tag constraint intentionally matches Collection ID to bind correctly to this collection
+                        {filtered.map(p => {
                           const tg = `REL_${blockId}`;
                           const on = p.tags?.includes(tg);
                           return (
@@ -1014,8 +1003,7 @@ export const AdminConfig: React.FC = () => {
                               {on && <span style={{ color: 'var(--c-lime)' }}>★</span>}
                             </label>
                           );
-                        });
-                      })()}
+                        })}
                       </div>
                     </div>
                   </div>
