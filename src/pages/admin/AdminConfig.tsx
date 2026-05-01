@@ -210,6 +210,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>NOMBRE / TÍTULO</th>
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>DESCRIPCIÓN</th>
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>COLECCIÓN</th>
+              <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>⭐</th>
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>PRECIO</th>
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>OFERTA</th>
               <th style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>ACCIONES</th>
@@ -253,6 +254,25 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
                     <option value="">Sin colección</option>
                     {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                  {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home'].includes(section) && (
+                    <input 
+                      type="checkbox" 
+                      title={`Destacar en ${section}`}
+                      checked={p.tags?.includes(`REL_${section}`)} 
+                      onChange={async () => {
+                        const tg = `REL_${section}`;
+                        const on = p.tags?.includes(tg);
+                        const newTags = on ? (p.tags || []).filter(x => x !== tg) : [...(p.tags || []), tg];
+                        setSavingItem(p.id);
+                        await updateProduct(p.id, { tags: newTags });
+                        setProducts(prev => prev.map(x => x.id === p.id ? { ...x, tags: newTags } : x));
+                        setSavingItem(null);
+                      }} 
+                      style={{ cursor: 'pointer', accentColor: 'var(--c-lime)' }}
+                    />
+                  )}
                 </td>
                 <td style={{ padding: '4px 8px', width: '80px' }}>
                   <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'price', e.target.value)} className="td-input" style={{ color: 'var(--c-lime)', fontWeight: 'bold' }} />
