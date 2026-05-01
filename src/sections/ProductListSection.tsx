@@ -6,14 +6,16 @@ import './ProductListSection.css';
 
 interface Props {
   products: Product[];
+  featured?: boolean;
+  title?: React.ReactNode;
 }
 
-export const ProductListSection: React.FC<Props> = ({ products }) => {
+export const ProductListSection: React.FC<Props> = ({ products, featured, title }) => {
   return (
     <section className="product-list-section section" id="productos">
       <div className="page-width">
-        <div className="product-list-section__header">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '14px' }}>
+        {title || (
+          <div className="product-list-section__header">
             <h2 className="product-list-section__title">
               Nuestros Productos <span className="lime-text">más Vendidos.</span>
             </h2>
@@ -21,18 +23,18 @@ export const ProductListSection: React.FC<Props> = ({ products }) => {
               VER TODO
             </Link>
           </div>
-        </div>
+        )}
 
         {products.length === 0 ? (
           <div className="product-list-section__skeleton">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="skeleton" style={{ height: 340, borderRadius: 20 }} />
             ))}
           </div>
         ) : (
           <div className="product-list-section__grid">
             {products.map(p => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} featured={featured} />
             ))}
           </div>
         )}
