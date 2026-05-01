@@ -129,7 +129,8 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
     try {
       for (const item of items) {
         const original = products.find(p => p.id === item.id);
-        const stockNum = Number(item.stock);
+        const currentStock = item.stock ?? (item.in_stock ? 2 : 0);
+        const stockNum = Number(currentStock);
         const inStock = stockNum > 0;
         const cat = item.category === '' ? null : item.category;
 
@@ -160,7 +161,10 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
           });
         }
       }
-      onSave(items.map(item => ({...item, stock: Number(item.stock), in_stock: Number(item.stock) > 0, category: item.category === '' ? null : item.category})));
+      onSave(items.map(item => {
+        const st = Number(item.stock ?? (item.in_stock ? 2 : 0));
+        return {...item, stock: st, in_stock: st > 0, category: item.category === '' ? null : item.category};
+      }));
       alert('¡Todos los cambios han sido guardados!');
     } catch (err) {
       console.error(err);
