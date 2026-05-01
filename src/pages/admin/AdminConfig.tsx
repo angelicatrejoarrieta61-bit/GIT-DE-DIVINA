@@ -82,6 +82,9 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
     } else if (key === 'price' || key === 'compare_price') {
       finalVal = val ? Number(val) : null;
       updates = { [key]: finalVal };
+    } else if (key === 'category') {
+      finalVal = val === '' ? null : val;
+      updates = { [key]: finalVal };
     } else {
       updates = { [key]: finalVal };
     }
@@ -126,15 +129,20 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
     try {
       for (const item of items) {
         const original = products.find(p => p.id === item.id);
+        const stockNum = Number(item.stock);
+        const inStock = stockNum > 0;
+        const cat = item.category === '' ? null : item.category;
+
         const hasChanged = 
           item.name !== original?.name ||
           item.brand !== original?.brand ||
-          item.price !== original?.price ||
-          item.compare_price !== original?.compare_price ||
+          Number(item.price) !== original?.price ||
+          (item.compare_price ? Number(item.compare_price) : null) !== original?.compare_price ||
           item.sku !== original?.sku ||
-          item.in_stock !== original?.in_stock ||
-          item.stock !== original?.stock ||
-          item.category !== original?.category ||
+          inStock !== original?.in_stock ||
+          stockNum !== original?.stock ||
+          cat !== original?.category ||
+          item.description !== original?.description ||
           JSON.stringify(item.tags) !== JSON.stringify(original?.tags);
 
         if (hasChanged) {
@@ -144,15 +152,15 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
             price: Number(item.price),
             compare_price: item.compare_price ? Number(item.compare_price) : null,
             sku: item.sku,
-            stock: item.stock,
-            in_stock: item.in_stock,
-            category: item.category,
+            stock: stockNum,
+            in_stock: inStock,
+            category: cat,
             description: item.description,
             tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? (item.tags as string).split(',').map(t => t.trim()).filter(Boolean) : [])
           });
         }
       }
-      onSave(items);
+      onSave(items.map(item => ({...item, stock: Number(item.stock), in_stock: Number(item.stock) > 0, category: item.category === '' ? null : item.category})));
       alert('¡Todos los cambios han sido guardados!');
     } catch (err) {
       console.error(err);
