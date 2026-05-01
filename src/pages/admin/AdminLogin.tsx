@@ -42,7 +42,7 @@ export const AdminLogin: React.FC = () => {
         if (error) {
           setError(error.message);
         } else {
-          navigate('/admin/productos');
+          navigate('/admin/config?section=site-general');
         }
       }
     } catch (err: any) {
