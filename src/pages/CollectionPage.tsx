@@ -162,16 +162,18 @@ export const CollectionPage: React.FC = () => {
               <div key={i} className="skeleton" style={{ height: 340, borderRadius: 20 }} />
             ))}
           </div>
-        ) : products.length === 0 && related.length === 0 ? (
-          <div className="collection-page__empty">
-            <p>No hay productos en esta sección aún.</p>
-            <Link to="/catalogo" className="btn btn-lime" style={{ marginTop: 20 }}>Ver todo el catálogo</Link>
+        ) : products.length === 0 ? (
+          <div className="collection-page__empty" style={{ padding: '60px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <p className="muted-text">Aún no hay productos generales en esta categoría.</p>
+            {related.length === 0 && (
+              <Link to="/catalogo" className="btn btn-lime" style={{ marginTop: 20 }}>Ver todo el catálogo</Link>
+            )}
           </div>
-        ) : products.length > 0 ? (
+        ) : (
           <div className="collection-page__grid">
             {products.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
