@@ -30,8 +30,12 @@ export const AdminLayout: React.FC = () => {
       if (!session) navigate('/admin/login');
     });
 
+    if (location.pathname === '/admin') {
+      navigate('/admin/config?section=site-general', { replace: true });
+    }
+
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, location]);
 
   useEffect(() => {
     const loadCustomSections = async () => {

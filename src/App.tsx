@@ -54,7 +54,7 @@ export default function App() {
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route path="productos" element={<AdminProducts />} />
+          <Route index element={<GenericPage />} /> {/* Placeholder, we'll redirect in AdminLayout or just leave it */}
           <Route path="import" element={<AdminImport />} />
           <Route path="config" element={<AdminConfig />} />
           <Route path="reportes" element={<AdminOrderReports />} />
