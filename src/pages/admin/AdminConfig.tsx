@@ -302,6 +302,7 @@ export const AdminConfig: React.FC = () => {
   const [adminProducts, setAdminProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<'global' | 'hero' | 'secciones' | 'editor' | 'cols' | 'pages'>('global');
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
@@ -426,8 +427,15 @@ export const AdminConfig: React.FC = () => {
       } else {
         setHeaderLinks(DEFAULT_HEADER_LINKS);
       }
-    } catch (err) {
+      
+      if (aProds.length === 0) {
+        const { error } = await supabase.from('products').select('*, collection:collections(id,name,slug)').limit(1);
+        if (error) setLoadError(`Supabase error: ${error.message} - ${error.details || ''}`);
+      }
+
+    } catch (err: any) {
       console.error('Error loading admin config data:', err);
+      setLoadError(err.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -525,6 +533,7 @@ export const AdminConfig: React.FC = () => {
   }, [previewDevice]);
 
   if (loading) return <p style={{ padding: 48 }}>Cargando...</p>;
+  if (loadError) return <div style={{ padding: 48, color: 'red' }}><h2>Error cargando productos:</h2><p>{loadError}</p></div>;
 
   const sc = configs.hero_card_scale || '1';
   const featured = products.filter(p => p.tags?.includes('TOP_HOME'));
