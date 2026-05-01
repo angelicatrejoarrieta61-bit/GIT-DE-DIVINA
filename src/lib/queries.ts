@@ -35,7 +35,7 @@ export const getProducts = async (limit = 48): Promise<Product[]> => {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*, collection:collections(id,name,slug)')
+      .select('*, collection:collections!category(id,name,slug)')
       .eq('in_stock', true)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -76,7 +76,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
   try {
     const { data } = await supabase
       .from('products')
-      .select('*, collection:collections(id,name,slug)')
+      .select('*, collection:collections!category(id,name,slug)')
       .eq('slug', slug)
       .single();
     return data;
@@ -90,7 +90,7 @@ export const getBestSellers = async (limit = 8): Promise<Product[]> => {
   try {
     const { data } = await supabase
       .from('products')
-      .select('*, collection:collections(id,name,slug)')
+      .select('*, collection:collections!category(id,name,slug)')
       .eq('in_stock', true)
       .contains('tags', ['TOP_HOME'])
       .order('created_at', { ascending: false })
@@ -100,7 +100,7 @@ export const getBestSellers = async (limit = 8): Promise<Product[]> => {
     if (!data || data.length === 0) {
       const { data: fallback } = await supabase
         .from('products')
-        .select('*, collection:collections(id,name,slug)')
+        .select('*, collection:collections!category(id,name,slug)')
         .eq('in_stock', true)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -118,7 +118,7 @@ export const getBestSellers = async (limit = 8): Promise<Product[]> => {
 export const getAdminProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
     .from('products')
-    .select('*, collection:collections(id,name,slug)')
+    .select('*, collection:collections!category(id,name,slug)')
     .order('name');
   if (error) { console.error(error); return []; }
   return data ?? [];

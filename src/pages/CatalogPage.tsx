@@ -46,7 +46,7 @@ export const CatalogPage: React.FC = () => {
       const blockId = 'catalogo';
       const { data } = await supabase
         .from('products')
-        .select('*, collection:collections(id,name,slug)')
+        .select('*, collection:collections!category(id,name,slug)')
         .contains('tags', [`REL_${blockId}`])
         .eq('in_stock', true);
       

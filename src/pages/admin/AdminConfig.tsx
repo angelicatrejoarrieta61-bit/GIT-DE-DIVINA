@@ -429,7 +429,7 @@ export const AdminConfig: React.FC = () => {
       }
       
       if (aProds.length === 0) {
-        const { error } = await supabase.from('products').select('*, collection:collections(id,name,slug)').limit(1);
+        const { error } = await supabase.from('products').select('*, collection:collections!category(id,name,slug)').limit(1);
         if (error) setLoadError(`Supabase error: ${error.message} - ${error.details || ''}`);
       }
 
