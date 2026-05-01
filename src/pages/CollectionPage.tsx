@@ -59,11 +59,10 @@ export const CollectionPage: React.FC = () => {
       
       setProducts(prods);
       setCollection(finalCol);
-      const blockId = finalCol?.id || slug;
       const { data } = await supabase
         .from('products')
         .select('*, collection:collections!category(id,name,slug)')
-        .contains('tags', [`REL_${blockId}`])
+        .contains('tags', [`REL_${slug}`])
         .eq('in_stock', true);
       setRelated(data ?? []);
       setLoading(false);
@@ -82,7 +81,7 @@ export const CollectionPage: React.FC = () => {
     };
   }, [slug]);
 
-  const blockId = collection?.id || slug;
+  const blockId = slug;
   
   const bgImg = config[`col_${blockId}_hero_img`] 
     ? getImageUrl(config[`col_${blockId}_hero_img`], { width: 1920, quality: 80 }) 
@@ -174,7 +173,10 @@ export const CollectionPage: React.FC = () => {
           </div>
         ) : (
           <div className="collection-page__grid">
-            {products.map(p => <ProductCard key={p.id} product={p} />)}
+            {products
+              .filter(p => !related.find(r => r.id === p.id))
+              .map(p => <ProductCard key={p.id} product={p} />)
+            }
           </div>
         )}
       </div>
