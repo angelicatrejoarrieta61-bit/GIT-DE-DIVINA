@@ -131,7 +131,7 @@ export const CatalogPage: React.FC = () => {
       </div>
 
       {related.length > 0 && (
-        <div style={{ background: '#0a0a0a', padding: '24px 0 32px' }}>
+        <div style={{ background: '#0a0a0a', padding: '24px 0 0' }}>
           <div className="page-width">
             <h2 style={{ fontFamily: 'var(--f-heading)', fontSize: 24, marginBottom: 24, paddingLeft: 10, borderLeft: '2px solid var(--c-lime)' }}>
               Destacados
@@ -143,31 +143,32 @@ export const CatalogPage: React.FC = () => {
         </div>
       )}
 
-      <div className="page-width section-sm">
+      <div className="page-width section-sm" style={{ paddingTop: 10 }}>
         {/* Search */}
-        <div className="catalog-page__search" style={{ marginBottom: 20, display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="search"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o marca..."
-            className="input-dark catalog-page__search-input"
-            aria-label="Buscar productos"
-            style={{ flex: 1, minWidth: '250px' }}
-          />
+        <div className="catalog-page__search">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nombre o marca..."
+              className="input-dark catalog-page__search-input"
+              aria-label="Buscar productos"
+            />
+            <span className="catalog-page__search-count">
+              {filtered.length} PRODUCTOS
+            </span>
+          </div>
+
           <select 
             className="input-dark" 
             value={sortOrder} 
             onChange={e => setSortOrder(e.target.value as 'relevance' | 'asc' | 'desc')}
-            style={{ width: 'auto' }}
           >
-            <option value="relevance">Ordenar por: Relevancia</option>
-            <option value="asc">Precio: Menor a Mayor</option>
-            <option value="desc">Precio: Mayor a Menor</option>
+            <option value="relevance">RELEVANCIA</option>
+            <option value="asc">PRECIO: MENOR A MAYOR</option>
+            <option value="desc">PRECIO: MAYOR A MENOR</option>
           </select>
-          <span className="catalog-page__search-count muted-text" style={{ whiteSpace: 'nowrap' }}>
-            {filtered.length} productos
-          </span>
         </div>
 
         {/* Grid */}

@@ -138,7 +138,7 @@ export const CollectionPage: React.FC = () => {
       </div>
 
       {related.length > 0 && (
-        <div style={{ background: '#0a0a0a', padding: '24px 0 32px' }}>
+        <div style={{ background: '#0a0a0a', padding: '24px 0 0' }}>
           <div className="page-width">
             <h2 style={{ fontFamily: 'var(--f-heading)', fontSize: 24, marginBottom: 24, paddingLeft: 10, borderLeft: '2px solid var(--c-lime)' }}>
               Destacados
@@ -151,7 +151,7 @@ export const CollectionPage: React.FC = () => {
       )}
 
       {/* Products */}
-      <div className="page-width section">
+      <div className="page-width section" style={{ paddingTop: 10 }}>
         <nav className="collection-page__breadcrumb" aria-label="Breadcrumb">
           <Link to="/">Inicio</Link>
           <span>/</span>
