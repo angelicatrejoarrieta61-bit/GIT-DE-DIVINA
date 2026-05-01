@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { HeroSection } from '../sections/HeroSection';
 import { CategoriesSection } from '../sections/CategoriesSection';
 import { ProductListSection } from '../sections/ProductListSection';
@@ -16,7 +17,7 @@ export const HomePage: React.FC = () => {
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_ORDER);
 
   useEffect(() => {
-    getBestSellers(8).then(setProducts);
+    getBestSellers(20).then(setProducts);
     getCollections().then(setCollections);
     getStoreConfig().then(cfg => {
       setConfig(cfg);
@@ -101,6 +102,22 @@ export const HomePage: React.FC = () => {
       <ProductListSection
         key="products"
         products={products}
+        featured={true}
+        title={
+          <div className="product-list-section__header">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+              <h2 className="product-list-section__title">
+                Nuestros Productos <span className="lime-text">más Vendidos.</span>
+              </h2>
+              <p className="muted-text" style={{ fontSize: '14px', letterSpacing: '0.05em' }}>
+                Selección exclusiva de los artículos más recomendados por nuestros expertos.
+              </p>
+            </div>
+            <Link to="/catalogo" className="btn btn-outline product-list-section__cta" style={{ borderRadius: '100px', fontSize: '11px', padding: '10px 24px', letterSpacing: '0.1em' }}>
+              VER TODO EL CATÁLOGO
+            </Link>
+          </div>
+        }
       />
     ),
   };
