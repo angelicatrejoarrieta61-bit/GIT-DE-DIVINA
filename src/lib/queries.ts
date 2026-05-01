@@ -20,10 +20,18 @@ export const getCollectionBySlug = async (slug: string): Promise<Collection | nu
   try {
     const { data } = await supabase
       .from('collections')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-    return data;
+      .select('*');
+      
+    if (!data) return null;
+    
+    const lowerSlug = slug.toLowerCase();
+    const matched = data.find(c => 
+      (c.slug || '').toLowerCase() === lowerSlug ||
+      (c.name || '').toLowerCase().replace(/\s+/g, '-') === lowerSlug ||
+      (c.id || '').toLowerCase() === lowerSlug
+    );
+    
+    return matched || null;
   } catch (err) {
     console.error('getCollectionBySlug error:', err);
     return null;
@@ -49,11 +57,7 @@ export const getProducts = async (limit = 48): Promise<Product[]> => {
 
 export const getProductsByCollection = async (collectionSlug: string): Promise<Product[]> => {
   try {
-    const { data: col } = await supabase
-      .from('collections')
-      .select('id,name,slug')
-      .eq('slug', collectionSlug)
-      .single();
+    const col = await getCollectionBySlug(collectionSlug);
       
     if (!col) return [];
 
