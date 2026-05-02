@@ -41,12 +41,10 @@ export const Header: React.FC = () => {
     const onScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 20);
-      setVisible(y < lastY || y < 80);
-      setLastY(y);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [lastY]);
+  }, []);
 
   useEffect(() => {
     getCollections().then(setCollections);
@@ -107,7 +105,7 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header className={`header ${scrolled ? 'header--scrolled' : ''} ${!visible ? 'header--hidden' : ''}`}>
+      <header className={`header ${scrolled ? 'header--scrolled' : ''}`}>
         <div className="header__inner page-width">
           {/* Hamburger (Left on mobile) */}
           <button

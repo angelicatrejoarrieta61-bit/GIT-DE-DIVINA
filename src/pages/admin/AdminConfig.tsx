@@ -827,7 +827,22 @@ export const AdminConfig: React.FC = () => {
                   </div>
 
                   <div style={box}>
-                    <h3 style={{ fontSize: 14, marginBottom: 16 }}>Posición de la Tarjeta</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, margin: 0 }}>Posición de la Tarjeta</h3>
+                      <button 
+                        onClick={() => {
+                          if (window.confirm('¿Restaurar posición original de la tarjeta?')) {
+                            updateConfig('hero_card_x', '-20');
+                            updateConfig('hero_card_y', '40');
+                            updateConfig('hero_card_scale', '1');
+                            updateConfig('hero_card_visible', 'flex');
+                          }
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--c-lime)', cursor: 'pointer', fontSize: 11, fontWeight: 'bold', textDecoration: 'underline' }}
+                      >
+                        RESTAURAR
+                      </button>
+                    </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 20 }}>
                       <input type="checkbox" checked={configs.hero_card_visible !== 'none'}
                         onChange={e => updateConfig('hero_card_visible', e.target.checked ? 'flex' : 'none')}
