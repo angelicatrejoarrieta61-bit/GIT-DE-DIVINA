@@ -894,17 +894,42 @@ export const AdminConfig: React.FC = () => {
           {(part === 'home-segmentos') && (
             <section>
               <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>📁 Colecciones y Portadas</h2>
-              <p className="muted-text" style={{ marginBottom: 24 }}>Sube la imagen de portada para cada categoría.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+              <p className="muted-text" style={{ marginBottom: 24 }}>Personaliza las imágenes y textos de cada categoría.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
                 {collections.map(col => (
-                  <AssetUploader
-                    key={col.id}
-                    label={col.name}
-                    configKey={`col_img_${col.id}`}
-                    currentValue={col.image_url}
-                    skipConfig
-                    onUpdate={path => updateColImg(col.id, path)}
-                  />
+                  <div key={col.id} style={{ ...box, padding: '12px' }}>
+                    <AssetUploader
+                      label={col.name}
+                      configKey={`col_img_${col.id}`}
+                      currentValue={col.image_url}
+                      skipConfig
+                      onUpdate={path => updateColImg(col.id, path)}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                      <div>
+                        <label style={lbl}>Título</label>
+                        <input 
+                          className="input-dark" 
+                          style={{ fontSize: 11, height: 28 }}
+                          value={col.name}
+                          onChange={e => {
+                            const next = collections.map(c => c.id === col.id ? { ...c, name: e.target.value } : c);
+                            setCollections(next);
+                          }}
+                          onBlur={e => updateColName(col.id, e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label style={lbl}>Subtítulo</label>
+                        <input 
+                          className="input-dark" 
+                          style={{ fontSize: 11, height: 28 }}
+                          value={configs[`cat_subtitle_${col.id}`] || 'COLECCIÓN'}
+                          onChange={e => updateConfig(`cat_subtitle_${col.id}`, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>
