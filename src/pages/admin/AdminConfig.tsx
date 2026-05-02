@@ -893,62 +893,19 @@ export const AdminConfig: React.FC = () => {
           {/* ── SEGMENTOS / COLLECTIONS ── */}
           {(part === 'home-segmentos') && (
             <section>
-              <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>📁 Colecciones y Portadas (Segmentos)</h2>
-              <p className="muted-text" style={{ marginBottom: 24 }}>Sube la imagen de portada y personaliza el texto de cada colección. Activas en la página principal.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {collections.map(col => {
-                  const imgSrc = col.image_url ? getImageUrl(col.image_url, { width: 400, quality: 75 }) : null;
-                  return (
-                    <div key={col.id} style={{ ...box, display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: 24, alignItems: 'start' }}>
-                      <div>
-                        <div style={{ width: '100%', aspectRatio: '4/5', borderRadius: 12, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {imgSrc
-                            ? <img src={imgSrc} alt={col.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <span style={{ fontSize: 40 }}>📷</span>
-                          }
-                        </div>
-                        <AssetUploader
-                          label="Cambiar Imagen"
-                          configKey={`col_img_${col.id}`}
-                          currentValue={col.image_url}
-                          skipConfig
-                          onUpdate={path => updateColImg(col.id, path)}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                        <div>
-                          <label style={lbl}>Título de la Colección</label>
-                          <input className="input-dark" type="text"
-                            value={col.name}
-                            onChange={e => {
-                              const newCols = collections.map(c => c.id === col.id ? { ...c, name: e.target.value } : c);
-                              setCollections(newCols);
-                            }}
-                            onBlur={e => updateColName(col.id, e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label style={lbl}>Texto inferior de la tarjeta (ej: "COLECCIÓN")</label>
-                          <input className="input-dark" type="text"
-                            value={configs[`cat_subtitle_${col.id}`] || 'COLECCIÓN'}
-                            onChange={e => updateConfig(`cat_subtitle_${col.id}`, e.target.value)} />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div>
-                            <label style={lbl}>Posición X tarjeta: {configs[`col_x_${col.id}`] || '0'}px</label>
-                            <input type="range" min={-400} max={400} value={configs[`col_x_${col.id}`] || '0'}
-                              onChange={e => updateConfig(`col_x_${col.id}`, e.target.value)} style={{ width: '100%', accentColor: 'var(--c-lime)' }} />
-                          </div>
-                          <div>
-                            <label style={lbl}>Posición Y tarjeta: {configs[`col_y_${col.id}`] || '0'}px</label>
-                            <input type="range" min={-300} max={300} value={configs[`col_y_${col.id}`] || '0'}
-                              onChange={e => updateConfig(`col_y_${col.id}`, e.target.value)} style={{ width: '100%', accentColor: 'var(--c-lime)' }} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <h2 style={{ fontSize: 18, marginBottom: 8, color: 'var(--c-lime)' }}>📁 Colecciones y Portadas</h2>
+              <p className="muted-text" style={{ marginBottom: 24 }}>Sube la imagen de portada para cada categoría.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                {collections.map(col => (
+                  <AssetUploader
+                    key={col.id}
+                    label={col.name}
+                    configKey={`col_img_${col.id}`}
+                    currentValue={col.image_url}
+                    skipConfig
+                    onUpdate={path => updateColImg(col.id, path)}
+                  />
+                ))}
               </div>
             </section>
           )}
