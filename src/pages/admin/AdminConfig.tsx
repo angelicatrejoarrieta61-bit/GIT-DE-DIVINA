@@ -938,7 +938,7 @@ export const AdminConfig: React.FC = () => {
           {/* ── ESPECIFICO COLECCION (HERO Y RELACIONADOS) ── */}
           {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', ...customSections.map(s => s.key)].includes(section) && (() => {
             const col = collections.find(c => c.slug === section);
-            const blockId = col?.id || section;
+            const blockId = section; // Use slug (section) instead of col.id to match Storefront's CollectionPage.tsx logic
             const blockName = col?.name || section.replace(/-/g, ' ');
             return (
               <section>
