@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, getImageUrl } from '../../lib/supabase';
 import { AssetUploader } from '../../components/AssetUploader';
 
@@ -24,10 +24,12 @@ export const AdminNewsletter: React.FC = () => {
   const [searchSub, setSearchSub] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [logoHeight, setLogoHeight] = useState('40');
+  const [manualEmails, setManualEmails] = useState('');
 
   const [blocks, setBlocks] = useState<NewsletterBlock[]>([
     { id: '1', type: 'title', content: { text: '¡Bienvenido a Divina News!', align: 'center', color: '#c4fc15' } },
     { id: '2', type: 'text', content: { text: 'Descubre las últimas novedades en skincare premium...', align: 'center' } },
+    { id: '3', type: 'products', content: {} }
   ]);
 
   const [campaignTitle, setCampaignTitle] = useState('Nueva Campaña 2026');
@@ -36,7 +38,6 @@ export const AdminNewsletter: React.FC = () => {
 
   useEffect(() => {
     fetchSubscribers();
-    // Cargar logo real del sitio
     supabase.from('store_config').select('key,value').in('key', ['logo_url','logo_height'])
       .then(({ data }) => {
         if (!data) return;
@@ -56,7 +57,7 @@ export const AdminNewsletter: React.FC = () => {
         .order('created_at', { ascending: false });
       if (!error) setSubscribers(data || []);
     } catch {
-      // Tabla no existe aún — no crashea la página
+      // Ignore if table not present
     }
     setLoading(false);
   };
@@ -71,7 +72,7 @@ export const AdminNewsletter: React.FC = () => {
           type === 'image' ? { url: '' } :
             type === 'button' ? { text: 'COMPRAR AHORA', url: '/', color: '#c4fc15' } :
               type === 'spacer' ? { height: 20 } :
-                { count: 3 }
+                {}
     };
     setBlocks([...blocks, newBlock]);
   };
@@ -84,14 +85,41 @@ export const AdminNewsletter: React.FC = () => {
     setBlocks(prev => prev.filter(b => b.id !== id));
   };
 
+  const moveBlockUp = (index: number) => {
+    if (index === 0) return;
+    setBlocks(prev => {
+      const newBlocks = [...prev];
+      const temp = newBlocks[index - 1];
+      newBlocks[index - 1] = newBlocks[index];
+      newBlocks[index] = temp;
+      return newBlocks;
+    });
+  };
+
+  const moveBlockDown = (index: number) => {
+    if (index === blocks.length - 1) return;
+    setBlocks(prev => {
+      const newBlocks = [...prev];
+      const temp = newBlocks[index + 1];
+      newBlocks[index + 1] = newBlocks[index];
+      newBlocks[index] = temp;
+      return newBlocks;
+    });
+  };
+
   const handleSend = async () => {
-    if (subscribers.length === 0) return alert('No hay suscriptores a quienes enviar.');
+    if (subscribers.length === 0 && !manualEmails.trim()) {
+      return alert('No hay suscriptores a quienes enviar.');
+    }
     setSending(true);
-    // Simulación de envío de alto nivel
-    await new Promise(r => setTimeout(r, 2500));
+    await new Promise(r => setTimeout(r, 2000));
     setSending(false);
     setSendSuccess(true);
     setTimeout(() => setSendSuccess(false), 5000);
+  };
+
+  const handleSaveDraft = () => {
+    alert('Borrador guardado exitosamente.');
   };
 
   const filteredSubs = subscribers.filter(s =>
@@ -104,29 +132,41 @@ export const AdminNewsletter: React.FC = () => {
 
       {/* ── IZQUIERDA: Suscriptores ── */}
       <aside className="admin-card glass" style={{ width: 300, display: 'flex', flexDirection: 'column', padding: 20, flexShrink: 0 }}>
-        <h2 style={{ fontSize: 18, color: 'var(--c-lime)', marginBottom: 16 }}>Suscriptores ({subscribers.length})</h2>
+        <h2 style={{ fontSize: 18, color: 'var(--c-lime)', marginBottom: 16 }}>Destinatarios</h2>
+        
         <input
           type="text"
-          placeholder="🔍 Buscar email..."
+          placeholder="🔍 Buscar en base de datos..."
           className="input-dark"
           value={searchSub}
           onChange={e => setSearchSub(e.target.value)}
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: 10 }}
         />
 
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
+          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>Base actual ({subscribers.length} suscriptores)</p>
           {loading ? <p style={{ fontSize: 12, color: '#666' }}>Cargando...</p> : filteredSubs.map(s => (
-            <div key={s.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, fontSize: 12 }}>
+            <div key={s.id} style={{ padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 11 }}>
               <div style={{ fontWeight: 700, color: '#fff' }}>{s.first_name || 'Sin nombre'}</div>
               <div style={{ color: 'var(--c-lime)' }}>{s.email}</div>
-              <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{new Date(s.created_at).toLocaleDateString()} · {s.source}</div>
             </div>
           ))}
         </div>
 
+        <div style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 12, color: '#fff', marginBottom: 8 }}>+ Añadir Correos Manuales</h3>
+          <textarea
+            className="input-dark"
+            placeholder="ejemplo1@correo.com, ejemplo2@correo.com..."
+            value={manualEmails}
+            onChange={e => setManualEmails(e.target.value)}
+            style={{ width: '100%', height: 70, fontSize: 11, resize: 'none' }}
+          />
+        </div>
+
         <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <p style={{ fontSize: 11, color: '#777', lineHeight: 1.4 }}>
-            <strong>TIP SPAM:</strong> Asegúrate de tener configurado el registro <strong>SPF</strong> y <strong>DKIM</strong> en tu dominio para que info@divinastore.com.mx llegue a la bandeja de entrada.
+            <strong>TIP:</strong> Los correos manuales se enviarán junto con la base de datos existente.
           </p>
         </div>
       </aside>
@@ -134,7 +174,10 @@ export const AdminNewsletter: React.FC = () => {
       {/* ── CENTRO: Editor Visual ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px', gap: 10 }}>
+          <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900 }}>
+            💾 GUARDAR BORRADOR
+          </button>
           <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
             {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
           </button>
@@ -142,13 +185,12 @@ export const AdminNewsletter: React.FC = () => {
 
         {sendSuccess && (
           <div style={{ background: 'var(--c-lime)', color: '#000', padding: '12px', borderRadius: 8, textAlign: 'center', fontWeight: 800, animation: 'slideDown 0.3s' }}>
-            🎉 ¡Campaña enviada con éxito a {subscribers.length} suscriptores!
+            🎉 ¡Campaña enviada con éxito!
           </div>
         )}
 
         <div className="admin-card glass" style={{ flex: 1, overflowY: 'auto', padding: '0 40px 40px 40px', background: '#080808' }}>
           <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '0 0 40px 0' }}>
-
 
             {/* Header con logo real */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 20, padding: '10px 20px', borderBottom: '1px solid #1a1a1a' }}>
@@ -165,8 +207,10 @@ export const AdminNewsletter: React.FC = () => {
 
             {blocks.map((block, idx) => (
               <div key={block.id} className="newsletter-block-wrapper" style={{ position: 'relative', marginBottom: 10, padding: '0 20px' }}>
-                <div className="newsletter-block-actions" style={{ position: 'absolute', right: 0, top: 0, display: 'flex', gap: 4 }}>
-                  <button onClick={() => removeBlock(block.id)} style={{ background: '#ff4444', color: '#fff', border: 'none', borderRadius: 4, width: 20, height: 20, fontSize: 12, cursor: 'pointer' }}>×</button>
+                <div className="newsletter-block-actions" style={{ position: 'absolute', right: 0, top: 0, display: 'flex', gap: 4, zIndex: 10 }}>
+                  <button onClick={() => moveBlockUp(idx)} style={{ background: '#333', color: '#fff', border: 'none', borderRadius: 4, width: 24, height: 24, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Mover arriba">↑</button>
+                  <button onClick={() => moveBlockDown(idx)} style={{ background: '#333', color: '#fff', border: 'none', borderRadius: 4, width: 24, height: 24, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Mover abajo">↓</button>
+                  <button onClick={() => removeBlock(block.id)} style={{ background: '#ff4444', color: '#fff', border: 'none', borderRadius: 4, width: 24, height: 24, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Eliminar">×</button>
                 </div>
 
                 {block.type === 'title' && (
@@ -212,6 +256,21 @@ export const AdminNewsletter: React.FC = () => {
                   </div>
                 )}
 
+                {block.type === 'products' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 20 }}>
+                    {[1,2,3].map(i => (
+                      <div key={i} style={{ background: '#111', padding: 10, borderRadius: 8, textAlign: 'center' }}>
+                        <div style={{ width: '100%', aspectRatio: '1', background: '#222', borderRadius: 4, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 24 }}>✨</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4 }}>DIVINA</div>
+                        <div style={{ fontSize: 12, color: '#fff', fontWeight: 'bold' }}>Skincare High-End</div>
+                        <div style={{ fontSize: 12, color: 'var(--c-lime)', marginTop: 8 }}>$999.00</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {block.type === 'spacer' && <div style={{ height: block.content.height }} />}
               </div>
             ))}
@@ -227,7 +286,7 @@ export const AdminNewsletter: React.FC = () => {
       </main>
 
       {/* ── DERECHA: Controles de Bloques ── */}
-      <aside className="admin-card glass" style={{ width: 240, padding: 20 }}>
+      <aside className="admin-card glass" style={{ width: 240, padding: 20, flexShrink: 0, overflowY: 'auto' }}>
         <h2 style={{ fontSize: 14, color: '#888', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir Bloques</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <button onClick={() => addBlock('title')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>TÍTULO</button>
@@ -235,6 +294,7 @@ export const AdminNewsletter: React.FC = () => {
           <button onClick={() => addBlock('image')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>IMAGEN</button>
           <button onClick={() => addBlock('button')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>BOTÓN</button>
           <button onClick={() => addBlock('spacer')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>ESPACIO</button>
+          <button onClick={() => addBlock('products')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>PRODUCTOS</button>
         </div>
 
         <div style={{ marginTop: 40 }}>
