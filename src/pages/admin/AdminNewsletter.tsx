@@ -25,6 +25,7 @@ export const AdminNewsletter: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [logoHeight, setLogoHeight] = useState('40');
   const [manualEmails, setManualEmails] = useState('');
+  const [dbProducts, setDbProducts] = useState<{id:string,name:string,price:number,image_url:string}[]>([]);
 
   const [blocks, setBlocks] = useState<NewsletterBlock[]>([
     { id: '1', type: 'title', content: { text: '¡Bienvenido a Divina News!', align: 'center', color: '#c4fc15' } },
@@ -32,12 +33,17 @@ export const AdminNewsletter: React.FC = () => {
     { id: '3', type: 'products', content: {} }
   ]);
 
-  const [campaignTitle, setCampaignTitle] = useState('Nueva Campaña 2026');
+
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
 
   useEffect(() => {
     fetchSubscribers();
+    
+    // Cargar productos para el selector
+    supabase.from('products').select('id, name, price, image_url').order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setDbProducts(data); });
+
     supabase.from('store_config').select('key,value').in('key', ['logo_url','logo_height'])
       .then(({ data }) => {
         if (!data) return;
@@ -107,11 +113,22 @@ export const AdminNewsletter: React.FC = () => {
     });
   };
 
+  // Cargar borrador al montar si existe
+  useEffect(() => {
+    const saved = localStorage.getItem('newsletter_draft');
+    if (saved) {
+      try { setBlocks(JSON.parse(saved)); } catch {}
+    }
+  }, []);
+
   const handleSend = async () => {
     if (subscribers.length === 0 && !manualEmails.trim()) {
       return alert('No hay suscriptores a quienes enviar.');
     }
+    if (!window.confirm('¿Seguro que deseas enviar esta campaña ahora?')) return;
+    
     setSending(true);
+    // Simulación de envío a Vercel API
     await new Promise(r => setTimeout(r, 2000));
     setSending(false);
     setSendSuccess(true);
@@ -119,7 +136,31 @@ export const AdminNewsletter: React.FC = () => {
   };
 
   const handleSaveDraft = () => {
-    alert('Borrador guardado exitosamente.');
+    localStorage.setItem('newsletter_draft', JSON.stringify(blocks));
+    alert('Borrador guardado exitosamente en tu navegador.');
+  };
+
+  const handleAddManualEmails = async () => {
+    if (!manualEmails.trim()) return;
+    const emails = manualEmails.split(/[,;\n]+/).map(e => e.trim()).filter(e => e.includes('@'));
+    if (emails.length === 0) return alert('No se detectaron correos válidos.');
+    
+    setLoading(true);
+    const inserts = emails.map(email => ({
+      email,
+      first_name: email.split('@')[0],
+      source: 'manual_admin'
+    }));
+
+    try {
+      await supabase.from('subscribers').upsert(inserts, { onConflict: 'email' });
+      alert(`¡${emails.length} suscriptores añadidos/actualizados correctamente!`);
+      setManualEmails('');
+      fetchSubscribers();
+    } catch (err) {
+      alert('Hubo un error al agregar los correos.');
+    }
+    setLoading(false);
   };
 
   const filteredSubs = subscribers.filter(s =>
@@ -160,8 +201,16 @@ export const AdminNewsletter: React.FC = () => {
             placeholder="ejemplo1@correo.com, ejemplo2@correo.com..."
             value={manualEmails}
             onChange={e => setManualEmails(e.target.value)}
-            style={{ width: '100%', height: 70, fontSize: 11, resize: 'none' }}
+            style={{ width: '100%', height: 70, fontSize: 11, resize: 'none', marginBottom: 8 }}
           />
+          <button 
+            onClick={handleAddManualEmails} 
+            className="btn btn-outline" 
+            style={{ width: '100%', padding: '8px', fontSize: 11, fontWeight: 'bold' }}
+            disabled={!manualEmails.trim()}
+          >
+            AGREGAR SUSCRIPTORES A LA BASE
+          </button>
         </div>
 
         <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -216,7 +265,7 @@ export const AdminNewsletter: React.FC = () => {
                 {block.type === 'title' && (
                   <h1
                     contentEditable
-                    onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
+                    onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerHTML })}
                     style={{ color: block.content.color, textAlign: block.content.align, fontSize: 28, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
@@ -225,7 +274,7 @@ export const AdminNewsletter: React.FC = () => {
                 {block.type === 'text' && (
                   <p
                     contentEditable
-                    onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
+                    onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerHTML })}
                     style={{ color: '#ccc', textAlign: block.content.align, fontSize: 15, lineHeight: 1.3, margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
@@ -248,7 +297,7 @@ export const AdminNewsletter: React.FC = () => {
                     <div style={{ background: block.content.color, color: '#000', padding: '10px 24px', borderRadius: 100, fontWeight: 900, display: 'inline-block', fontSize: 14 }}>
                       <span
                         contentEditable
-                        onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
+                        onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerHTML })}
                         style={{ outline: 'none', borderBottom: '1px dashed rgba(0,0,0,0.3)' }}
                         dangerouslySetInnerHTML={{ __html: block.content.text }}
                       />
@@ -257,17 +306,51 @@ export const AdminNewsletter: React.FC = () => {
                 )}
 
                 {block.type === 'products' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 20 }}>
-                    {[1,2,3].map(i => (
-                      <div key={i} style={{ background: '#111', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-                        <div style={{ width: '100%', aspectRatio: '1', background: '#222', borderRadius: 4, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: 24 }}>✨</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4 }}>DIVINA</div>
-                        <div style={{ fontSize: 12, color: '#fff', fontWeight: 'bold' }}>Skincare High-End</div>
-                        <div style={{ fontSize: 12, color: 'var(--c-lime)', marginTop: 8 }}>$999.00</div>
-                      </div>
-                    ))}
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 15, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8 }}>
+                      <select 
+                        className="input-dark" 
+                        style={{ flex: 1, fontSize: 11 }}
+                        onChange={e => {
+                          const pid = e.target.value;
+                          if (!pid) return;
+                          const currentIds = block.content.productIds || [];
+                          if (currentIds.length < 3 && !currentIds.includes(pid)) {
+                            updateBlock(block.id, { productIds: [...currentIds, pid] });
+                          }
+                          e.target.value = '';
+                        }}
+                      >
+                        <option value="">+ Añadir producto a este bloque...</option>
+                        {dbProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      <button onClick={() => updateBlock(block.id, { productIds: [] })} className="btn btn-outline" style={{ fontSize: 11, padding: '0 10px' }}>Limpiar</button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                      {[0,1,2].map(i => {
+                        const pid = (block.content.productIds || [])[i];
+                        const prod = dbProducts.find(p => p.id === pid);
+                        return (
+                          <div key={i} style={{ background: '#111', padding: 10, borderRadius: 8, textAlign: 'center' }}>
+                            <div style={{ width: '100%', aspectRatio: '1', background: '#222', borderRadius: 4, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                              {prod?.image_url ? (
+                                <img src={getImageUrl(prod.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={prod.name} />
+                              ) : (
+                                <span style={{ fontSize: 24, opacity: 0.5 }}>✨</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4 }}>DIVINA</div>
+                            <div style={{ fontSize: 11, color: '#fff', fontWeight: 'bold', height: 32, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {prod ? prod.name : 'Espacio de Producto'}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--c-lime)', marginTop: 8 }}>
+                              {prod ? `$${prod.price.toFixed(2)}` : '---'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
