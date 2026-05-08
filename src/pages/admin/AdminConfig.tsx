@@ -256,7 +256,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
                   </select>
                 </td>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                  {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home'].includes(section) && (
+                  {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home', ...customSections.map(s => s.key)].includes(section || '') && (
                     <input 
                       type="checkbox" 
                       title={`Destacar en ${section}`}
@@ -341,7 +341,13 @@ export const AdminConfig: React.FC = () => {
   const saveConfigBulk = async (cfg: Record<string, string>, frst: any, hBlocks: any, hLinks: any) => {
     const updates = [
       ...Object.entries(cfg)
-        .filter(([k, v]) => !['frost_cards_data', 'home_sections', 'header_links'].includes(k) && !String(v).startsWith('data:'))
+        .filter(([k, v]) => 
+          v !== undefined && 
+          v !== null && 
+          String(v) !== 'undefined' &&
+          !['frost_cards_data', 'home_sections', 'header_links'].includes(k) && 
+          !String(v).startsWith('data:')
+        )
         .map(([key, value]) => ({ key, value: String(value) })),
       { key: 'frost_cards_data', value: JSON.stringify(frst) },
       { key: 'home_sections', value: JSON.stringify(hBlocks) },
