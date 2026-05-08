@@ -185,6 +185,13 @@ export const AdminLayout: React.FC = () => {
             ✉️ Mensajes de Contacto
           </NavLink>
 
+          <NavLink
+            to="/admin/newsletter"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            📢 Newsletter y Campañas
+          </NavLink>
+
 
 
           <NavLink

@@ -20,6 +20,7 @@ import { AdminImport } from './pages/admin/AdminImport';
 import { AdminConfig } from './pages/admin/AdminConfig';
 import { AdminOrderReports } from './pages/admin/AdminOrderReports';
 import { AdminMessages } from './pages/admin/AdminMessages';
+import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 
 function RouteRedirector() {
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="config" element={<AdminConfig />} />
           <Route path="reportes" element={<AdminOrderReports />} />
           <Route path="mensajes" element={<AdminMessages />} />
+          <Route path="newsletter" element={<AdminNewsletter />} />
         </Route>
 
         {/* Public routes */}
