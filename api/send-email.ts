@@ -3,9 +3,11 @@ import nodemailer from 'nodemailer';
 
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 const transporter = nodemailer.createTransport({
+  pool: true, // Reutiliza la conexión para múltiples envíos rápidos
+  maxConnections: 1, // Evita que HostGator bloquee por muchas conexiones simultáneas
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
+  port: Number(process.env.SMTP_PORT) || 465,
+  secure: true,
   auth: {
     user: 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, // Contraseña de admin@ en tu panel de hosting
@@ -68,13 +70,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new Error('No recipients found for campaign');
       }
 
-      await transporter.sendMail({
-        from: FROM,
-        to: FROM, // Requerido por cPanel/HostGator para no marcarlo como Spam al usar BCC
-        bcc: toList.join(', '), // Enviar con copia oculta a los clientes
-        subject: subject || 'Divina Store Newsletter',
-        html: htmlBody,
-      });
+      // Para evitar que HostGator bloquee por Spam (Error 451 BCC limit), enviamos uno por uno en la misma conexión
+      for (const recipientEmail of toList) {
+        await transporter.sendMail({
+          from: FROM,
+          to: recipientEmail,
+          subject: subject || 'Divina Store Newsletter',
+          html: htmlBody,
+        });
+      }
     }
 
     return res.status(200).json({ ok: true });
