@@ -147,10 +147,11 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
           JSON.stringify(item.tags) !== JSON.stringify(original?.tags);
 
         if (hasChanged) {
+          console.log(`Saving changes for ${item.name}...`);
           await updateProduct(item.id, {
             name: item.name,
             brand: item.brand,
-            price: Number(item.price),
+            price: Number(item.price) || 0,
             compare_price: item.compare_price ? Number(item.compare_price) : null,
             sku: item.sku,
             stock: stockNum,
@@ -256,7 +257,7 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
                   </select>
                 </td>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                  {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home', ...customSections.map(s => s.key)].includes(section || '') && (
+                  {['products-config', 'cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home', ...customSections.map(s => s.key)].includes(section || '') && (
                     <input 
                       type="checkbox" 
                       title={`Destacar en ${section}`}
