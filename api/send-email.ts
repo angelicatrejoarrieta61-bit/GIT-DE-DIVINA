@@ -3,19 +3,21 @@ import nodemailer from 'nodemailer';
 
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 const transporter = nodemailer.createTransport({
-  pool: true, // Reutiliza la conexión para múltiples envíos rápidos
-  maxConnections: 1, // Evita que HostGator bloquee por muchas conexiones simultáneas
+  pool: true,
+  maxConnections: 1,
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
   port: Number(process.env.SMTP_PORT) || 465,
   secure: true,
   auth: {
     user: 'admin@divinastore.com.mx',
-    pass: process.env.SMTP_PASS, // Contraseña de admin@ en tu panel de hosting
+    pass: process.env.SMTP_PASS, 
   },
   tls: { rejectUnauthorized: false },
-  connectionTimeout: 5000, // Tiempo máximo de espera para conectar
-  greetingTimeout: 5000,
-  socketTimeout: 5000,
+  debug: true, // Muestra todo el tráfico SMTP en los logs de Vercel
+  logger: true, // Registra cada paso del proceso
+  connectionTimeout: 10000, 
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
@@ -23,6 +25,15 @@ const TO   = 'info@divinastore.com.mx';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Verificar conexión SMTP al inicio
+  try {
+    await transporter.verify();
+    console.log('SMTP Connection verified successfully');
+  } catch (verifyError: any) {
+    console.error('SMTP Verification failed:', verifyError);
+    return res.status(500).json({ ok: false, error: 'No se pudo conectar al servidor de correos: ' + verifyError.message });
+  }
 
   const { type, firstName, email, message, subscribe } = req.body || {};
 
