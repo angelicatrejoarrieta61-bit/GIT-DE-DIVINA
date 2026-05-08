@@ -134,18 +134,10 @@ export const AdminNewsletter: React.FC = () => {
       {/* ── CENTRO: Editor Visual ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
 
-        <div className="admin-card glass" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={campaignTitle}
-            onChange={e => setCampaignTitle(e.target.value)}
-            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, fontWeight: 700, width: '60%' }}
-          />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
-              {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
-            </button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px' }}>
+          <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
+            {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
+          </button>
         </div>
 
         {sendSuccess && (
@@ -154,8 +146,9 @@ export const AdminNewsletter: React.FC = () => {
           </div>
         )}
 
-        <div className="admin-card glass" style={{ flex: 1, overflowY: 'auto', padding: '40px', background: '#080808' }}>
-          <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '40px 0' }}>
+        <div className="admin-card glass" style={{ flex: 1, overflowY: 'auto', padding: '0 40px 40px 40px', background: '#080808' }}>
+          <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '0 0 40px 0' }}>
+
 
             {/* Header con logo real */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 20, padding: '10px 20px', borderBottom: '1px solid #1a1a1a' }}>
