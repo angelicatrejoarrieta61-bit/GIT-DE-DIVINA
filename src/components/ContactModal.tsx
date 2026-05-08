@@ -12,7 +12,7 @@ interface ContactModalProps {
 export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const [render, setRender] = useState(isOpen);
   const [whatsapp, setWhatsapp] = useState('5215647438328');
-  const [contactEmail, setContactEmail] = useState('hola@divinastore.com.mx');
+  const [contactEmail, setContactEmail] = useState('admin@divinastore.com.mx');
   
   const [form, setForm] = useState({ 
     firstName: '', 
@@ -46,17 +46,26 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.register) {
-      try {
+    try {
+      // Save message
+      const { error: msgError } = await supabase.from('contact_messages').insert([{
+        first_name: form.firstName,
+        email: form.email,
+        message: form.message,
+        source: 'contact_modal',
+        status: 'pending'
+      }]);
+      if (msgError && msgError.code !== '42P01') console.error('Msg error:', msgError);
+
+      if (form.register) {
         await supabase.from('subscribers').insert([{
           email: form.email,
           first_name: form.firstName,
-          last_name: form.lastNamePaterno,
           source: 'contact_modal'
         }]);
-      } catch (err) {
-        console.error("Error silently handled", err);
       }
+    } catch (err) {
+      console.error("Error silently handled", err);
     }
     setShowCoupon(true);
   };
@@ -86,6 +95,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-lime)" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                 +{whatsapp}
               </a>
+              <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0' }}>Soporte administrativo: admin@divinastore.com.mx</p>
+            </div>
             </div>
 
             <div style={{ marginBottom: 20 }}>

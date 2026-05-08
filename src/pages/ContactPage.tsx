@@ -14,7 +14,7 @@ export const ContactPage: React.FC = () => {
     register: false
   });
   const [whatsapp, setWhatsapp] = useState('5215647438328');
-  const [contactEmail, setContactEmail] = useState('hola@divinastore.com.mx');
+  const [contactEmail, setContactEmail] = useState('admin@divinastore.com.mx');
   const [showCoupon, setShowCoupon] = useState(false);
   
   const [bgImg, setBgImg] = useState<string | null>(null);
@@ -64,21 +64,35 @@ export const ContactPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.firstName && form.email && form.message) {
-      if (form.register) {
-        try {
-          const { error } = await supabase.from('subscribers').insert([{ 
+      try {
+        // Save the actual message to the database
+        const { error: msgError } = await supabase.from('contact_messages').insert([{
+          first_name: form.firstName,
+          last_name_paterno: form.lastNamePaterno,
+          last_name_materno: form.lastNameMaterno,
+          email: form.email,
+          message: form.message,
+          status: 'pending'
+        }]);
+        
+        if (msgError && msgError.code !== '42P01') {
+          console.error('Error saving message:', msgError);
+        }
+
+        if (form.register) {
+          const { error: subError } = await supabase.from('subscribers').insert([{ 
             first_name: form.firstName,
             last_name_paterno: form.lastNamePaterno,
             last_name_materno: form.lastNameMaterno,
             email: form.email,
             source: 'contact_form'
           }]);
-          if (error && error.code !== '42P01') console.error(error);
-        } catch(err) { /* ignore */ }
+          if (subError && subError.code !== '42P01') console.error('Error saving subscriber:', subError);
+        }
+      } catch(err) { 
+        console.error('Contact form error:', err);
       }
       
-      // Simulate form submission to DB for the contact message
-      // No WhatsApp redirect for the right side form.
       setShowCoupon(true);
     }
   };

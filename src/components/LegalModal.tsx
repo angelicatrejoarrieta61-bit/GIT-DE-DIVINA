@@ -17,7 +17,6 @@ export const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const handleAnimationEnd = (e: React.AnimationEvent) => {
-    // Solo reaccionar a la animación del overlay para evitar bugs con hijos
     if (e.target === e.currentTarget && !isOpen) {
       setRender(false);
     }
@@ -37,20 +36,31 @@ export const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose }) => {
       >
         <div className="legal-modal-main">
           <h2 className="legal-modal-title">LEGALES Y COPYRIGHT</h2>
-          <p className="legal-modal-date"><em>Actualizado: 25 de abril de 2026</em></p>
+          <p className="legal-modal-date"><em>Actualizado: {new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</em></p>
           
           <div className="legal-modal-text-content">
-            <h3>TÉRMINOS Y CONDICIONES</h3>
-            <p>Bienvenido a Divina Store. Al acceder y utilizar este sitio web, aceptas cumplir con los siguientes términos y condiciones. Todo el contenido, marcas, logotipos, imágenes y diseños visuales están protegidos por derechos de autor internacionales y leyes de propiedad intelectual.</p>
-            <p>Queda estrictamente prohibida la reproducción, distribución o modificación no autorizada de cualquier material presente en esta plataforma sin el consentimiento expreso y por escrito de Divina Store.</p>
+            <h3 style={{ color: 'var(--c-lime)', marginTop: 24, marginBottom: 12 }}>1. PROPIEDAD INTELECTUAL Y COPYRIGHT</h3>
+            <p>Todo el contenido presente en este sitio web, incluyendo pero no limitado a: código fuente, arquitectura de software, diseños gráficos, logotipos, imágenes de productos, textos, y combinaciones de colores, es propiedad exclusiva de <strong>Divina Store®</strong> o de sus respectivos licenciantes.</p>
+            <p>Queda estrictamente prohibida la extracción automática de datos (web scraping), la copia total o parcial del código fuente, el uso de nuestras imágenes para fines comerciales externos, o cualquier otra forma de robo de propiedad intelectual. Divina Store® se reserva el derecho de emprender acciones legales civiles y penales contra cualquier individuo o entidad que infrinja estos derechos.</p>
             
-            <h3>AVISO DE PRIVACIDAD</h3>
-            <p>Tus datos personales están protegidos con los más altos estándares de seguridad (cifrado SSL). Utilizamos la información recopilada únicamente para procesar tus pedidos, mejorar tu experiencia en la plataforma y enviarte comunicaciones relevantes si así lo has autorizado.</p>
-            <p>No compartimos, vendemos ni alquilamos tu información a terceros bajo ninguna circunstancia. Puedes solicitar la eliminación de tu cuenta y datos en cualquier momento a través del correo de contacto.</p>
+            <h3 style={{ color: 'var(--c-lime)', marginTop: 24, marginBottom: 12 }}>2. TÉRMINOS Y CONDICIONES DE USO</h3>
+            <p>Al navegar y comprar en Divina Store, el usuario acepta que es mayor de edad y que la información proporcionada para transacciones es verídica. Nos reservamos el derecho de cancelar pedidos sospechosos de fraude o que infrinjan nuestras políticas de seguridad.</p>
+            <p>Los precios mostrados están en Pesos Mexicanos (MXN) e incluyen IVA, a menos que se indique lo contrario. Las promociones tienen vigencia limitada y no son acumulables a menos que se especifique.</p>
+            
+            <h3 style={{ color: 'var(--c-lime)', marginTop: 24, marginBottom: 12 }}>3. AVISO DE PRIVACIDAD INTEGRAL</h3>
+            <p>Divina Store® cumple con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares. Tus datos (nombre, correo, dirección, teléfono) son utilizados exclusivamente para:</p>
+            <ul style={{ listStyleType: 'disc', paddingLeft: 20, marginBottom: 12 }}>
+              <li>Procesar y enviar tus pedidos.</li>
+              <li>Brindar soporte técnico y atención al cliente.</li>
+              <li>Enviar boletines informativos (solo si te has suscrito).</li>
+              <li>Prevenir actividades fraudulentas.</li>
+            </ul>
+            <p>No almacenamos datos sensibles de tarjetas bancarias; todos los pagos son procesados a través de pasarelas seguras y certificadas (como Clip®).</p>
 
-            <h3>POLÍTICAS DE DEVOLUCIÓN</h3>
-            <p>Por razones de higiene y salubridad, debido a la naturaleza de los productos cosméticos y de cuidado personal, no aceptamos devoluciones una vez que el empaque original del producto ha sido alterado o abierto.</p>
-            <p>Solo se aceptarán cambios o devoluciones en caso de defectos de fábrica o si el producto recibido no corresponde al pedido original, en un plazo máximo de 7 días naturales tras la recepción.</p>
+            <h3 style={{ color: 'var(--c-lime)', marginTop: 24, marginBottom: 12 }}>4. POLÍTICAS DE ENVÍO Y DEVOLUCIÓN</h3>
+            <p><strong>Envíos:</strong> Procesamos pedidos en 24-48 horas hábiles. El tiempo de entrega varía según la zona geográfica (generalmente de 3 a 5 días hábiles).</p>
+            <p><strong>Devoluciones:</strong> Por razones de higiene y salubridad, no se aceptan devoluciones de productos cosméticos o de cuidado personal una vez que el sello de seguridad ha sido roto o el empaque abierto.</p>
+            <p>En caso de recibir un producto dañado o incorrecto, el cliente tiene <strong>7 días naturales</strong> para reportarlo a hola@divinastore.com.mx adjuntando fotografías del estado del paquete.</p>
           </div>
         </div>
         

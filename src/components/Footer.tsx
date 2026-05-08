@@ -143,6 +143,7 @@ export const Footer: React.FC = () => {
                     </svg>
                   </button>
                 </div>
+                <p style={{ fontSize: '10px', color: '#666', marginTop: '8px' }}>Gestionado por: info@divinastore.com.mx</p>
               </form>
             )}
           </div>

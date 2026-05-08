@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import './ContactPage.css'; // Podemos reusar los estilos de ContactPage para el wrapper
+import './ContactPage.css';
 
 export const GenericPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -11,42 +11,44 @@ export const GenericPage: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     
-    // Aquí podríamos jalar la información de Supabase (una tabla de 'pages')
-    // Por ahora, pondremos información estática basada en el slug para cumplir con las páginas faltantes.
-    
     if (slug === 'legales') {
-      setTitle('Legales y Copyright');
+      setTitle('Legales, Copyright y Propiedad Intelectual');
       setContent(
         <div style={{ color: '#ccc', lineHeight: 1.8 }}>
-          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>Términos y Condiciones</h3>
-          <p style={{ marginBottom: 20 }}>Bienvenido a Divina Store. Al acceder y utilizar este sitio web, aceptas cumplir con los siguientes términos y condiciones. Todo el contenido, marcas y diseños están protegidos por derechos de autor.</p>
+          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>1. Protección de Derechos de Autor</h3>
+          <p style={{ marginBottom: 20 }}>Todo el software, código fuente (HTML, CSS, JS), diseños UX/UI, logotipos y material fotográfico presente en Divina Store® está protegido por leyes nacionales e internacionales de Propiedad Intelectual. Queda estrictamente prohibida su copia o reproducción sin autorización.</p>
           
-          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>Aviso de Privacidad</h3>
-          <p style={{ marginBottom: 20 }}>Tus datos personales están protegidos. Utilizamos la información recopilada únicamente para procesar tus pedidos, mejorar tu experiencia y enviarte comunicaciones relevantes si así lo has autorizado.</p>
+          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>2. Aviso de Privacidad</h3>
+          <p style={{ marginBottom: 20 }}>Recopilamos tus datos únicamente para fines operativos. Contamos con protocolos de cifrado de extremo a extremo para asegurar que tu información personal y de pago nunca sea comprometida.</p>
 
-          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>Políticas de Devolución</h3>
-          <p>Debido a la naturaleza de los productos cosméticos, no aceptamos devoluciones una vez que el producto ha sido abierto, a menos que presente un defecto de fábrica.</p>
+          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>3. Políticas de Devolución y Garantías</h3>
+          <p style={{ marginBottom: 20 }}>Garantizamos la originalidad de todos nuestros productos. Si recibes un producto con defecto de fábrica, cuentas con 7 días para reportarlo. No se aceptan cambios en productos abiertos por razones de higiene.</p>
+          
+          <h3 style={{ color: 'var(--c-lime)', marginBottom: 12 }}>4. Limitación de Responsabilidad</h3>
+          <p>Divina Store no se hace responsable por el uso inadecuado de los productos adquiridos. Recomendamos siempre consultar con un dermatólogo antes de iniciar cualquier tratamiento.</p>
         </div>
       );
     } else if (slug === 'programa-de-promocion') {
-      setTitle('Programa de Promoción');
+      setTitle('Programa de Promoción y Embajadores');
       setContent(
         <div style={{ color: '#ccc', lineHeight: 1.8 }}>
-          <p style={{ marginBottom: 20 }}>Únete a nuestro programa de embajadores y recibe comisiones por cada venta generada a través de tus enlaces referidos.</p>
+          <p style={{ marginBottom: 20 }}>Conviértete en embajador de Divina Store y ayuda a otros a encontrar el cuidado de piel perfecto mientras generas ingresos.</p>
           <ul style={{ listStyleType: 'disc', paddingLeft: 20, marginBottom: 20 }}>
-            <li>Comisiones atractivas</li>
-            <li>Acceso a productos exclusivos</li>
-            <li>Soporte y material publicitario</li>
+            <li>Comisiones del 10% al 20% por venta referida.</li>
+            <li>Códigos de descuento exclusivos para tu audiencia.</li>
+            <li>Acceso anticipado a lanzamientos de marcas como ISDIN y La Roche-Posay.</li>
+            <li>Dashboard personal para rastrear tus ganancias.</li>
           </ul>
-          <p>Para más información, envíanos un mensaje a través de nuestra página de contacto.</p>
+          <p>Para aplicar, envía tus redes sociales y estadísticas a <strong>ventas@divinastore.com.mx</strong>.</p>
         </div>
       );
     } else if (slug === 'programa-testers') {
-      setTitle('Programa Testers (Youtubers)');
+      setTitle('Programa de Testers y Creadores (UGC)');
       setContent(
         <div style={{ color: '#ccc', lineHeight: 1.8 }}>
-          <p style={{ marginBottom: 20 }}>¿Eres creador de contenido? Nos encantaría colaborar contigo. Si tienes un canal de YouTube, TikTok o Instagram dedicado al cuidado personal, puedes aplicar para recibir nuestros productos de prueba.</p>
-          <p>Por favor, envíanos tus estadísticas y enlaces a tus canales a través de nuestra página de contacto o correo electrónico directo.</p>
+          <p style={{ marginBottom: 20 }}>¿Te apasiona el skincare y te gusta crear contenido? Queremos enviarte productos para que los pruebes y compartas tu opinión honesta.</p>
+          <p style={{ marginBottom: 20 }}>Buscamos perfiles en TikTok e Instagram que tengan una comunidad activa interesada en belleza y salud cutánea.</p>
+          <p>Envíanos un mensaje con el asunto "Programa Tester" indicando tus canales principales y por qué te gustaría colaborar con nosotros.</p>
         </div>
       );
     } else {

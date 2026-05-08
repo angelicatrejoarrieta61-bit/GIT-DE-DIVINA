@@ -174,7 +174,11 @@ export const AdminOrderReports: React.FC = () => {
           <h2 style={{ fontSize: 22, color: 'var(--c-lime)', marginBottom: 6 }}>📊 Reportes de Pedidos y Clientes</h2>
           <p style={{ color: 'var(--c-text-muted)', fontSize: 13, margin: 0 }}>Gestión completa de pedidos, clientes y datos para email marketing.</p>
         </div>
-        <button onClick={loadOrders} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>🔄 Actualizar</button>
+        <div style={{ textAlign: 'right' }}>
+           <p style={{ fontSize: '11px', color: '#888', margin: '0 0 4px' }}>Notificaciones de compras: <strong>admin@divinastore.com.mx</strong></p>
+           <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px' }}>Gestión de Info/Newsletter: <strong>info@divinastore.com.mx</strong></p>
+           <button onClick={loadOrders} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>🔄 Actualizar</button>
+        </div>
       </div>
 
       {/* ── Metrics ── */}
