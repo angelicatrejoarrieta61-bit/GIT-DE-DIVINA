@@ -67,7 +67,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       await transporter.sendMail({
         from: FROM,
-        bcc: toList.join(', '), // Enviar con copia oculta para privacidad
+        to: FROM, // Requerido por cPanel/HostGator para no marcarlo como Spam al usar BCC
+        bcc: toList.join(', '), // Enviar con copia oculta a los clientes
         subject: subject || 'Divina Store Newsletter',
         html: htmlBody,
       });
