@@ -360,14 +360,7 @@ export const AdminNewsletter: React.FC = () => {
           <button onClick={() => addBlock('products')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>PRODUCTO</button>
         </div>
 
-        <div style={{ marginTop: 40 }}>
-          <h2 style={{ fontSize: 14, color: '#888', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 }}>Tipografías Site</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 14, fontFamily: 'var(--f-heading)' }}>HEADING (Michroma)</div>
-            <div style={{ fontSize: 14, fontFamily: 'var(--f-sub)' }}>SUBTITLE (Catamaran)</div>
-            <div style={{ fontSize: 14, fontFamily: 'var(--f-accent)' }}>ACCENT (Barlow)</div>
-          </div>
-        </div>
+
 
         <div style={{ marginTop: 40, background: '#000', padding: 16, borderRadius: 8, border: '1px solid #1a1a1a' }}>
           <h3 style={{ fontSize: 12, color: 'var(--c-lime)', margin: '0 0 12px' }}>Añadir Producto al Bloque</h3>
