@@ -158,7 +158,7 @@ export const AdminNewsletter: React.FC = () => {
           <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '40px 0' }}>
 
             {/* Header con logo real */}
-            <div style={{ textAlign: 'center', marginBottom: 40, padding: '20px 40px', borderBottom: '1px solid #1a1a1a' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 20, padding: '10px 20px', borderBottom: '1px solid #1a1a1a' }}>
               {logoUrl ? (
                 <img 
                   src={getImageUrl(logoUrl)} 
@@ -171,7 +171,7 @@ export const AdminNewsletter: React.FC = () => {
             </div>
 
             {blocks.map((block, idx) => (
-              <div key={block.id} className="newsletter-block-wrapper" style={{ position: 'relative', marginBottom: 20, padding: '0 40px' }}>
+              <div key={block.id} className="newsletter-block-wrapper" style={{ position: 'relative', marginBottom: 10, padding: '0 20px' }}>
                 <div className="newsletter-block-actions" style={{ position: 'absolute', right: 0, top: 0, display: 'flex', gap: 4 }}>
                   <button onClick={() => removeBlock(block.id)} style={{ background: '#ff4444', color: '#fff', border: 'none', borderRadius: 4, width: 20, height: 20, fontSize: 12, cursor: 'pointer' }}>×</button>
                 </div>
@@ -180,7 +180,7 @@ export const AdminNewsletter: React.FC = () => {
                   <h1
                     contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
-                    style={{ color: block.content.color, textAlign: block.content.align, fontSize: 32, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
+                    style={{ color: block.content.color, textAlign: block.content.align, fontSize: 28, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
                 )}
@@ -189,7 +189,7 @@ export const AdminNewsletter: React.FC = () => {
                   <p
                     contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
-                    style={{ color: '#ccc', textAlign: block.content.align, fontSize: 16, lineHeight: 1.6, margin: 0, outline: 'none' }}
+                    style={{ color: '#ccc', textAlign: block.content.align, fontSize: 15, lineHeight: 1.3, margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
                 )}
@@ -199,7 +199,7 @@ export const AdminNewsletter: React.FC = () => {
                     {block.content.url ? (
                       <img src={getImageUrl(block.content.url)} style={{ width: '100%', borderRadius: 8 }} alt="Block" />
                     ) : (
-                      <div style={{ background: '#111', padding: '40px', borderRadius: 8, border: '2px dashed #333' }}>
+                      <div style={{ background: '#111', padding: '20px', borderRadius: 8, border: '2px dashed #333' }}>
                         <AssetUploader label="Cargar Imagen para Email" configKey={`nl_img_${block.id}`} skipConfig onUpdate={url => updateBlock(block.id, { url })} />
                       </div>
                     )}
@@ -207,10 +207,15 @@ export const AdminNewsletter: React.FC = () => {
                 )}
 
                 {block.type === 'button' && (
-                  <div style={{ textAlign: 'center', marginTop: 20 }}>
-                    <a href="#" style={{ background: block.content.color, color: '#000', padding: '12px 32px', borderRadius: 100, fontWeight: 900, textDecoration: 'none', display: 'inline-block', fontSize: 14 }}>
-                      {block.content.text}
-                    </a>
+                  <div style={{ textAlign: 'center', marginTop: 10 }}>
+                    <div style={{ background: block.content.color, color: '#000', padding: '10px 24px', borderRadius: 100, fontWeight: 900, display: 'inline-block', fontSize: 14 }}>
+                      <span
+                        contentEditable
+                        onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
+                        style={{ outline: 'none', borderBottom: '1px dashed rgba(0,0,0,0.3)' }}
+                        dangerouslySetInnerHTML={{ __html: block.content.text }}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -218,9 +223,10 @@ export const AdminNewsletter: React.FC = () => {
               </div>
             ))}
 
-            {/* Footer placeholder */}
-            <div style={{ marginTop: 60, padding: '40px', borderTop: '1px solid #1a1a1a', textAlign: 'center' }}>
-              <p style={{ color: '#666', fontSize: 12, margin: '0 0 10px' }}>Estás recibiendo este correo porque te suscribiste a Divina Store MX.</p>
+            {/* Footer con legales */}
+            <div style={{ marginTop: 40, padding: '20px', borderTop: '1px solid #1a1a1a', textAlign: 'center' }}>
+              <p style={{ color: '#666', fontSize: 11, margin: '0 0 8px' }}>Estás recibiendo este correo porque te suscribiste a Divina Store MX.</p>
+              <p style={{ color: '#444', fontSize: 9, margin: '0 0 12px' }}>Protegido por las leyes de propiedad intelectual nacionales e internacionales. Queda estrictamente prohibida la copia, reproducción o distribución de este contenido y sus imágenes.</p>
               <a href="#" style={{ color: 'var(--c-lime)', fontSize: 12, textDecoration: 'none' }}>Darse de baja</a>
             </div>
           </div>
