@@ -179,14 +179,18 @@ export const AdminNewsletter: React.FC = () => {
         })
       });
 
-      if (!realRes.ok) throw new Error('Error en API');
+      const data = await realRes.json();
+
+      if (!realRes.ok || data.warning) {
+        throw new Error(data.warning || 'Error desconocido en el servidor de correos');
+      }
       
       setSending(false);
       setSendSuccess(true);
       setTimeout(() => setSendSuccess(false), 5000);
-    } catch (err) {
+    } catch (err: any) {
       setSending(false);
-      alert('Error crítico: No se pudieron enviar los correos. Revisa la configuración de SMTP en Vercel.');
+      alert(`Error crítico: No se pudieron enviar los correos.\nDetalle: ${err.message}\nRevisa la configuración de SMTP en Vercel.`);
     }
   };
 
