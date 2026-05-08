@@ -363,19 +363,29 @@ export const AdminNewsletter: React.FC = () => {
       <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
         <h2 style={{ fontSize: 12, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>Añadir Bloques</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          <button onClick={() => addBlock('title')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TÍTULO</button>
-          <button onClick={() => addBlock('image')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>IMAGEN</button>
-          <button onClick={() => addBlock('spacer')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>ESPACIO</button>
-          <button onClick={() => addBlock('text')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TEXTO</button>
-          <button onClick={() => addBlock('button')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>BOTÓN</button>
-          <button onClick={() => addBlock('products')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>PRODUCTO</button>
+          {['title', 'image', 'spacer', 'text', 'button', 'products'].map(type => (
+            <button 
+              key={type}
+              onClick={() => addBlock(type as any)} 
+              style={{ 
+                display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                fontSize: 9, padding: '6px 0', letterSpacing: 1, color: '#fff', 
+                background: 'linear-gradient(145deg, #555, #222)', 
+                boxShadow: '0 4px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                border: '1px solid #111', borderRadius: 4, cursor: 'pointer',
+                textTransform: 'uppercase', fontWeight: 'bold'
+              }}
+            >
+              {type === 'products' ? 'PRODUCTO' : type === 'spacer' ? 'ESPACIO' : type === 'image' ? 'IMAGEN' : type === 'button' ? 'BOTÓN' : type === 'title' ? 'TÍTULO' : 'TEXTO'}
+            </button>
+          ))}
         </div>
 
-        <div style={{ marginTop: 16, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
+        <div style={{ marginTop: 8, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
           <h3 style={{ fontSize: 12, color: 'var(--c-lime)', margin: '0 0 12px' }}>Añadir Producto al Bloque</h3>
           <select 
             className="input-dark" 
-            style={{ width: '100%', fontSize: 11, marginBottom: 10 }}
+            style={{ width: '100%', fontSize: 11, marginBottom: 10, backgroundColor: '#000', color: '#fff', border: '1px solid #333' }}
             onChange={e => {
               const pid = e.target.value;
               if (!pid) return;
