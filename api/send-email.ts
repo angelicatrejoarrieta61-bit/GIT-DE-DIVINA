@@ -4,16 +4,19 @@ import nodemailer from 'nodemailer';
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: true,
+  port: 587,
+  secure: false, // false para STARTTLS en puerto 587
   auth: {
     user: 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, 
   },
-  tls: { rejectUnauthorized: false },
-  connectionTimeout: 30000, 
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
+  tls: { 
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
+  },
+  connectionTimeout: 20000, 
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
 });
 
 const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
