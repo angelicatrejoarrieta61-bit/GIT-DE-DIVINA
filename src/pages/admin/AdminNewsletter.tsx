@@ -223,7 +223,7 @@ export const AdminNewsletter: React.FC = () => {
       {/* ── CENTRO: Editor Visual ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 20px', gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', gap: 10 }}>
           <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900 }}>
             💾 GUARDAR BORRADOR
           </button>
@@ -307,26 +307,6 @@ export const AdminNewsletter: React.FC = () => {
 
                 {block.type === 'products' && (
                   <div style={{ marginTop: 20 }}>
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 15, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8 }}>
-                      <select 
-                        className="input-dark" 
-                        style={{ flex: 1, fontSize: 11 }}
-                        onChange={e => {
-                          const pid = e.target.value;
-                          if (!pid) return;
-                          const currentIds = block.content.productIds || [];
-                          if (currentIds.length < 3 && !currentIds.includes(pid)) {
-                            updateBlock(block.id, { productIds: [...currentIds, pid] });
-                          }
-                          e.target.value = '';
-                        }}
-                      >
-                        <option value="">+ Añadir producto a este bloque...</option>
-                        {dbProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                      <button onClick={() => updateBlock(block.id, { productIds: [] })} className="btn btn-outline" style={{ fontSize: 11, padding: '0 10px' }}>Limpiar</button>
-                    </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                       {[0,1,2].map(i => {
                         const pid = (block.content.productIds || [])[i];
@@ -369,15 +349,15 @@ export const AdminNewsletter: React.FC = () => {
       </main>
 
       {/* ── DERECHA: Controles de Bloques ── */}
-      <aside className="admin-card glass" style={{ width: 240, padding: 20, flexShrink: 0, overflowY: 'auto' }}>
-        <h2 style={{ fontSize: 14, color: '#888', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir Bloques</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button onClick={() => addBlock('title')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>TÍTULO</button>
-          <button onClick={() => addBlock('text')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>TEXTO</button>
-          <button onClick={() => addBlock('image')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>IMAGEN</button>
-          <button onClick={() => addBlock('button')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>BOTÓN</button>
-          <button onClick={() => addBlock('spacer')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>ESPACIO</button>
-          <button onClick={() => addBlock('products')} className="btn btn-outline" style={{ fontSize: 11, padding: 12 }}>PRODUCTOS</button>
+      <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
+        <h2 style={{ fontSize: 14, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir Bloques</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <button onClick={() => addBlock('title')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>TÍTULO</button>
+          <button onClick={() => addBlock('text')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>TEXTO</button>
+          <button onClick={() => addBlock('image')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>IMAGEN</button>
+          <button onClick={() => addBlock('button')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>BOTÓN</button>
+          <button onClick={() => addBlock('spacer')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>ESPACIO</button>
+          <button onClick={() => addBlock('products')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>PRODUCTO</button>
         </div>
 
         <div style={{ marginTop: 40 }}>
@@ -389,13 +369,43 @@ export const AdminNewsletter: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ marginTop: 40, background: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 8 }}>
-          <h3 style={{ fontSize: 12, color: 'var(--c-lime)', margin: '0 0 8px' }}>Anti-Spam Check</h3>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <li style={{ fontSize: 10, color: '#aaa' }}>✅ SSL Encriptado</li>
-            <li style={{ fontSize: 10, color: '#aaa' }}>✅ Link de Unsubscribe</li>
-            <li style={{ fontSize: 10, color: '#aaa' }}>⚠️ Configurar DNS</li>
-          </ul>
+        <div style={{ marginTop: 40, background: '#000', padding: 16, borderRadius: 8, border: '1px solid #1a1a1a' }}>
+          <h3 style={{ fontSize: 12, color: 'var(--c-lime)', margin: '0 0 12px' }}>Añadir Producto al Bloque</h3>
+          <select 
+            className="input-dark" 
+            style={{ width: '100%', fontSize: 11, marginBottom: 10 }}
+            onChange={e => {
+              const pid = e.target.value;
+              if (!pid) return;
+              // Encuentra el primer bloque de productos para insertarlo
+              const prodBlock = blocks.find(b => b.type === 'products');
+              if (!prodBlock) {
+                alert('Primero añade un bloque de "PRODUCTOS" al diseño del correo.');
+                e.target.value = '';
+                return;
+              }
+              const currentIds = prodBlock.content.productIds || [];
+              if (currentIds.length < 3 && !currentIds.includes(pid)) {
+                updateBlock(prodBlock.id, { productIds: [...currentIds, pid] });
+              } else if (currentIds.length >= 3) {
+                alert('Ya hay 3 productos en este bloque. Límpialo o añade otro bloque de productos.');
+              }
+              e.target.value = '';
+            }}
+          >
+            <option value="">+ Seleccionar catálogo...</option>
+            {dbProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button 
+            onClick={() => {
+              const prodBlock = blocks.find(b => b.type === 'products');
+              if (prodBlock) updateBlock(prodBlock.id, { productIds: [] });
+            }} 
+            className="btn btn-outline" 
+            style={{ width: '100%', fontSize: 11, padding: '8px' }}
+          >
+            Limpiar Bloque
+          </button>
         </div>
       </aside>
 
