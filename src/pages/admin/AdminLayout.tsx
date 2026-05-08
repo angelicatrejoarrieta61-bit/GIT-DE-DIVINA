@@ -163,21 +163,9 @@ export const AdminLayout: React.FC = () => {
           </Link>
         </div>
 
-        <nav className="admin-sidebar__nav">
-          <NavLink
-            to="/admin/config?section=site-general"
-            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
-          >
-            Configuración general del sitio
-          </NavLink>
-
-          <NavLink
-            to="/admin/reportes"
-            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
-          >
-            📊 Reportes de Pedidos
-          </NavLink>
-
+        <nav className="admin-sidebar__nav" style={{ overflowY: 'auto', paddingRight: '4px' }}>
+          <p className="admin-sidebar__label">ADMINISTRACIÓN</p>
+          
           <NavLink
             to="/admin/mensajes"
             className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
@@ -192,7 +180,23 @@ export const AdminLayout: React.FC = () => {
             📢 Newsletter y Campañas
           </NavLink>
 
+          <NavLink
+            to="/admin/reportes"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            📊 Reportes de Pedidos
+          </NavLink>
 
+          <div style={{ margin: '12px 0', height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+
+          <p className="admin-sidebar__label">CONFIGURACIÓN</p>
+
+          <NavLink
+            to="/admin/config?section=site-general"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            ⚙️ General del Sitio
+          </NavLink>
 
           <NavLink
             to="/admin/config?section=products-config"
