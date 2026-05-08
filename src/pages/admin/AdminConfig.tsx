@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+// AdminConfig v1.5 - Optimized Master Product Logic
 import { useSearchParams } from 'react-router-dom';
 import { AssetUploader } from '../../components/AssetUploader';
 import { ImageUploaderModal } from '../../components/ImageUploaderModal';

@@ -16,6 +16,9 @@ import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminImport } from './pages/admin/AdminImport';
 import { AdminConfig } from './pages/admin/AdminConfig';
+import { AdminOrderReports } from './pages/admin/AdminOrderReports';
+import { AdminMessages } from './pages/admin/AdminMessages';
+import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 import { SiteGeneral } from './pages/admin/SiteGeneral';
 
@@ -37,10 +40,13 @@ export default function App() {
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/config?section=home&part=home-hero" replace />} />
+          <Route index element={<Navigate to="/admin/config?section=site-general" replace />} />
           <Route path="productos" element={<AdminProducts />} />
           <Route path="import" element={<AdminImport />} />
           <Route path="config" element={<AdminConfig />} />
+          <Route path="reportes" element={<AdminOrderReports />} />
+          <Route path="mensajes" element={<AdminMessages />} />
+          <Route path="newsletter" element={<AdminNewsletter />} />
         </Route>
 
         {/* Public routes */}

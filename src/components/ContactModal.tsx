@@ -97,7 +97,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               </a>
               <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0' }}>Soporte administrativo: admin@divinastore.com.mx</p>
             </div>
-            </div>
 
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ margin: '0 0 4px', fontSize: 12 }}>CORREO ELECTRÓNICO</h3>

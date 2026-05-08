@@ -202,7 +202,7 @@ export const AdminLayout: React.FC = () => {
             to="/admin/config?section=products-config"
             className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
           >
-            Configuración de Productos
+            📦 Configuración de Productos
           </NavLink>
 
           <p className="admin-sidebar__label admin-sidebar__label--tight">SECCIONES</p>
