@@ -22,6 +22,8 @@ export const AdminNewsletter: React.FC = () => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchSub, setSearchSub] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoHeight, setLogoHeight] = useState('40');
 
   const [blocks, setBlocks] = useState<NewsletterBlock[]>([
     { id: '1', type: 'title', content: { text: '¡Bienvenido a Divina News!', align: 'center', color: '#c4fc15' } },
