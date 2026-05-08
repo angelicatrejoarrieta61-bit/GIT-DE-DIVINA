@@ -153,12 +153,23 @@ export const AdminNewsletter: React.FC = () => {
     }));
 
     try {
-      await supabase.from('subscribers').upsert(inserts, { onConflict: 'email' });
+      const { error } = await supabase.from('subscribers').upsert(inserts, { onConflict: 'email' });
+      if (error) throw error;
+      
       alert(`¡${emails.length} suscriptores añadidos/actualizados correctamente!`);
       setManualEmails('');
-      fetchSubscribers();
+      
+      // Update local state immediately so they appear in the list
+      const newSubs = inserts.map(i => ({ ...i, id: Date.now().toString() + Math.random(), created_at: new Date().toISOString() })) as Subscriber[];
+      setSubscribers(prev => {
+        const combined = [...newSubs, ...prev];
+        // remove duplicates
+        return combined.filter((v, i, a) => a.findIndex(t => t.email === v.email) === i);
+      });
+      
     } catch (err) {
-      alert('Hubo un error al agregar los correos.');
+      console.error(err);
+      alert('Hubo un error al agregar los correos. Verifica los permisos de la base de datos.');
     }
     setLoading(false);
   };
@@ -177,11 +188,11 @@ export const AdminNewsletter: React.FC = () => {
         
         <input
           type="text"
-          placeholder="🔍 Buscar en base de datos..."
+          placeholder="🔍 Buscar..."
           className="input-dark"
           value={searchSub}
           onChange={e => setSearchSub(e.target.value)}
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 10, fontSize: 11, padding: '6px 10px', height: 'auto' }}
         />
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
@@ -266,7 +277,7 @@ export const AdminNewsletter: React.FC = () => {
                   <h1
                     contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerHTML })}
-                    style={{ color: block.content.color, textAlign: block.content.align, fontSize: 28, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
+                    style={{ color: block.content.color, textAlign: 'center', fontSize: 28, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
                 )}
@@ -275,7 +286,7 @@ export const AdminNewsletter: React.FC = () => {
                   <p
                     contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerHTML })}
-                    style={{ color: '#ccc', textAlign: block.content.align, fontSize: 15, lineHeight: 1.3, margin: 0, outline: 'none' }}
+                    style={{ color: '#ccc', textAlign: 'center', fontSize: 14, fontFamily: 'var(--f-sub)', lineHeight: 1.4, margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
                   />
                 )}
@@ -350,14 +361,14 @@ export const AdminNewsletter: React.FC = () => {
 
       {/* ── DERECHA: Controles de Bloques ── */}
       <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
-        <h2 style={{ fontSize: 14, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir Bloques</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          <button onClick={() => addBlock('title')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>TÍTULO</button>
-          <button onClick={() => addBlock('text')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>TEXTO</button>
-          <button onClick={() => addBlock('image')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>IMAGEN</button>
-          <button onClick={() => addBlock('button')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>BOTÓN</button>
-          <button onClick={() => addBlock('spacer')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>ESPACIO</button>
-          <button onClick={() => addBlock('products')} className="btn btn-outline" style={{ fontSize: 10, padding: '6px 0', letterSpacing: 1 }}>PRODUCTO</button>
+        <h2 style={{ fontSize: 12, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>Añadir Bloques</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          <button onClick={() => addBlock('title')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TÍTULO</button>
+          <button onClick={() => addBlock('image')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>IMAGEN</button>
+          <button onClick={() => addBlock('spacer')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>ESPACIO</button>
+          <button onClick={() => addBlock('text')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TEXTO</button>
+          <button onClick={() => addBlock('button')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>BOTÓN</button>
+          <button onClick={() => addBlock('products')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>PRODUCTO</button>
         </div>
 
 
