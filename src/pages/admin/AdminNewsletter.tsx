@@ -47,8 +47,15 @@ export const AdminNewsletter: React.FC = () => {
 
   const fetchSubscribers = async () => {
     setLoading(true);
-    const { data } = await supabase.from('subscribers').select('*').order('created_at', { ascending: false });
-    setSubscribers(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('subscribers')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error) setSubscribers(data || []);
+    } catch {
+      // Tabla no existe aún — no crashea la página
+    }
     setLoading(false);
   };
 
