@@ -181,8 +181,8 @@ export const AdminNewsletter: React.FC = () => {
 
       const data = await realRes.json();
 
-      if (!realRes.ok || data.warning) {
-        throw new Error(data.warning || 'Error desconocido en el servidor de correos');
+      if (!realRes.ok || data.error || data.warning) {
+        throw new Error(data.error || data.warning || 'Error desconocido en el servidor de correos');
       }
       
       setSending(false);

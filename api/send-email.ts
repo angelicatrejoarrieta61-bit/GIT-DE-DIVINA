@@ -11,6 +11,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS, // Contraseña de admin@ en tu panel de hosting
   },
   tls: { rejectUnauthorized: false },
+  connectionTimeout: 5000, // Tiempo máximo de espera para conectar
+  greetingTimeout: 5000,
+  socketTimeout: 5000,
 });
 
 const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
