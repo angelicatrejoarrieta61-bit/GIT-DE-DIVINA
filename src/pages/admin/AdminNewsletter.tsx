@@ -22,7 +22,7 @@ export const AdminNewsletter: React.FC = () => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchSub, setSearchSub] = useState('');
-  
+
   const [blocks, setBlocks] = useState<NewsletterBlock[]>([
     { id: '1', type: 'title', content: { text: '¡Bienvenido a Divina News!', align: 'center', color: '#c4fc15' } },
     { id: '2', type: 'text', content: { text: 'Descubre las últimas novedades en skincare premium...', align: 'center' } },
@@ -34,6 +34,15 @@ export const AdminNewsletter: React.FC = () => {
 
   useEffect(() => {
     fetchSubscribers();
+    // Cargar logo real del sitio
+    supabase.from('store_config').select('key,value').in('key', ['logo_url','logo_height'])
+      .then(({ data }) => {
+        if (!data) return;
+        data.forEach(r => {
+          if (r.key === 'logo_url') setLogoUrl(r.value || '');
+          if (r.key === 'logo_height') setLogoHeight(r.value || '40');
+        });
+      });
   }, []);
 
   const fetchSubscribers = async () => {
@@ -49,11 +58,11 @@ export const AdminNewsletter: React.FC = () => {
       id,
       type,
       content: type === 'text' ? { text: 'Nuevo párrafo...' } :
-               type === 'title' ? { text: 'Nuevo Título', align: 'left', color: '#ffffff' } :
-               type === 'image' ? { url: '' } :
-               type === 'button' ? { text: 'COMPRAR AHORA', url: '/', color: '#c4fc15' } :
-               type === 'spacer' ? { height: 20 } :
-               { count: 3 }
+        type === 'title' ? { text: 'Nuevo Título', align: 'left', color: '#ffffff' } :
+          type === 'image' ? { url: '' } :
+            type === 'button' ? { text: 'COMPRAR AHORA', url: '/', color: '#c4fc15' } :
+              type === 'spacer' ? { height: 20 } :
+                { count: 3 }
     };
     setBlocks([...blocks, newBlock]);
   };
@@ -76,26 +85,26 @@ export const AdminNewsletter: React.FC = () => {
     setTimeout(() => setSendSuccess(false), 5000);
   };
 
-  const filteredSubs = subscribers.filter(s => 
-    s.email.toLowerCase().includes(searchSub.toLowerCase()) || 
+  const filteredSubs = subscribers.filter(s =>
+    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
     (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
   );
 
   return (
     <div className="admin-newsletter" style={{ display: 'flex', height: 'calc(100vh - 40px)', gap: 20, padding: '10px' }}>
-      
+
       {/* ── IZQUIERDA: Suscriptores ── */}
       <aside className="admin-card glass" style={{ width: 300, display: 'flex', flexDirection: 'column', padding: 20, flexShrink: 0 }}>
         <h2 style={{ fontSize: 18, color: 'var(--c-lime)', marginBottom: 16 }}>Suscriptores ({subscribers.length})</h2>
-        <input 
-          type="text" 
-          placeholder="🔍 Buscar email..." 
-          className="input-dark" 
-          value={searchSub} 
-          onChange={e => setSearchSub(e.target.value)} 
+        <input
+          type="text"
+          placeholder="🔍 Buscar email..."
+          className="input-dark"
+          value={searchSub}
+          onChange={e => setSearchSub(e.target.value)}
           style={{ marginBottom: 16 }}
         />
-        
+
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {loading ? <p style={{ fontSize: 12, color: '#666' }}>Cargando...</p> : filteredSubs.map(s => (
             <div key={s.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, fontSize: 12 }}>
@@ -115,18 +124,18 @@ export const AdminNewsletter: React.FC = () => {
 
       {/* ── CENTRO: Editor Visual ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
-        
+
         <div className="admin-card glass" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <input 
-            type="text" 
-            value={campaignTitle} 
+          <input
+            type="text"
+            value={campaignTitle}
             onChange={e => setCampaignTitle(e.target.value)}
             style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, fontWeight: 700, width: '60%' }}
           />
           <div style={{ display: 'flex', gap: 10 }}>
-             <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
-               {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
-             </button>
+            <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
+              {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
+            </button>
           </div>
         </div>
 
@@ -138,10 +147,18 @@ export const AdminNewsletter: React.FC = () => {
 
         <div className="admin-card glass" style={{ flex: 1, overflowY: 'auto', padding: '40px', background: '#080808' }}>
           <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '40px 0' }}>
-            
-            {/* Header placeholder */}
-            <div style={{ textAlign: 'center', marginBottom: 40 }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#c4fc15', letterSpacing: 4 }}>DIVIИ⋀</div>
+
+            {/* Header con logo real */}
+            <div style={{ textAlign: 'center', marginBottom: 40, padding: '20px 40px', borderBottom: '1px solid #1a1a1a' }}>
+              {logoUrl ? (
+                <img 
+                  src={getImageUrl(logoUrl)} 
+                  alt="Divina Store" 
+                  style={{ height: `${logoHeight}px`, objectFit: 'contain' }} 
+                />
+              ) : (
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#c4fc15', letterSpacing: 4 }}>DIVINA</div>
+              )}
             </div>
 
             {blocks.map((block, idx) => (
@@ -151,8 +168,8 @@ export const AdminNewsletter: React.FC = () => {
                 </div>
 
                 {block.type === 'title' && (
-                  <h1 
-                    contentEditable 
+                  <h1
+                    contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
                     style={{ color: block.content.color, textAlign: block.content.align, fontSize: 32, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
@@ -160,8 +177,8 @@ export const AdminNewsletter: React.FC = () => {
                 )}
 
                 {block.type === 'text' && (
-                  <p 
-                    contentEditable 
+                  <p
+                    contentEditable
                     onBlur={e => updateBlock(block.id, { text: e.currentTarget.innerText })}
                     style={{ color: '#ccc', textAlign: block.content.align, fontSize: 16, lineHeight: 1.6, margin: 0, outline: 'none' }}
                     dangerouslySetInnerHTML={{ __html: block.content.text }}
@@ -213,12 +230,12 @@ export const AdminNewsletter: React.FC = () => {
         </div>
 
         <div style={{ marginTop: 40 }}>
-           <h2 style={{ fontSize: 14, color: '#888', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 }}>Tipografías Site</h2>
-           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-             <div style={{ fontSize: 14, fontFamily: 'var(--f-heading)' }}>HEADING (Michroma)</div>
-             <div style={{ fontSize: 14, fontFamily: 'var(--f-sub)' }}>SUBTITLE (Catamaran)</div>
-             <div style={{ fontSize: 14, fontFamily: 'var(--f-accent)' }}>ACCENT (Barlow)</div>
-           </div>
+          <h2 style={{ fontSize: 14, color: '#888', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 }}>Tipografías Site</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 14, fontFamily: 'var(--f-heading)' }}>HEADING (Michroma)</div>
+            <div style={{ fontSize: 14, fontFamily: 'var(--f-sub)' }}>SUBTITLE (Catamaran)</div>
+            <div style={{ fontSize: 14, fontFamily: 'var(--f-accent)' }}>ACCENT (Barlow)</div>
+          </div>
         </div>
 
         <div style={{ marginTop: 40, background: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 8 }}>
