@@ -3,8 +3,6 @@ import nodemailer from 'nodemailer';
 
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 const transporter = nodemailer.createTransport({
-  pool: true,
-  maxConnections: 1,
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
   port: Number(process.env.SMTP_PORT) || 465,
   secure: true,
@@ -13,11 +11,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS, 
   },
   tls: { rejectUnauthorized: false },
-  debug: true, // Muestra todo el tráfico SMTP en los logs de Vercel
-  logger: true, // Registra cada paso del proceso
-  connectionTimeout: 10000, 
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
+  connectionTimeout: 30000, 
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
 });
 
 const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
