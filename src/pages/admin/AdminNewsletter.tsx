@@ -361,19 +361,17 @@ export const AdminNewsletter: React.FC = () => {
 
       {/* ── DERECHA: Controles de Bloques ── */}
       <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
-        <h2 style={{ fontSize: 12, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>Añadir Bloques</h2>
+        <h2 style={{ fontSize: 12, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>Añadir Bloques</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          <button onClick={() => addBlock('title')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TÍTULO</button>
-          <button onClick={() => addBlock('image')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>IMAGEN</button>
-          <button onClick={() => addBlock('spacer')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>ESPACIO</button>
-          <button onClick={() => addBlock('text')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TEXTO</button>
-          <button onClick={() => addBlock('button')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>BOTÓN</button>
-          <button onClick={() => addBlock('products')} className="glass" style={{ fontSize: 9, padding: '4px 0', letterSpacing: 1, textAlign: 'center', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>PRODUCTO</button>
+          <button onClick={() => addBlock('title')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TÍTULO</button>
+          <button onClick={() => addBlock('image')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>IMAGEN</button>
+          <button onClick={() => addBlock('spacer')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>ESPACIO</button>
+          <button onClick={() => addBlock('text')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>TEXTO</button>
+          <button onClick={() => addBlock('button')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>BOTÓN</button>
+          <button onClick={() => addBlock('products')} className="glass" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 9, padding: '4px 0', letterSpacing: 1, color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer' }}>PRODUCTO</button>
         </div>
 
-
-
-        <div style={{ marginTop: 40, background: '#000', padding: 16, borderRadius: 8, border: '1px solid #1a1a1a' }}>
+        <div style={{ marginTop: 16, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
           <h3 style={{ fontSize: 12, color: 'var(--c-lime)', margin: '0 0 12px' }}>Añadir Producto al Bloque</h3>
           <select 
             className="input-dark" 
