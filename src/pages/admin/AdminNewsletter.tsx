@@ -125,14 +125,69 @@ export const AdminNewsletter: React.FC = () => {
     if (subscribers.length === 0 && !manualEmails.trim()) {
       return alert('No hay suscriptores a quienes enviar.');
     }
-    if (!window.confirm('¿Seguro que deseas enviar esta campaña ahora?')) return;
+    if (!window.confirm('¿Seguro que deseas enviar esta campaña a toda la base de datos ahora?')) return;
     
     setSending(true);
-    // Simulación de envío a Vercel API
-    await new Promise(r => setTimeout(r, 2000));
-    setSending(false);
-    setSendSuccess(true);
-    setTimeout(() => setSendSuccess(false), 5000);
+
+    // Generar HTML a partir de los bloques
+    let htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:40px 20px;">`;
+    if (logoUrl) htmlBody += `<div style="text-align:center;margin-bottom:30px;"><img src="${getImageUrl(logoUrl)}" style="height:${logoHeight}px;"/></div>`;
+    
+    blocks.forEach(b => {
+      if (b.type === 'title') htmlBody += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:10px 0;">${b.content.text}</h1>`;
+      if (b.type === 'text') htmlBody += `<p style="color:#ccc;text-align:center;line-height:1.5;">${b.content.text}</p>`;
+      if (b.type === 'spacer') htmlBody += `<div style="height:${b.content.height || 20}px;"></div>`;
+      if (b.type === 'image' && b.content.url) htmlBody += `<div style="text-align:center;"><img src="${getImageUrl(b.content.url)}" style="max-width:100%;border-radius:8px;"/></div>`;
+      if (b.type === 'button') htmlBody += `<div style="text-align:center;margin:20px 0;"><a href="${b.content.url}" style="display:inline-block;background:${b.content.color || '#c4fc15'};color:#000;padding:12px 24px;border-radius:30px;text-decoration:none;font-weight:bold;">${b.content.text}</a></div>`;
+      if (b.type === 'products') {
+         const pIds = b.content.productIds || [];
+         if (pIds.length > 0) {
+           htmlBody += `<div style="text-align:center;margin:20px 0;">`;
+           pIds.forEach((pid: string) => {
+             const p = dbProducts.find(x => x.id === pid);
+             if (p) {
+               htmlBody += `
+                 <div style="background:#111;padding:15px;border-radius:8px;margin-bottom:10px;text-align:center;">
+                   ${p.image_url ? `<img src="${getImageUrl(p.image_url)}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;"/>` : ''}
+                   <div style="font-weight:bold;color:#fff;margin-bottom:5px;">${p.name}</div>
+                   <div style="color:#c4fc15;">$${p.price.toFixed(2)}</div>
+                 </div>
+               `;
+             }
+           });
+           htmlBody += `</div>`;
+         }
+      }
+    });
+    htmlBody += `
+      <hr style="border:none;border-top:1px solid #333;margin:40px 0;"/>
+      <div style="text-align:center;color:#666;font-size:11px;">
+        <p>Has recibido este correo porque te suscribiste a Divina Store MX.</p>
+        <p>No respondas a este correo generado automáticamente.</p>
+      </div>
+    </div>`;
+
+    try {
+      const realRes = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'campaign',
+          subject: 'Novedades exclusivas de Divina Store ✨',
+          toList: subscribers.map(s => s.email),
+          htmlBody: htmlBody
+        })
+      });
+
+      if (!realRes.ok) throw new Error('Error en API');
+      
+      setSending(false);
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccess(false), 5000);
+    } catch (err) {
+      setSending(false);
+      alert('Error crítico: No se pudieron enviar los correos. Revisa la configuración de SMTP en Vercel.');
+    }
   };
 
   const handleSaveDraft = () => {
@@ -413,10 +468,15 @@ export const AdminNewsletter: React.FC = () => {
               const prodBlock = blocks.find(b => b.type === 'products');
               if (prodBlock) updateBlock(prodBlock.id, { productIds: [] });
             }} 
-            className="btn btn-outline" 
-            style={{ width: '100%', fontSize: 11, padding: '8px' }}
+            style={{ 
+              width: '100%', fontSize: 9, padding: '8px 0', letterSpacing: 1, color: '#fff', 
+              background: 'linear-gradient(145deg, #555, #222)', 
+              boxShadow: '0 4px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+              border: '1px solid #111', borderRadius: 4, cursor: 'pointer',
+              textTransform: 'uppercase', fontWeight: 'bold'
+            }}
           >
-            Limpiar Bloque
+            LIMPIAR BLOQUE
           </button>
         </div>
       </aside>

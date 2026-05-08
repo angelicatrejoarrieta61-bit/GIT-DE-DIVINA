@@ -59,6 +59,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    if (type === 'campaign') {
+      const { toList, subject, htmlBody } = req.body;
+      if (!toList || !Array.isArray(toList) || toList.length === 0) {
+        throw new Error('No recipients found for campaign');
+      }
+
+      await transporter.sendMail({
+        from: FROM,
+        bcc: toList.join(', '), // Enviar con copia oculta para privacidad
+        subject: subject || 'Divina Store Newsletter',
+        html: htmlBody,
+      });
+    }
+
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('Email error:', err);
