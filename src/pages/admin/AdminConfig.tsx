@@ -258,23 +258,20 @@ const SectionProductsConfig = ({ products, collections, onSave }: { products: Pr
                   </select>
                 </td>
                 <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                  {['products-config', 'cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', 'home', ...customSections.map(s => s.key)].includes(section || '') && (
-                    <input 
-                      type="checkbox" 
-                      title={`Destacar en ${section}`}
-                      checked={p.tags?.includes(`REL_${section}`)} 
-                      onChange={async () => {
-                        const tg = `REL_${section}`;
-                        const on = p.tags?.includes(tg);
-                        const newTags = on ? (p.tags || []).filter(x => x !== tg) : [...(p.tags || []), tg];
-                        setSavingItem(p.id);
-                        await updateProduct(p.id, { tags: newTags });
-                        setProducts(prev => prev.map(x => x.id === p.id ? { ...x, tags: newTags } : x));
-                        setSavingItem(null);
-                      }} 
-                      style={{ cursor: 'pointer', accentColor: 'var(--c-lime)' }}
-                    />
-                  )}
+                  <input 
+                    type="checkbox" 
+                    title="Destacado en inicio (TOP_HOME)"
+                    checked={p.tags?.includes('TOP_HOME') ?? false} 
+                    onChange={async () => {
+                      const on = p.tags?.includes('TOP_HOME');
+                      const newTags = on ? (p.tags || []).filter(x => x !== 'TOP_HOME') : [...(p.tags || []), 'TOP_HOME'];
+                      setSavingItem(p.id);
+                      await updateProduct(p.id, { tags: newTags });
+                      setItems(prev => prev.map(x => x.id === p.id ? { ...x, tags: newTags } : x));
+                      setSavingItem(null);
+                    }} 
+                    style={{ cursor: 'pointer', accentColor: 'var(--c-lime)' }}
+                  />
                 </td>
                 <td style={{ padding: '4px 8px', width: '80px' }}>
                   <input type="number" value={p.price} onChange={e => updateItem(p.id, 'price', e.target.value)} onBlur={e => updateItemAndSave(p.id, 'price', e.target.value)} className="td-input" style={{ color: 'var(--c-lime)', fontWeight: 'bold' }} />

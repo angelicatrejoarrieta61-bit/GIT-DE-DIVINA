@@ -65,7 +65,7 @@ export const ContactPage: React.FC = () => {
     e.preventDefault();
     if (form.firstName && form.email && form.message) {
       try {
-        // Save the actual message to the database
+        // 1. Save to database
         const { error: msgError } = await supabase.from('contact_messages').insert([{
           first_name: form.firstName,
           last_name_paterno: form.lastNamePaterno,
@@ -74,21 +74,31 @@ export const ContactPage: React.FC = () => {
           message: form.message,
           status: 'pending'
         }]);
-        
-        if (msgError && msgError.code !== '42P01') {
-          console.error('Error saving message:', msgError);
-        }
+        if (msgError && msgError.code !== '42P01') console.error('Error saving message:', msgError);
 
         if (form.register) {
-          const { error: subError } = await supabase.from('subscribers').insert([{ 
+          await supabase.from('subscribers').insert([{ 
             first_name: form.firstName,
             last_name_paterno: form.lastNamePaterno,
             last_name_materno: form.lastNameMaterno,
             email: form.email,
             source: 'contact_form'
           }]);
-          if (subError && subError.code !== '42P01') console.error('Error saving subscriber:', subError);
         }
+
+        // 2. Send real emails via API
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'contact',
+            firstName: form.firstName,
+            email: form.email,
+            message: form.message,
+            subscribe: form.register,
+          }),
+        }).catch(() => {}); // Falla silenciosamente si SMTP no está configurado
+
       } catch(err) { 
         console.error('Contact form error:', err);
       }
