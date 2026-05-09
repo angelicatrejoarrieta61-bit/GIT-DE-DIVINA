@@ -1,92 +1,78 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import nodemailer from 'nodemailer';
 
-// ─────────────────────────────────────────────────────────────
-// CRÍTICO: El transporter se crea DENTRO del handler.
-// Vercel es serverless — no existe proceso persistente.
-// Pool:true destruye la conexión antes de que termine el envío.
-// ─────────────────────────────────────────────────────────────
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: true, // Puerto 465 siempre requiere secure:true
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+const RESEND_API = 'https://api.resend.com/emails';
+const FROM = 'Divina Store MX <onboarding@resend.dev>'; // Reemplazar por tu dominio verificado cuando lo tengas
+const TO = 'info@divinastore.com.mx';
+
+async function sendEmail(payload: {
+  from: string;
+  to: string | string[];
+  replyTo?: string;
+  subject: string;
+  html: string;
+}) {
+  const res = await fetch(RESEND_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
     },
-    tls: {
-      rejectUnauthorized: false,
-      minVersion: 'TLSv1.2',
-    },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
+    body: JSON.stringify({
+      from: payload.from,
+      to: Array.isArray(payload.to) ? payload.to : [payload.to],
+      reply_to: payload.replyTo,
+      subject: payload.subject,
+      html: payload.html,
+    }),
   });
-}
 
-const FROM = process.env.SMTP_FROM || '"Divina Store MX" <admin@divinastore.com.mx>';
-const TO = process.env.SMTP_TO || 'info@divinastore.com.mx';
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data?.message || data?.name || `Resend error ${res.status}`);
+  }
+
+  return data;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // ── Guard: verificar variables críticas antes de operar ──
-  const missingVars: string[] = [];
-  if (!process.env.SMTP_HOST) missingVars.push('SMTP_HOST');
-  if (!process.env.SMTP_USER) missingVars.push('SMTP_USER');
-  if (!process.env.SMTP_PASS) missingVars.push('SMTP_PASS');
-
-  if (missingVars.length > 0) {
+  if (!process.env.RESEND_API_KEY) {
     return res.status(500).json({
       ok: false,
-      error: `Variables faltantes en Vercel Environment: ${missingVars.join(', ')}`,
+      error: 'RESEND_API_KEY no configurada en Vercel Environment Variables',
     });
   }
 
   const { type, firstName, email, message, subscribe, to, subject, htmlBody } = req.body || {};
-  const transporter = createTransporter();
 
-  // ── MODO TEST — solo verifica conexión SMTP ──
+  // ── MODO TEST — envia correo real de prueba ──
   if (type === 'test') {
     try {
-      await transporter.verify();
-      transporter.close();
+      await sendEmail({
+        from: FROM,
+        to: TO,
+        subject: 'Test de conexion Divina Store',
+        html: '<p>Conexion con Resend exitosa. Correo de prueba automatico.</p>',
+      });
       return res.status(200).json({
         ok: true,
-        message: 'Conexion SMTP exitosa',
-        config: {
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT || '465',
-          user: process.env.SMTP_USER,
-          pass: '***configurada***',
-        },
+        message: 'Conexion Resend exitosa — correo de prueba enviado a ' + TO,
       });
     } catch (err: any) {
-      transporter.close();
-      return res.status(500).json({
-        ok: false,
-        error: err.message,
-        code: err.code || null,
-        config: {
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT || '465',
-          user: process.env.SMTP_USER,
-        },
-      });
+      return res.status(500).json({ ok: false, error: err.message });
     }
   }
 
   try {
     // ── CONTACTO — formulario del sitio ──
     if (type === 'contact') {
-      if (!email) {
-        return res.status(400).json({ ok: false, error: 'Campo email requerido' });
-      }
+      if (!email) return res.status(400).json({ ok: false, error: 'Campo email requerido' });
 
-      await transporter.sendMail({
+      await sendEmail({
         from: FROM,
         to: TO,
         replyTo: email,
@@ -112,11 +98,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── NEWSLETTER — nuevo suscriptor desde el sitio ──
     if (type === 'newsletter') {
-      if (!email) {
-        return res.status(400).json({ ok: false, error: 'Campo email requerido' });
-      }
+      if (!email) return res.status(400).json({ ok: false, error: 'Campo email requerido' });
 
-      await transporter.sendMail({
+      await sendEmail({
         from: FROM,
         to: TO,
         replyTo: email,
@@ -135,16 +119,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ── CAMPAIGN — envío masivo desde AdminNewsletter ──
+    // ── CAMPAIGN — envio masivo desde AdminNewsletter ──
     if (type === 'campaign') {
-      if (!to) {
-        return res.status(400).json({ ok: false, error: 'Campo to (destinatario) requerido' });
-      }
-      if (!htmlBody) {
-        return res.status(400).json({ ok: false, error: 'Campo htmlBody requerido' });
-      }
+      if (!to) return res.status(400).json({ ok: false, error: 'Campo to requerido' });
+      if (!htmlBody) return res.status(400).json({ ok: false, error: 'Campo htmlBody requerido' });
 
-      await transporter.sendMail({
+      await sendEmail({
         from: FROM,
         to: to,
         subject: subject || 'Novedades de Divina Store',
@@ -152,21 +132,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Cerrar conexión limpiamente — obligatorio en serverless
-    transporter.close();
-
     return res.status(200).json({ ok: true });
 
   } catch (err: any) {
     console.error('[send-email] Error:', err);
-    transporter.close();
-
     return res.status(500).json({
       ok: false,
       error: err.message || 'Error desconocido',
-      code: err.code || null,
-      responseCode: err.responseCode || null,
-      command: err.command || null,
     });
   }
 }
