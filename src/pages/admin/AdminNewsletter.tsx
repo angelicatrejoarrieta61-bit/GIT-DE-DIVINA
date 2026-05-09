@@ -121,11 +121,11 @@ export const AdminNewsletter: React.FC = () => {
     }
   }, []);
 
-  const handleSend = async () => {
-    if (subscribers.length === 0 && !manualEmails.trim()) {
+    const totalRecipients = subscribers.length;
+    if (totalRecipients === 0 && !manualEmails.trim()) {
       return alert('No hay suscriptores a quienes enviar.');
     }
-    if (!window.confirm('¿Seguro que deseas enviar esta campaña a toda la base de datos ahora?')) return;
+    if (!window.confirm(`¿Seguro que deseas lanzar esta campaña a los ${totalRecipients} suscriptores de la base de datos ahora?`)) return;
     
     setSending(true);
 
@@ -294,9 +294,31 @@ export const AdminNewsletter: React.FC = () => {
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', gap: 10 }}>
-          <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900 }}>
-            💾 GUARDAR BORRADOR
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900 }}>
+              💾 GUARDAR BORRADOR
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'test' })
+                  });
+                  const data = await res.json();
+                  if (data.ok) alert(`✅ SUCCESS: ${data.message}`);
+                  else alert(`❌ ERROR: ${data.error}\nConfig Detectada: ${JSON.stringify(data.config, null, 2)}`);
+                } catch (e) {
+                  alert('Fallo total de conexión con la API.');
+                }
+              }} 
+              className="btn btn-outline" 
+              style={{ padding: '10px 24px', fontWeight: 900, borderColor: '#444' }}
+            >
+              🔍 PROBAR CONEXIÓN SMTP
+            </button>
+          </div>
           <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
             {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
           </button>

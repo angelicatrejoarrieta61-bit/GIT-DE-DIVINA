@@ -30,15 +30,38 @@ const TO   = process.env.SMTP_TO || 'info@divinastore.com.mx';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Eliminamos verify() inicial para no desperdiciar la única conexión permitida
+  // DIAGNÓSTICO: Verificar que las variables existan
+  const config = {
+    host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
+    port: Number(process.env.SMTP_PORT) || 465,
+    user: process.env.SMTP_USER || 'admin@divinastore.com.mx',
+    pass: process.env.SMTP_PASS ? '***(Configurada)***' : 'MISSING',
+    secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465
+  };
+
   const { type, firstName, email, message, subscribe } = req.body || {};
+
+  // MODO TEST: Solo para verificar conexión
+  if (type === 'test') {
+    try {
+      await transporter.verify();
+      return res.status(200).json({ ok: true, message: '¡Conexión SMTP exitosa!', config });
+    } catch (err: any) {
+      return res.status(500).json({ ok: false, error: 'Error de conexión: ' + err.message, config });
+    }
+  }
+
+  // Validar contraseña antes de seguir
+  if (!process.env.SMTP_PASS) {
+    return res.status(500).json({ ok: false, error: 'Falta la variable SMTP_PASS en Vercel.', config });
+  }
 
   try {
     if (type === 'contact') {
       await transporter.sendMail({
         from: '"Sitio Web Divina" <admin@divinastore.com.mx>',
         to: TO,
-        replyTo: email, // Permite responder directamente al cliente desde info@
+        replyTo: email, 
         subject: `📩 Nuevo contacto — ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
@@ -79,7 +102,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new Error('No recipients found for campaign');
       }
 
-      // Para evitar que HostGator bloquee por Spam (Error 451), enviamos secuencialmente con pausa obligatoria
       let sentCount = 0;
       for (const recipientEmail of toList) {
         try {
@@ -90,11 +112,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             html: htmlBody,
           });
           sentCount++;
-          // Pausa de 500ms entre cada correo para máxima compatibilidad
           await sleep(500); 
         } catch (mailErr) {
           console.error(`Error enviando a ${recipientEmail}:`, mailErr);
-          // Si es un error de conexión grave, paramos el bucle
           if (String(mailErr).includes('ECONN') || String(mailErr).includes('ETIMEDOUT')) break;
         }
       }
@@ -104,6 +124,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('Email error:', err);
-    return res.status(500).json({ ok: false, error: err.message || 'Error desconocido al enviar el email', fullError: String(err) });
+    return res.status(500).json({ ok: false, error: err.message || 'Error desconocido', config });
   }
 }
