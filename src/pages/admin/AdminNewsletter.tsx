@@ -45,6 +45,12 @@ export const AdminNewsletter: React.FC = () => {
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ── Filtrado de la base de datos ──
+  const filteredSubs = subscribers.filter(s =>
+    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
+    (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
+  );
+
   // ── FIX 1: Un único useEffect de inicialización — orden garantizado ──
   useEffect(() => {
     // Cargar borrador primero (sincrónico)
@@ -373,11 +379,6 @@ export const AdminNewsletter: React.FC = () => {
       alert('Fallo total de conexión con la API /send-email.');
     }
   };
-
-  const filteredSubs = subscribers.filter(s =>
-    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
-    (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
-  );
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredSubs.length) {
