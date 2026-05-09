@@ -140,11 +140,16 @@ export const AdminNewsletter: React.FC = () => {
     if (emails.length === 0) { alert('No se detectaron correos válidos.'); return; }
 
     setLoading(true);
-    const inserts = emails.map(email => ({
-      email,
-      first_name: email.split('@')[0],
-      source: 'manual_admin',
-    }));
+    const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+    const inserts = emails.map(email => {
+      const name = email.split('@')[0];
+      return {
+        email,
+        first_name: capitalize(name),
+        source: 'manual_admin',
+      };
+    });
 
     try {
       const { error } = await supabase
@@ -179,11 +184,13 @@ export const AdminNewsletter: React.FC = () => {
     e.preventDefault();
     if (!editingSub) return;
     setLoading(true);
+    const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+    
     try {
       const updateData: any = {
-        first_name: editingSub.first_name || '',
-        last_name_paterno: editingSub.last_name_paterno || null,
-        last_name_materno: editingSub.last_name_materno || null,
+        first_name: capitalize(editingSub.first_name || ''),
+        last_name_paterno: capitalize(editingSub.last_name_paterno || ''),
+        last_name_materno: capitalize(editingSub.last_name_materno || ''),
         birth_date: editingSub.birth_date || null,
       };
 
@@ -214,32 +221,32 @@ export const AdminNewsletter: React.FC = () => {
 
   // ── Construir HTML del email ──
   const buildHtml = (): string => {
-    let html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:40px 20px;">`;
+    let html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:20px 10px;">`;
 
     if (logoUrl) {
-      html += `<div style="text-align:center;margin-bottom:30px;">
+      html += `<div style="text-align:center;margin-bottom:15px;">
         <img src="${getImageUrl(logoUrl)}" style="height:${logoHeight}px;"/>
       </div>`;
     }
 
     blocks.forEach(b => {
       if (b.type === 'title') {
-        html += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:10px 0;">${b.content.text}</h1>`;
+        html += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:5px 0;font-size:24px;">${b.content.text}</h1>`;
       }
       if (b.type === 'text') {
-        html += `<p style="color:#ccc;text-align:center;line-height:1.5;">${b.content.text}</p>`;
+        html += `<p style="color:#ccc;text-align:center;line-height:1.4;margin:5px 0;font-size:14px;">${b.content.text}</p>`;
       }
       if (b.type === 'spacer') {
-        html += `<div style="height:${b.content.height || 20}px;"></div>`;
+        html += `<div style="height:${b.content.height || 10}px;"></div>`;
       }
       if (b.type === 'image' && b.content.url) {
-        html += `<div style="text-align:center;">
-          <img src="${getImageUrl(b.content.url)}" style="max-width:100%;border-radius:8px;"/>
+        html += `<div style="text-align:center;margin:10px 0;">
+          <img src="${getImageUrl(b.content.url)}" style="max-width:100%;border-radius:4px;"/>
         </div>`;
       }
       if (b.type === 'button') {
-        html += `<div style="text-align:center;margin:20px 0;">
-          <a href="${b.content.url}" style="display:inline-block;background:${b.content.color || '#c4fc15'};color:#000;padding:12px 24px;border-radius:30px;text-decoration:none;font-weight:bold;">
+        html += `<div style="text-align:center;margin:15px 0;">
+          <a href="${b.content.url}" style="display:inline-block;background:${b.content.color || '#c4fc15'};color:#000;padding:10px 20px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:13px;">
             ${b.content.text}
           </a>
         </div>`;
@@ -247,15 +254,15 @@ export const AdminNewsletter: React.FC = () => {
       if (b.type === 'products') {
         const pIds: string[] = b.content.productIds || [];
         if (pIds.length > 0) {
-          html += `<div style="display:flex;gap:10px;justify-content:center;margin:20px 0;">`;
+          html += `<div style="display:flex;gap:8px;justify-content:center;margin:15px 0;">`;
           pIds.forEach(pid => {
             const p = dbProducts.find(x => x.id === pid);
             if (!p) return;
             html += `
-              <div style="background:#111;padding:15px;border-radius:8px;text-align:center;flex:1;">
-                ${p.image_url ? `<img src="${getImageUrl(p.image_url)}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;"/>` : ''}
-                <div style="font-weight:bold;color:#fff;margin-bottom:5px;">${p.name}</div>
-                <div style="color:#c4fc15;">$${p.price.toFixed(2)}</div>
+              <div style="background:#111;padding:10px;border-radius:4px;text-align:center;flex:1;">
+                ${p.image_url ? `<img src="${getImageUrl(p.image_url)}" style="width:100px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:8px;"/>` : ''}
+                <div style="font-weight:bold;color:#fff;margin-bottom:4px;font-size:11px;">${p.name}</div>
+                <div style="color:#c4fc15;font-size:12px;">$${p.price.toFixed(2)}</div>
               </div>`;
           });
           html += `</div>`;
@@ -264,10 +271,9 @@ export const AdminNewsletter: React.FC = () => {
     });
 
     html += `
-      <hr style="border:none;border-top:1px solid #333;margin:40px 0;"/>
-      <div style="text-align:center;color:#666;font-size:11px;">
-        <p>Has recibido este correo porque te suscribiste a Divina Store MX.</p>
-        <p>No respondas a este correo generado automáticamente.</p>
+      <div style="text-align:center;color:#444;font-size:10px;margin-top:20px;border-top:1px solid #111;padding-top:15px;">
+        <p style="margin:0;">Divina Store MX — Contenido Exclusivo</p>
+        <p style="margin:4px 0 0;color:#333;">&copy; ${new Date().getFullYear()} Todos los derechos reservados.</p>
       </div>
     </div>`;
 
