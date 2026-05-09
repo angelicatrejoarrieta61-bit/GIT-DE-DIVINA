@@ -401,91 +401,53 @@ export const AdminNewsletter: React.FC = () => {
   return (
     <div className="admin-newsletter" style={{ display: 'flex', height: 'calc(100vh - 40px)', gap: 20, padding: '10px' }}>
 
-      {/* ── IZQUIERDA: Suscriptores ── */}
-      <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 9, color: '#888' }}>Todos</span>
-            <input 
-              type="checkbox" 
-              checked={selectedIds.size > 0 && selectedIds.size === filteredSubs.length}
-              onChange={toggleSelectAll}
-              style={{ cursor: 'pointer' }}
-            />
+      {/* ── IZQUIERDA: Controles de Bloques ── */}
+      <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
+        <h2 style={{ fontSize: 12, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
+          Añadir Bloques
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          {(['title', 'image', 'spacer', 'text', 'button', 'products', 'greeting'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => addBlock(type)}
+              style={blockBtn}
+            >
+              {{ title: 'TITULO', image: 'IMAGEN', spacer: 'ESPACIO', text: 'TEXTO', button: 'BOTON', products: 'PRODUCTO', greeting: 'SALUDO' }[type]}
+            </button>
+          ))}
+        </div>
+
+        {/* ── FIX 2: Selector por bloque ── */}
+        {productBlocks.length > 0 && productBlocks.map(pb => (
+          <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
+            <h3 style={{ fontSize: 11, color: 'var(--c-lime)', margin: '0 0 8px' }}>
+              Bloque ···{pb.id.slice(-4)}
+            </h3>
+            <select
+              className="input-dark"
+              style={{ width: '100%', fontSize: 11, marginBottom: 8, backgroundColor: '#000', color: '#fff', border: '1px solid #333' }}
+              value=""
+              onChange={e => {
+                if (!e.target.value) return;
+                addProductToBlock(pb.id, e.target.value);
+                e.target.value = '';
+              }}
+            >
+              <option value="">+ Seleccionar...</option>
+              {dbProducts.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => updateBlock(pb.id, { productIds: [] })}
+              style={{ ...blockBtn, width: '100%', padding: '6px 0' }}
+            >
+              LIMPIAR
+            </button>
           </div>
-        </div>
-
-        <input
-          type="text"
-          placeholder="Buscar..."
-          className="input-dark"
-          value={searchSub}
-          onChange={e => setSearchSub(e.target.value)}
-          style={{ marginBottom: 8, fontSize: 10, padding: '4px 8px', height: 'auto', borderRadius: 4 }}
-        />
-
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0, background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
-          {loading
-            ? <p style={{ fontSize: 9, color: '#666', textAlign: 'center', padding: 4 }}>Cargando...</p>
-            : filteredSubs.length === 0 
-              ? <p style={{ fontSize: 9, color: '#444', textAlign: 'center', padding: 4 }}>Sin resultados</p>
-              : filteredSubs.map(s => (
-              <div key={s.id} className="sub-row" style={{ 
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '2px 4px', background: selectedIds.has(s.id) ? 'rgba(196, 252, 21, 0.05)' : 'transparent', 
-                fontSize: 9, borderBottom: '1px solid rgba(255,255,255,0.03)',
-                lineHeight: 1
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.has(s.id)}
-                    onChange={() => toggleSelect(s.id)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <div 
-                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
-                    style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selectedIds.has(s.id) ? '#fff' : '#ccc' }}
-                  >
-                    <strong style={{ color: 'var(--c-lime)' }}>{s.first_name || '...'}</strong>: {s.email}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
-                  <button 
-                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
-                    style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 0, fontSize: 10 }}
-                  >
-                    ✏️
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteSubscriber(s.id)}
-                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: 0, fontSize: 10, opacity: 0.4 }}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-
-        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-          <textarea
-            className="input-dark"
-            placeholder="Añadir correos (separados por coma)..."
-            value={manualEmails}
-            onChange={e => setManualEmails(e.target.value)}
-            style={{ width: '100%', height: 32, fontSize: 9, resize: 'none', marginBottom: 4, padding: '2px 6px', borderRadius: 2 }}
-          />
-          <button
-            onClick={handleAddManualEmails}
-            style={{ ...blockBtn, width: '100%', padding: '4px 0', fontSize: 9 }}
-            disabled={!manualEmails.trim() || loading}
-          >
-            AGREGAR
-          </button>
-        </div>
+        ))}
       </aside>
 
       {/* ── CENTRO: Editor Visual ── */}
@@ -647,53 +609,91 @@ export const AdminNewsletter: React.FC = () => {
         </div>
       </main>
 
-      {/* ── DERECHA: Controles de Bloques ── */}
-      <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>
-        <h2 style={{ fontSize: 12, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
-          Añadir Bloques
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {(['title', 'image', 'spacer', 'text', 'button', 'products', 'greeting'] as const).map(type => (
-            <button
-              key={type}
-              onClick={() => addBlock(type)}
-              style={blockBtn}
-            >
-              {{ title: 'TITULO', image: 'IMAGEN', spacer: 'ESPACIO', text: 'TEXTO', button: 'BOTON', products: 'PRODUCTO', greeting: 'SALUDO' }[type]}
-            </button>
-          ))}
+      {/* ── DERECHA: Base de Datos ── */}
+      <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 9, color: '#888' }}>Todos</span>
+            <input 
+              type="checkbox" 
+              checked={selectedIds.size > 0 && selectedIds.size === filteredSubs.length}
+              onChange={toggleSelectAll}
+              style={{ cursor: 'pointer', accentColor: 'var(--c-lime)', width: 16, height: 16 }}
+            />
+          </div>
         </div>
 
-        {/* ── FIX 2: Selector por bloque — muestra todos los bloques de productos ── */}
-        {productBlocks.length > 0 && productBlocks.map(pb => (
-          <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
-            <h3 style={{ fontSize: 11, color: 'var(--c-lime)', margin: '0 0 8px' }}>
-              Bloque ···{pb.id.slice(-4)}
-            </h3>
-            <select
-              className="input-dark"
-              style={{ width: '100%', fontSize: 11, marginBottom: 8, backgroundColor: '#000', color: '#fff', border: '1px solid #333' }}
-              value=""
-              onChange={e => {
-                if (!e.target.value) return;
-                addProductToBlock(pb.id, e.target.value);
-                e.target.value = '';
-              }}
-            >
-              <option value="">+ Seleccionar...</option>
-              {dbProducts.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => updateBlock(pb.id, { productIds: [] })}
-              style={{ ...blockBtn, width: '100%', padding: '6px 0' }}
-            >
-              LIMPIAR
-            </button>
-          </div>
-        ))}
+        <input
+          type="text"
+          placeholder="Buscar..."
+          className="input-dark"
+          value={searchSub}
+          onChange={e => setSearchSub(e.target.value)}
+          style={{ marginBottom: 8, fontSize: 10, padding: '4px 8px', height: 'auto', borderRadius: 4 }}
+        />
+
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0, background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
+          {loading
+            ? <p style={{ fontSize: 9, color: '#666', textAlign: 'center', padding: 4 }}>Cargando...</p>
+            : filteredSubs.length === 0 
+              ? <p style={{ fontSize: 9, color: '#444', textAlign: 'center', padding: 4 }}>Sin resultados</p>
+              : filteredSubs.map(s => (
+              <div key={s.id} className="sub-row" style={{ 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '2px 4px', background: selectedIds.has(s.id) ? 'rgba(196, 252, 21, 0.05)' : 'transparent', 
+                fontSize: 9, borderBottom: '1px solid rgba(255,255,255,0.03)',
+                lineHeight: 1
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, overflow: 'hidden' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelect(s.id)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--c-lime)', width: 14, height: 14, border: '1px solid var(--c-lime)' }}
+                  />
+                  <div 
+                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
+                    style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selectedIds.has(s.id) ? '#fff' : '#ccc' }}
+                  >
+                    <strong style={{ color: 'var(--c-lime)' }}>{s.first_name || '...'}</strong>: {s.email}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+                  <button 
+                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 0, fontSize: 10 }}
+                  >
+                    ✏️
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteSubscriber(s.id)}
+                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: 0, fontSize: 10, opacity: 0.4 }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+
+        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+          <textarea
+            className="input-dark"
+            placeholder="Añadir correos (separados por coma)..."
+            value={manualEmails}
+            onChange={e => setManualEmails(e.target.value)}
+            style={{ width: '100%', height: 32, fontSize: 9, resize: 'none', marginBottom: 4, padding: '2px 6px', borderRadius: 2 }}
+          />
+          <button
+            onClick={handleAddManualEmails}
+            style={{ ...blockBtn, width: '100%', padding: '4px 0', fontSize: 9 }}
+            disabled={!manualEmails.trim() || loading}
+          >
+            AGREGAR
+          </button>
+        </div>
       </aside>
 
       {/* ── MODAL DE DETALLES/EDICIÓN ── */}
