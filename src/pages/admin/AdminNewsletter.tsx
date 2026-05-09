@@ -426,36 +426,6 @@ export const AdminNewsletter: React.FC = () => {
           ))}
         </div>
 
-        {/* ── SECCION FONDO ── */}
-        <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.02)', padding: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
-          <h3 style={{ fontSize: 10, color: '#888', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Fondo Global</h3>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-            <input 
-              type="color" 
-              value={bgColor} 
-              onChange={e => setBgColor(e.target.value)} 
-              style={{ width: 24, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
-              title="Color de fondo"
-            />
-            <div style={{ flex: 1 }}>
-              <AssetUploader 
-                label="Imagen Fondo" 
-                configKey="newsletter_bg" 
-                skipConfig 
-                onUpdate={url => setBgImage(url)} 
-              />
-            </div>
-          </div>
-          {bgImage && (
-            <button 
-              onClick={() => setBgImage('')}
-              style={{ ...blockBtn, width: '100%', background: '#441111', fontSize: 8, padding: '2px 0' }}
-            >
-              QUITAR IMAGEN
-            </button>
-          )}
-        </div>
-
         {/* ── Selector por bloque ── */}
         {productBlocks.length > 0 && productBlocks.map(pb => (
           <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
@@ -485,6 +455,43 @@ export const AdminNewsletter: React.FC = () => {
             </button>
           </div>
         ))}
+
+        {/* ── SECCION FONDO (Al final de los bloques) ── */}
+        <div style={{ marginTop: 20, background: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
+          <h3 style={{ fontSize: 10, color: '#c4fc15', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: 1 }}>Fondo del Newsletter</h3>
+          
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'center' }}>
+            {['#000000', '#1a1a1a', '#ffffff', '#c4fc15'].map(c => (
+              <div 
+                key={c}
+                onClick={() => setBgColor(c)}
+                style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: '1px solid #444', cursor: 'pointer', boxShadow: bgColor === c ? '0 0 5px #c4fc15' : 'none' }}
+              />
+            ))}
+            <input 
+              type="color" 
+              value={bgColor} 
+              onChange={e => setBgColor(e.target.value)} 
+              style={{ width: 20, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+            />
+          </div>
+
+          <AssetUploader 
+            label="Subir Imagen de Fondo" 
+            configKey="newsletter_bg_new" 
+            skipConfig 
+            onUpdate={url => setBgImage(url)} 
+          />
+          
+          {bgImage && (
+            <button 
+              onClick={() => setBgImage('')}
+              style={{ ...blockBtn, width: '100%', background: '#441111', fontSize: 9, marginTop: 6 }}
+            >
+              QUITAR IMAGEN
+            </button>
+          )}
+        </div>
       </aside>
 
       {/* ── CENTRO: Editor Visual ── */}
