@@ -507,13 +507,18 @@ export const AdminNewsletter: React.FC = () => {
                   <button onClick={() => removeBlock(block.id)} style={{ ...actionBtn, background: '#ff4444' }} title="Eliminar">×</button>
                 </div>
 
-                {block.type === 'greeting' && (
-                  <h2
-                    style={{ color: block.content.color || '#c4fc15', textAlign: 'center', fontSize: 24, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
-                  >
-                    {block.content.prefix} <span style={{ background: 'rgba(196, 252, 21, 0.2)', padding: '0 4px', borderRadius: 4 }}>Nombre Cliente</span> {block.content.suffix}
-                  </h2>
-                )}
+                {block.type === 'greeting' && (() => {
+                  const firstSelectedId = Array.from(selectedIds)[0];
+                  const firstSub = subscribers.find(s => s.id === firstSelectedId);
+                  const previewName = firstSub ? firstSub.first_name : 'Nombre Cliente';
+                  return (
+                    <h2
+                      style={{ color: block.content.color || '#c4fc15', textAlign: 'center', fontSize: 24, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
+                    >
+                      {block.content.prefix} <span style={{ background: 'rgba(196, 252, 21, 0.2)', padding: '0 4px', borderRadius: 4 }}>{previewName}</span> {block.content.suffix}
+                    </h2>
+                  );
+                })()}
 
                 {block.type === 'title' && (
                   <h1
