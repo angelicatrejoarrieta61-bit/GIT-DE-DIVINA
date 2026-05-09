@@ -36,8 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (type === 'contact') {
       await transporter.sendMail({
-        from: FROM,
+        from: '"Sitio Web Divina" <admin@divinastore.com.mx>',
         to: TO,
+        replyTo: email, // Permite responder directamente al cliente desde info@
         subject: `📩 Nuevo contacto — ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
@@ -48,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:8px 0">${message || ''}</div>
             <p><strong>¿Quiere registrarse?</strong> ${subscribe ? '✅ Sí' : '❌ No'}</p>
             <hr style="margin-top:30px"/>
-            <p style="color:#999;font-size:11px">Divina Store MX · admin@divinastore.com.mx</p>
+            <p style="color:#999;font-size:11px">Divina Store MX · Notificación Automática</p>
           </div>
         `,
       });
@@ -56,8 +57,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (type === 'newsletter') {
       await transporter.sendMail({
-        from: FROM,
+        from: '"Sitio Web Divina" <admin@divinastore.com.mx>',
         to: TO,
+        replyTo: email,
         subject: `📧 Nuevo suscriptor — ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
@@ -65,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             <p><strong>Nombre:</strong> ${firstName || 'No proporcionado'}</p>
             <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
             <hr style="margin-top:30px"/>
-            <p style="color:#999;font-size:11px">Divina Store MX · admin@divinastore.com.mx</p>
+            <p style="color:#999;font-size:11px">Divina Store MX · Notificación Automática</p>
           </div>
         `,
       });
