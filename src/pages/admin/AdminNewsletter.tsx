@@ -41,6 +41,7 @@ export const AdminNewsletter: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
+  const [showBgConfig, setShowBgConfig] = useState(false);
 
   // Gestión de suscriptores
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -424,6 +425,9 @@ export const AdminNewsletter: React.FC = () => {
               {{ title: 'TITULO', image: 'IMAGEN', spacer: 'ESPACIO', text: 'TEXTO', button: 'BOTON', products: 'PRODUCTO', greeting: 'SALUDO' }[type]}
             </button>
           ))}
+          <button onClick={() => setShowBgConfig(!showBgConfig)} style={{ ...blockBtn, background: showBgConfig ? 'var(--c-lime)' : 'linear-gradient(145deg, #555, #222)', color: showBgConfig ? '#000' : '#fff' }}>
+            FONDO
+          </button>
         </div>
 
         {/* ── Selector por bloque ── */}
@@ -456,42 +460,47 @@ export const AdminNewsletter: React.FC = () => {
           </div>
         ))}
 
-        {/* ── SECCION FONDO (Al final de los bloques) ── */}
-        <div style={{ marginTop: 20, background: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-          <h3 style={{ fontSize: 10, color: '#c4fc15', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: 1 }}>Fondo del Newsletter</h3>
-          
-          <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'center' }}>
-            {['#000000', '#1a1a1a', '#ffffff', '#c4fc15'].map(c => (
-              <div 
-                key={c}
-                onClick={() => setBgColor(c)}
-                style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: '1px solid #444', cursor: 'pointer', boxShadow: bgColor === c ? '0 0 5px #c4fc15' : 'none' }}
+        {/* ── SECCION FONDO (Solo visible si se activa el botón FONDO) ── */}
+        {showBgConfig && (
+          <div style={{ marginTop: 20, background: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 8, border: '1px solid var(--c-lime)', boxShadow: '0 0 15px rgba(196, 252, 21, 0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <h3 style={{ fontSize: 10, color: '#c4fc15', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Fondo del Newsletter</h3>
+              <button onClick={() => setShowBgConfig(false)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 12 }}>×</button>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'center' }}>
+              {['#000000', '#1a1a1a', '#ffffff', '#c4fc15'].map(c => (
+                <div 
+                  key={c}
+                  onClick={() => setBgColor(c)}
+                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: '1px solid #444', cursor: 'pointer', boxShadow: bgColor === c ? '0 0 5px #c4fc15' : 'none' }}
+                />
+              ))}
+              <input 
+                type="color" 
+                value={bgColor} 
+                onChange={e => setBgColor(e.target.value)} 
+                style={{ width: 20, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
               />
-            ))}
-            <input 
-              type="color" 
-              value={bgColor} 
-              onChange={e => setBgColor(e.target.value)} 
-              style={{ width: 20, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
-            />
-          </div>
+            </div>
 
-          <AssetUploader 
-            label="Subir Imagen de Fondo" 
-            configKey="newsletter_bg_new" 
-            skipConfig 
-            onUpdate={url => setBgImage(url)} 
-          />
-          
-          {bgImage && (
-            <button 
-              onClick={() => setBgImage('')}
-              style={{ ...blockBtn, width: '100%', background: '#441111', fontSize: 9, marginTop: 6 }}
-            >
-              QUITAR IMAGEN
-            </button>
-          )}
-        </div>
+            <AssetUploader 
+              label="Subir Imagen de Fondo" 
+              configKey="newsletter_bg_new" 
+              skipConfig 
+              onUpdate={url => setBgImage(url)} 
+            />
+            
+            {bgImage && (
+              <button 
+                onClick={() => setBgImage('')}
+                style={{ ...blockBtn, width: '100%', background: '#441111', fontSize: 9, marginTop: 6 }}
+              >
+                QUITAR IMAGEN
+              </button>
+            )}
+          </div>
+        )}
       </aside>
 
       {/* ── CENTRO: Editor Visual ── */}
