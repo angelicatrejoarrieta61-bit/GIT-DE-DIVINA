@@ -1,39 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Resend } from 'resend';
 
-const RESEND_API = 'https://api.resend.com/emails';
-const FROM = 'Divina Store MX <onboarding@resend.dev>'; // Reemplazar por tu dominio verificado cuando lo tengas
+const FROM = 'Divina Store MX <admin@divinastore.com.mx>';
 const TO = 'info@divinastore.com.mx';
-
-async function sendEmail(payload: {
-  from: string;
-  to: string | string[];
-  replyTo?: string;
-  subject: string;
-  html: string;
-}) {
-  const res = await fetch(RESEND_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: payload.from,
-      to: Array.isArray(payload.to) ? payload.to : [payload.to],
-      reply_to: payload.replyTo,
-      subject: payload.subject,
-      html: payload.html,
-    }),
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data?.message || data?.name || `Resend error ${res.status}`);
-  }
-
-  return data;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -47,17 +16,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { type, firstName, email, message, subscribe, to, subject, htmlBody } = req.body || {};
 
-  // ── MODO TEST — envia correo real de prueba ──
+  // ── MODO TEST ──
   if (type === 'test') {
     try {
-      await sendEmail({
+      const { error } = await resend.emails.send({
         from: FROM,
-        to: TO,
+        to: [TO],
         subject: 'Test de conexion Divina Store',
         html: '<p>Conexion con Resend exitosa. Correo de prueba automatico.</p>',
       });
+      if (error) throw new Error(error.message);
       return res.status(200).json({
         ok: true,
         message: 'Conexion Resend exitosa — correo de prueba enviado a ' + TO,
@@ -68,14 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // ── CONTACTO — formulario del sitio ──
+    // ── CONTACTO ──
     if (type === 'contact') {
       if (!email) return res.status(400).json({ ok: false, error: 'Campo email requerido' });
 
-      await sendEmail({
+      const { error } = await resend.emails.send({
         from: FROM,
-        to: TO,
-        replyTo: email,
+        to: [TO],
+        reply_to: email,
         subject: `Nuevo contacto - ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -94,16 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           </div>
         `,
       });
+      if (error) throw new Error(error.message);
     }
 
-    // ── NEWSLETTER — nuevo suscriptor desde el sitio ──
+    // ── NEWSLETTER — nuevo suscriptor ──
     if (type === 'newsletter') {
       if (!email) return res.status(400).json({ ok: false, error: 'Campo email requerido' });
 
-      await sendEmail({
+      const { error } = await resend.emails.send({
         from: FROM,
-        to: TO,
-        replyTo: email,
+        to: [TO],
+        reply_to: email,
         subject: `Nuevo suscriptor - ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -117,19 +89,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           </div>
         `,
       });
+      if (error) throw new Error(error.message);
     }
 
-    // ── CAMPAIGN — envio masivo desde AdminNewsletter ──
+    // ── CAMPAIGN — envio masivo ──
     if (type === 'campaign') {
       if (!to) return res.status(400).json({ ok: false, error: 'Campo to requerido' });
       if (!htmlBody) return res.status(400).json({ ok: false, error: 'Campo htmlBody requerido' });
 
-      await sendEmail({
+      const { error } = await resend.emails.send({
         from: FROM,
-        to: to,
+        to: [to],
         subject: subject || 'Novedades de Divina Store',
         html: htmlBody,
       });
+      if (error) throw new Error(error.message);
     }
 
     return res.status(200).json({ ok: true });
