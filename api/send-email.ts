@@ -2,20 +2,21 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
 
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
+// Configuración de SMTP con variables de entorno para flexibilidad y corrección de host
 const transporter = nodemailer.createTransport({
-  host: 'divinastore.com.mx', // Conexión directa al dominio para evitar problemas de subdominio
-  port: 2525, // Puerto alternativo profesional para evitar bloqueos de red
-  secure: false, 
+  host: process.env.SMTP_HOST || 'mail.divinastore.com.mx', // Se cambió de divinastore.com.mx (que apunta a Vercel) a mail.divinastore.com.mx
+  port: Number(process.env.SMTP_PORT) || 587, // 587 es el puerto estándar para TLS, 2525 es alternativa
+  secure: process.env.SMTP_SECURE === 'true', // true para puerto 465, false para otros
   auth: {
-    user: 'admin@divinastore.com.mx',
+    user: process.env.SMTP_USER || 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, 
   },
   tls: { 
-    rejectUnauthorized: false
+    rejectUnauthorized: false // Permite certificados auto-firmados comunes en hosting compartido
   },
-  connectionTimeout: 20000, 
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
+  connectionTimeout: 30000, 
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
 });
 
 const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
