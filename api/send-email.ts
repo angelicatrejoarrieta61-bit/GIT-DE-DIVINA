@@ -19,8 +19,8 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 30000,
 });
 
-const FROM = '"Divina Store MX" <admin@divinastore.com.mx>';
-const TO   = 'info@divinastore.com.mx';
+const FROM = process.env.SMTP_FROM || '"Divina Store MX" <admin@divinastore.com.mx>';
+const TO   = process.env.SMTP_TO || 'info@divinastore.com.mx';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
