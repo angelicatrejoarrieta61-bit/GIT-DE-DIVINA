@@ -284,9 +284,10 @@ export const AdminNewsletter: React.FC = () => {
     });
 
     html += `
-      <div style="text-align:center;color:#444;font-size:10px;margin-top:20px;border-top:1px solid #111;padding-top:15px;">
-        <p style="margin:0;">Divina Store MX — Contenido Exclusivo</p>
-        <p style="margin:4px 0 0;color:#333;">&copy; ${new Date().getFullYear()} Todos los derechos reservados.</p>
+      <div style="text-align:center;color:#444;font-size:9px;margin-top:20px;border-top:1px solid #111;padding-top:10px;line-height:1.1;font-family:sans-serif;">
+        <p style="margin:0;">&copy; ${new Date().getFullYear()} DIVINASTORE.COM.MX — Todos los derechos reservados.</p>
+        <p style="margin:4px 0 0;">Estás recibiendo este mensaje porque te registraste voluntariamente en nuestra tienda o suscribiste a nuestro newsletter. Si ya no deseas recibirlo, puedes en cualquier momento enviando un correo a info@divinastore.com.mx</p>
+        <p style="margin:2px 0 0;">Consulta nuestra Politica de privacidad en nuestro sitio www.divinastore.com.mx para conocer cómo tratamos tus datos. (Cumbres de maltrata 202 col. narvarte cp 03020). Informacion: info@divinastore.com.mx</p>
       </div>
     </div>`;
 
@@ -604,11 +605,16 @@ export const AdminNewsletter: React.FC = () => {
             ))}
 
             {/* Footer legal */}
-            <div style={{ marginTop: 40, padding: '20px', borderTop: '1px solid #1a1a1a', textAlign: 'center' }}>
-              <p style={{ color: '#666', fontSize: 11, margin: '0 0 8px' }}>
-                Estas recibiendo este correo porque te suscribiste a Divina Store MX.
+            <div style={{ marginTop: 30, padding: '15px 20px', borderTop: '1px solid #1a1a1a', textAlign: 'center', fontSize: 9, color: '#444', lineHeight: 1.1 }}>
+              <p style={{ margin: '0 0 4px' }}>&copy; {new Date().getFullYear()} DIVINASTORE.COM.MX — Todos los derechos reservados.</p>
+              <p style={{ margin: '0 0 2px' }}>
+                Estás recibiendo este mensaje porque te registraste voluntariamente en nuestra tienda o suscribiste a nuestro newsletter. 
+                Si ya no deseas recibirlo, puedes en cualquier momento enviando un correo a info@divinastore.com.mx
               </p>
-              <a href="#" style={{ color: 'var(--c-lime)', fontSize: 12, textDecoration: 'none' }}>Darse de baja</a>
+              <p style={{ margin: 0 }}>
+                Consulta nuestra Politica de privacidad en nuestro sitio www.divinastore.com.mx para conocer cómo tratamos tus datos. 
+                (Cumbres de maltrata 202 col. narvarte cp 03020). Informacion: info@divinastore.com.mx
+              </p>
             </div>
           </div>
         </div>
