@@ -16,7 +16,7 @@ interface Subscriber {
 
 interface NewsletterBlock {
   id: string;
-  type: 'image' | 'text' | 'title' | 'spacer' | 'button' | 'products';
+  type: 'image' | 'text' | 'title' | 'spacer' | 'button' | 'products' | 'greeting';
   content: any;
 }
 
@@ -41,6 +41,7 @@ export const AdminNewsletter: React.FC = () => {
   const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
 
   // Gestión de suscriptores
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -96,6 +97,7 @@ export const AdminNewsletter: React.FC = () => {
       button: { text: 'COMPRAR AHORA', url: '/', color: '#c4fc15' },
       spacer: { height: 20 },
       products: { productIds: [] },
+      greeting: { prefix: '¡Hola, ', suffix: '!', color: '#c4fc15' },
     };
     setBlocks(prev => [...prev, { id, type, content: defaults[type] }]);
   };
@@ -230,6 +232,11 @@ export const AdminNewsletter: React.FC = () => {
     }
 
     blocks.forEach(b => {
+      if (b.type === 'greeting') {
+        html += `<h2 style="color:${b.content.color || '#c4fc15'};text-align:center;margin:10px 0;font-size:22px;">
+          ${b.content.prefix || '¡Hola, '}{{nombre}}${b.content.suffix || '!'}
+        </h2>`;
+      }
       if (b.type === 'title') {
         html += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:5px 0;font-size:24px;">${b.content.text}</h1>`;
       }
@@ -282,22 +289,26 @@ export const AdminNewsletter: React.FC = () => {
 
   // ── FIX 4: total se fija DESPUÉS de conocer la lista real ──
   const handleSend = async () => {
-    const list = [...subscribers]; // snapshot en el momento del click
+    const list = subscribers.filter(s => selectedIds.has(s.id));
 
     if (list.length === 0) {
-      alert('No hay suscriptores a quienes enviar.');
+      alert('Selecciona al menos un destinatario en la lista de la izquierda.');
       return;
     }
-    if (!window.confirm(`¿Lanzar esta campaña a ${list.length} suscriptores ahora?`)) return;
+    if (!window.confirm(`¿Lanzar esta campaña a los ${list.length} suscriptores seleccionados?`)) return;
 
     setSending(true);
-    setSendProgress({ current: 0, total: list.length }); // total correcto
+    setSendProgress({ current: 0, total: list.length });
 
-    const htmlBody = buildHtml();
+    const baseHtml = buildHtml();
     let errors = 0;
 
     for (let i = 0; i < list.length; i++) {
       const s = list[i];
+      
+      // Personalización dinámica del saludo
+      const personalizedHtml = baseHtml.replace(/{{nombre}}/g, s.first_name || 'amiga');
+
       let sent = false;
       let attempts = 0;
 
@@ -311,7 +322,7 @@ export const AdminNewsletter: React.FC = () => {
               type: 'campaign',
               subject: 'Novedades exclusivas de Divina Store',
               to: s.email,
-              htmlBody,
+              htmlBody: personalizedHtml,
             }),
           });
 
@@ -363,10 +374,20 @@ export const AdminNewsletter: React.FC = () => {
     }
   };
 
-  const filteredSubs = subscribers.filter(s =>
-    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
-    (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
-  );
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredSubs.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredSubs.map(s => s.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
 
   // Bloques de tipo products para el selector del panel derecho
   const productBlocks = blocks.filter(b => b.type === 'products');
@@ -376,7 +397,18 @@ export const AdminNewsletter: React.FC = () => {
 
       {/* ── IZQUIERDA: Suscriptores ── */}
       <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
-        <h2 style={{ fontSize: 14, color: 'var(--c-lime)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 9, color: '#888' }}>Todos</span>
+            <input 
+              type="checkbox" 
+              checked={selectedIds.size > 0 && selectedIds.size === filteredSubs.length}
+              onChange={toggleSelectAll}
+              style={{ cursor: 'pointer' }}
+            />
+          </div>
+        </div>
 
         <input
           type="text"
@@ -395,15 +427,23 @@ export const AdminNewsletter: React.FC = () => {
               : filteredSubs.map(s => (
               <div key={s.id} className="sub-row" style={{ 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '2px 4px', background: 'transparent', 
+                padding: '2px 4px', background: selectedIds.has(s.id) ? 'rgba(196, 252, 21, 0.05)' : 'transparent', 
                 fontSize: 9, borderBottom: '1px solid rgba(255,255,255,0.03)',
                 lineHeight: 1
               }}>
-                <div 
-                  onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
-                  style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#ccc' }}
-                >
-                  <strong style={{ color: 'var(--c-lime)' }}>{s.first_name || '...'}</strong>: {s.email}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelect(s.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <div 
+                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
+                    style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selectedIds.has(s.id) ? '#fff' : '#ccc' }}
+                  >
+                    <strong style={{ color: 'var(--c-lime)' }}>{s.first_name || '...'}</strong>: {s.email}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
                   <button 
@@ -455,7 +495,7 @@ export const AdminNewsletter: React.FC = () => {
             </button>
           </div>
           <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
-            {sending ? 'ENVIANDO...' : 'LANZAR CAMPANA'}
+            {sending ? 'ENVIANDO...' : `LANZAR A ${selectedIds.size} SELECCIONADOS`}
           </button>
         </div>
 
@@ -498,6 +538,14 @@ export const AdminNewsletter: React.FC = () => {
                   <button onClick={() => moveBlock(idx, 1)} style={actionBtn} title="Mover abajo">↓</button>
                   <button onClick={() => removeBlock(block.id)} style={{ ...actionBtn, background: '#ff4444' }} title="Eliminar">×</button>
                 </div>
+
+                {block.type === 'greeting' && (
+                  <h2
+                    style={{ color: block.content.color || '#c4fc15', textAlign: 'center', fontSize: 24, fontFamily: 'var(--f-heading)', margin: 0, outline: 'none' }}
+                  >
+                    {block.content.prefix} <span style={{ background: 'rgba(196, 252, 21, 0.2)', padding: '0 4px', borderRadius: 4 }}>Nombre Cliente</span> {block.content.suffix}
+                  </h2>
+                )}
 
                 {block.type === 'title' && (
                   <h1
@@ -600,13 +648,13 @@ export const AdminNewsletter: React.FC = () => {
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {(['title', 'image', 'spacer', 'text', 'button', 'products'] as const).map(type => (
+          {(['title', 'image', 'spacer', 'text', 'button', 'products', 'greeting'] as const).map(type => (
             <button
               key={type}
               onClick={() => addBlock(type)}
               style={blockBtn}
             >
-              {{ title: 'TITULO', image: 'IMAGEN', spacer: 'ESPACIO', text: 'TEXTO', button: 'BOTON', products: 'PRODUCTO' }[type]}
+              {{ title: 'TITULO', image: 'IMAGEN', spacer: 'ESPACIO', text: 'TEXTO', button: 'BOTON', products: 'PRODUCTO', greeting: 'SALUDO' }[type]}
             </button>
           ))}
         </div>
