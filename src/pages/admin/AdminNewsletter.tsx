@@ -36,6 +36,7 @@ export const AdminNewsletter: React.FC = () => {
 
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     fetchSubscribers();
@@ -121,6 +122,7 @@ export const AdminNewsletter: React.FC = () => {
     }
   }, []);
 
+  const handleSend = async () => {
     const totalRecipients = subscribers.length;
     if (totalRecipients === 0 && !manualEmails.trim()) {
       return alert('No hay suscriptores a quienes enviar.');
@@ -128,6 +130,7 @@ export const AdminNewsletter: React.FC = () => {
     if (!window.confirm(`¿Seguro que deseas lanzar esta campaña a los ${totalRecipients} suscriptores de la base de datos ahora?`)) return;
     
     setSending(true);
+    setSendProgress({ current: 0, total: totalRecipients });
 
     // Generar HTML a partir de los bloques
     let htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:40px 20px;">`;
@@ -167,30 +170,42 @@ export const AdminNewsletter: React.FC = () => {
       </div>
     </div>`;
 
-    try {
-      const realRes = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'campaign',
-          subject: 'Novedades exclusivas de Divina Store ✨',
-          toList: subscribers.map(s => s.email),
-          htmlBody: htmlBody
-        })
-      });
+    // ENVÍO SECUENCIAL DESDE EL CLIENTE (Evita Timeouts de Vercel)
+    let errors = 0;
+    for (let i = 0; i < subscribers.length; i++) {
+      const s = subscribers[i];
+      try {
+        const res = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'campaign',
+            subject: 'Novedades exclusivas de Divina Store ✨',
+            to: s.email,
+            htmlBody: htmlBody
+          })
+        });
 
-      const data = await realRes.json();
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Error en servidor');
+        }
 
-      if (!realRes.ok || data.error || data.warning) {
-        throw new Error(data.error || data.warning || 'Error desconocido en el servidor de correos');
+        setSendProgress(prev => ({ ...prev, current: i + 1 }));
+        // Pequeña pausa para no saturar al servidor
+        await new Promise(r => setTimeout(r, 400));
+      } catch (err) {
+        console.error(`Error enviando a ${s.email}:`, err);
+        errors++;
       }
-      
-      setSending(false);
+    }
+
+    setSending(false);
+    if (errors === 0) {
       setSendSuccess(true);
       setTimeout(() => setSendSuccess(false), 5000);
-    } catch (err: any) {
-      setSending(false);
-      alert(`Error crítico: No se pudieron enviar los correos.\nDetalle: ${err.message}\nRevisa la configuración de SMTP en Vercel.`);
+    } else {
+      alert(`Campaña finalizada con ${errors} errores. Revisa la consola para más detalles.`);
     }
   };
 
@@ -323,6 +338,15 @@ export const AdminNewsletter: React.FC = () => {
             {sending ? 'ENVIANDO...' : '🚀 LANZAR CAMPAÑA'}
           </button>
         </div>
+
+        {sending && (
+          <div style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '12px', borderRadius: 8, textAlign: 'center', fontWeight: 600 }}>
+            🚀 Enviando: {sendProgress.current} de {sendProgress.total} suscriptores...
+            <div style={{ width: '100%', height: 4, background: '#222', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${(sendProgress.current / sendProgress.total) * 100}%`, height: '100%', background: 'var(--c-lime)', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        )}
 
         {sendSuccess && (
           <div style={{ background: 'var(--c-lime)', color: '#000', padding: '12px', borderRadius: 8, textAlign: 'center', fontWeight: 800, animation: 'slideDown 0.3s' }}>

@@ -97,28 +97,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (type === 'campaign') {
-      const { toList, subject, htmlBody } = req.body;
-      if (!toList || !Array.isArray(toList) || toList.length === 0) {
-        throw new Error('No recipients found for campaign');
-      }
+      const { to, subject, htmlBody } = req.body;
+      if (!to) throw new Error('No recipient specified');
 
-      let sentCount = 0;
-      for (const recipientEmail of toList) {
-        try {
-          await transporter.sendMail({
-            from: FROM,
-            to: recipientEmail,
-            subject: subject || 'Divina Store Newsletter',
-            html: htmlBody,
-          });
-          sentCount++;
-          await sleep(500); 
-        } catch (mailErr) {
-          console.error(`Error enviando a ${recipientEmail}:`, mailErr);
-          if (String(mailErr).includes('ECONN') || String(mailErr).includes('ETIMEDOUT')) break;
-        }
-      }
-      console.log(`Campaign processed. Sent ${sentCount} of ${toList.length}.`);
+      await transporter.sendMail({
+        from: FROM,
+        to: to,
+        subject: subject || 'Divina Store Newsletter',
+        html: htmlBody,
+      });
+      console.log(`Campaign email sent to ${to}`);
     }
 
     return res.status(200).json({ ok: true });
