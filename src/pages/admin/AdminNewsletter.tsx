@@ -375,35 +375,34 @@ export const AdminNewsletter: React.FC = () => {
           style={{ marginBottom: 8, fontSize: 10, padding: '4px 8px', height: 'auto', borderRadius: 4 }}
         />
 
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0, background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
           {loading
-            ? <p style={{ fontSize: 10, color: '#666', textAlign: 'center', padding: 10 }}>Cargando...</p>
+            ? <p style={{ fontSize: 9, color: '#666', textAlign: 'center', padding: 4 }}>Cargando...</p>
             : filteredSubs.length === 0 
-              ? <p style={{ fontSize: 10, color: '#444', textAlign: 'center', padding: 10 }}>Sin resultados</p>
+              ? <p style={{ fontSize: 9, color: '#444', textAlign: 'center', padding: 4 }}>Sin resultados</p>
               : filteredSubs.map(s => (
               <div key={s.id} className="sub-row" style={{ 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 4, 
-                fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.02)'
+                padding: '2px 4px', background: 'transparent', 
+                fontSize: 9, borderBottom: '1px solid rgba(255,255,255,0.03)',
+                lineHeight: 1
               }}>
                 <div 
                   onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
-                  style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eee' }}
+                  style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#ccc' }}
                 >
-                  <span style={{ fontWeight: 800, color: 'var(--c-lime)' }}>{s.first_name || '...'}</span>: {s.email}
+                  <strong style={{ color: 'var(--c-lime)' }}>{s.first_name || '...'}</strong>: {s.email}
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
                   <button 
                     onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
-                    style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 0, fontSize: 12 }}
-                    title="Editar detalles"
+                    style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 0, fontSize: 10 }}
                   >
                     ✏️
                   </button>
                   <button 
                     onClick={() => handleDeleteSubscriber(s.id)}
-                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: 0, fontSize: 12, opacity: 0.6 }}
-                    title="Borrar"
+                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: 0, fontSize: 10, opacity: 0.4 }}
                   >
                     🗑️
                   </button>
@@ -413,21 +412,20 @@ export const AdminNewsletter: React.FC = () => {
           }
         </div>
 
-        <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
-          <h3 style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase' }}>Añadir correos</h3>
+        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
           <textarea
             className="input-dark"
-            placeholder="correo1@ejemplo.com, correo2@ejemplo.com..."
+            placeholder="Añadir correos (separados por coma)..."
             value={manualEmails}
             onChange={e => setManualEmails(e.target.value)}
-            style={{ width: '100%', height: 40, fontSize: 10, resize: 'none', marginBottom: 6, padding: 6, borderRadius: 4 }}
+            style={{ width: '100%', height: 32, fontSize: 9, resize: 'none', marginBottom: 4, padding: '2px 6px', borderRadius: 2 }}
           />
           <button
             onClick={handleAddManualEmails}
-            style={{ ...blockBtn, width: '100%', padding: '6px 0', fontSize: 10 }}
+            style={{ ...blockBtn, width: '100%', padding: '4px 0', fontSize: 9 }}
             disabled={!manualEmails.trim() || loading}
           >
-            AGREGAR SUSCRIPTORES
+            AGREGAR
           </button>
         </div>
       </aside>
