@@ -32,6 +32,8 @@ export const AdminNewsletter: React.FC = () => {
   const [searchSub, setSearchSub] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [logoHeight, setLogoHeight] = useState('40');
+  const [bgColor, setBgColor] = useState('#000000');
+  const [bgImage, setBgImage] = useState('');
   const [manualEmails, setManualEmails] = useState('');
   const [dbProducts, setDbProducts] = useState<{ id: string; name: string; price: number; image_url: string }[]>([]);
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(DEFAULT_BLOCKS);
@@ -229,7 +231,11 @@ export const AdminNewsletter: React.FC = () => {
 
   // ── Construir HTML del email ──
   const buildHtml = (): string => {
-    let html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:20px 10px;">`;
+    const bgStyle = bgImage 
+      ? `background-image:url(${getImageUrl(bgImage)});background-size:cover;background-position:center;`
+      : `background-color:${bgColor};`;
+
+    let html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#fff;padding:20px 10px;${bgStyle}">`;
 
     if (logoUrl) {
       html += `<div style="text-align:center;margin-bottom:15px;">
@@ -420,7 +426,37 @@ export const AdminNewsletter: React.FC = () => {
           ))}
         </div>
 
-        {/* ── FIX 2: Selector por bloque ── */}
+        {/* ── SECCION FONDO ── */}
+        <div style={{ marginTop: 12, background: 'rgba(255,255,255,0.02)', padding: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 style={{ fontSize: 10, color: '#888', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Fondo Global</h3>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            <input 
+              type="color" 
+              value={bgColor} 
+              onChange={e => setBgColor(e.target.value)} 
+              style={{ width: 24, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+              title="Color de fondo"
+            />
+            <div style={{ flex: 1 }}>
+              <AssetUploader 
+                label="Imagen Fondo" 
+                configKey="newsletter_bg" 
+                skipConfig 
+                onUpdate={url => setBgImage(url)} 
+              />
+            </div>
+          </div>
+          {bgImage && (
+            <button 
+              onClick={() => setBgImage('')}
+              style={{ ...blockBtn, width: '100%', background: '#441111', fontSize: 8, padding: '2px 0' }}
+            >
+              QUITAR IMAGEN
+            </button>
+          )}
+        </div>
+
+        {/* ── Selector por bloque ── */}
         {productBlocks.length > 0 && productBlocks.map(pb => (
           <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
             <h3 style={{ fontSize: 11, color: 'var(--c-lime)', margin: '0 0 8px' }}>
@@ -489,7 +525,17 @@ export const AdminNewsletter: React.FC = () => {
         )}
 
         <div className="admin-card glass" style={{ flex: 1, overflowY: 'auto', padding: '0 40px 40px 40px', background: '#080808' }}>
-          <div style={{ maxWidth: 600, margin: '0 auto', background: '#000', border: '1px solid #1a1a1a', minHeight: '100%', padding: '0 0 40px 0' }}>
+          <div style={{ 
+            maxWidth: 600, 
+            margin: '0 auto', 
+            border: '1px solid #1a1a1a', 
+            minHeight: '100%', 
+            padding: '0 0 40px 0',
+            backgroundColor: bgColor,
+            backgroundImage: bgImage ? `url(${getImageUrl(bgImage)})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}>
 
             {/* Header logo */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 20, padding: '10px 20px', borderBottom: '1px solid #1a1a1a' }}>
@@ -570,10 +616,6 @@ export const AdminNewsletter: React.FC = () => {
 
                 {block.type === 'products' && (
                   <div style={{ marginTop: 20 }}>
-                    {/* Label para identificar cada bloque de productos en el panel derecho */}
-                    <div style={{ fontSize: 9, color: '#555', marginBottom: 6, textAlign: 'center', letterSpacing: 1, textTransform: 'uppercase' }}>
-                      Bloque Productos · ID {block.id.slice(-4)}
-                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                       {[0, 1, 2].map(i => {
                         const pid = (block.content.productIds || [])[i];
