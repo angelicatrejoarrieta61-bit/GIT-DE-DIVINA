@@ -646,12 +646,20 @@ export const AdminNewsletter: React.FC = () => {
                 lineHeight: 1
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, overflow: 'hidden' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.has(s.id)}
-                    onChange={() => toggleSelect(s.id)}
-                    style={{ cursor: 'pointer', accentColor: 'var(--c-lime)', width: 14, height: 14, border: '1px solid var(--c-lime)' }}
-                  />
+                  {/* Checkbox Personalizado que "prende" */}
+                  <div 
+                    onClick={() => toggleSelect(s.id)}
+                    style={{ 
+                      width: 14, height: 14, borderRadius: 2, 
+                      border: '1px solid var(--c-lime)', 
+                      background: selectedIds.has(s.id) ? 'var(--c-lime)' : 'transparent',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: selectedIds.has(s.id) ? '0 0 8px var(--c-lime)' : 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {selectedIds.has(s.id) && <span style={{ color: '#000', fontSize: 10, fontWeight: 900 }}>✓</span>}
+                  </div>
                   <div 
                     onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
                     style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selectedIds.has(s.id) ? '#fff' : '#ccc' }}
