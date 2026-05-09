@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     'Authorization': `Bearer ${secretKey}`,
                 },
             });
-            const data = await response.json().catch(() => ({ raw: await response.text().catch(() => '') }));
+            const data = await response.json().catch(async () => ({ raw: await response.text().catch(() => '') }));
             results.push({
                 url,
                 status: response.status,
