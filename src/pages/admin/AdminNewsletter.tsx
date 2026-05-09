@@ -374,6 +374,16 @@ export const AdminNewsletter: React.FC = () => {
     }
   };
 
+  const filteredSubs = subscribers.filter(s =>
+    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
+    (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
+  );
+
+  const filteredSubs = subscribers.filter(s =>
+    s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
+    (s.first_name || '').toLowerCase().includes(searchSub.toLowerCase())
+  );
+
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredSubs.length) {
       setSelectedIds(new Set());
