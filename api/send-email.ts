@@ -4,20 +4,25 @@ import nodemailer from 'nodemailer';
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 // Configuración de SMTP con variables de entorno para flexibilidad y corrección de host
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'mail.divinastore.com.mx', // Se cambió de divinastore.com.mx (que apunta a Vercel) a mail.divinastore.com.mx
-  port: Number(process.env.SMTP_PORT) || 587, // 587 es el puerto estándar para TLS, 2525 es alternativa
-  secure: process.env.SMTP_SECURE === 'true', // true para puerto 465, false para otros
+  pool: true, // Reutiliza conexiones para evitar bloqueos por múltiples inicios de sesión
+  maxConnections: 3, // Límite de conexiones simultáneas
+  maxMessages: 100, // Mensajes por conexión antes de reabrirla
+  host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
     user: process.env.SMTP_USER || 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, 
   },
   tls: { 
-    rejectUnauthorized: false // Permite certificados auto-firmados comunes en hosting compartido
+    rejectUnauthorized: false
   },
-  connectionTimeout: 30000, 
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
+  connectionTimeout: 40000, 
+  greetingTimeout: 40000,
+  socketTimeout: 40000,
 });
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const FROM = process.env.SMTP_FROM || '"Divina Store MX" <admin@divinastore.com.mx>';
 const TO   = process.env.SMTP_TO || 'info@divinastore.com.mx';
@@ -81,6 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Para evitar que HostGator bloquee por Spam (Error 451 BCC limit), enviamos uno por uno en la misma conexión
+      let sentCount = 0;
       for (const recipientEmail of toList) {
         await transporter.sendMail({
           from: FROM,
@@ -88,7 +94,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subject: subject || 'Divina Store Newsletter',
           html: htmlBody,
         });
+        sentCount++;
+        // Pequeña pausa para no saturar el servidor y evitar el error 451
+        if (sentCount % 5 === 0) await sleep(150); 
       }
+      console.log(`Campaign sent to ${sentCount} recipients.`);
     }
 
     return res.status(200).json({ ok: true });
