@@ -4,12 +4,12 @@ import nodemailer from 'nodemailer';
 // admin@ es quien ENVÍA — info@ es quien RECIBE todo
 // Configuración de SMTP con variables de entorno para flexibilidad y corrección de host
 const transporter = nodemailer.createTransport({
-  pool: true, // Reutiliza conexiones para evitar bloqueos por múltiples inicios de sesión
-  maxConnections: 3, // Límite de conexiones simultáneas
-  maxMessages: 100, // Mensajes por conexión antes de reabrirla
+  pool: true, 
+  maxConnections: 1, // Límite estricto de 1 conexión para evitar bloqueos de HostGator
+  maxMessages: Infinity, 
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === 'true',
+  port: Number(process.env.SMTP_PORT) || 465, // Cambiado a 465 (SSL) que suele ser más estable en HostGator
+  secure: true, // true para puerto 465
   auth: {
     user: process.env.SMTP_USER || 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, 
@@ -17,9 +17,9 @@ const transporter = nodemailer.createTransport({
   tls: { 
     rejectUnauthorized: false
   },
-  connectionTimeout: 40000, 
-  greetingTimeout: 40000,
-  socketTimeout: 40000,
+  connectionTimeout: 60000, 
+  greetingTimeout: 60000,
+  socketTimeout: 60000,
 });
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -30,15 +30,7 @@ const TO   = process.env.SMTP_TO || 'info@divinastore.com.mx';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Verificar conexión SMTP al inicio
-  try {
-    await transporter.verify();
-    console.log('SMTP Connection verified successfully');
-  } catch (verifyError: any) {
-    console.error('SMTP Verification failed:', verifyError);
-    return res.status(500).json({ ok: false, error: 'No se pudo conectar al servidor de correos: ' + verifyError.message });
-  }
-
+  // Eliminamos verify() inicial para no desperdiciar la única conexión permitida
   const { type, firstName, email, message, subscribe } = req.body || {};
 
   try {
@@ -85,20 +77,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new Error('No recipients found for campaign');
       }
 
-      // Para evitar que HostGator bloquee por Spam (Error 451 BCC limit), enviamos uno por uno en la misma conexión
+      // Para evitar que HostGator bloquee por Spam (Error 451), enviamos secuencialmente con pausa obligatoria
       let sentCount = 0;
       for (const recipientEmail of toList) {
-        await transporter.sendMail({
-          from: FROM,
-          to: recipientEmail,
-          subject: subject || 'Divina Store Newsletter',
-          html: htmlBody,
-        });
-        sentCount++;
-        // Pequeña pausa para no saturar el servidor y evitar el error 451
-        if (sentCount % 5 === 0) await sleep(150); 
+        try {
+          await transporter.sendMail({
+            from: FROM,
+            to: recipientEmail,
+            subject: subject || 'Divina Store Newsletter',
+            html: htmlBody,
+          });
+          sentCount++;
+          // Pausa de 500ms entre cada correo para máxima compatibilidad
+          await sleep(500); 
+        } catch (mailErr) {
+          console.error(`Error enviando a ${recipientEmail}:`, mailErr);
+          // Si es un error de conexión grave, paramos el bucle
+          if (String(mailErr).includes('ECONN') || String(mailErr).includes('ETIMEDOUT')) break;
+        }
       }
-      console.log(`Campaign sent to ${sentCount} recipients.`);
+      console.log(`Campaign processed. Sent ${sentCount} of ${toList.length}.`);
     }
 
     return res.status(200).json({ ok: true });
