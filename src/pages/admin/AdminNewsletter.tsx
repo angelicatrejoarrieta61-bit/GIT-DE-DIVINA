@@ -170,33 +170,48 @@ export const AdminNewsletter: React.FC = () => {
       </div>
     </div>`;
 
-    // ENVÍO SECUENCIAL DESDE EL CLIENTE (Evita Timeouts de Vercel)
+    // ENVÍO SECUENCIAL DESDE EL CLIENTE CON REINTENTO AUTOMÁTICO
     let errors = 0;
     for (let i = 0; i < subscribers.length; i++) {
       const s = subscribers[i];
-      try {
-        const res = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'campaign',
-            subject: 'Novedades exclusivas de Divina Store ✨',
-            to: s.email,
-            htmlBody: htmlBody
-          })
-        });
+      let attempts = 0;
+      let sent = false;
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Error en servidor');
+      while (attempts < 3 && !sent) {
+        try {
+          attempts++;
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'campaign',
+              subject: 'Novedades exclusivas de Divina Store ✨',
+              to: s.email,
+              htmlBody: htmlBody
+            })
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            // Si el error es 451 (Temporal), esperamos más tiempo y reintentamos
+            if (String(data.error).includes('451')) {
+              console.warn(`Error 451 en ${s.email}. Reintentando intento ${attempts}...`);
+              await new Promise(r => setTimeout(r, 2000)); // Esperar 2 segundos antes de reintentar
+              continue;
+            }
+            throw new Error(data.error || 'Error en servidor');
+          }
+
+          sent = true;
+          setSendProgress(prev => ({ ...prev, current: i + 1 }));
+          // Pausa de 1 segundo entre cada correo para máxima compatibilidad con HostGator
+          await new Promise(r => setTimeout(r, 1000));
+        } catch (err) {
+          if (attempts >= 3) {
+            console.error(`Error definitivo enviando a ${s.email}:`, err);
+            errors++;
+          }
         }
-
-        setSendProgress(prev => ({ ...prev, current: i + 1 }));
-        // Pequeña pausa para no saturar al servidor
-        await new Promise(r => setTimeout(r, 400));
-      } catch (err) {
-        console.error(`Error enviando a ${s.email}:`, err);
-        errors++;
       }
     }
 

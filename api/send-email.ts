@@ -5,21 +5,23 @@ import nodemailer from 'nodemailer';
 // Configuración de SMTP con variables de entorno para flexibilidad y corrección de host
 const transporter = nodemailer.createTransport({
   pool: true, 
-  maxConnections: 1, // Límite estricto de 1 conexión para evitar bloqueos de HostGator
+  maxConnections: 1, 
   maxMessages: Infinity, 
   host: process.env.SMTP_HOST || 'mail.divinastore.com.mx',
-  port: Number(process.env.SMTP_PORT) || 465, // Cambiado a 465 (SSL) que suele ser más estable en HostGator
-  secure: true, // true para puerto 465
+  port: Number(process.env.SMTP_PORT) || 465, 
+  secure: true, 
   auth: {
     user: process.env.SMTP_USER || 'admin@divinastore.com.mx',
     pass: process.env.SMTP_PASS, 
   },
   tls: { 
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   },
   connectionTimeout: 60000, 
   greetingTimeout: 60000,
   socketTimeout: 60000,
+  debug: true, // Habilita logs detallados en el servidor
 });
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
