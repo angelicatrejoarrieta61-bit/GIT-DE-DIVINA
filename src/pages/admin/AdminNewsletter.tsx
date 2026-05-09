@@ -180,23 +180,29 @@ export const AdminNewsletter: React.FC = () => {
     if (!editingSub) return;
     setLoading(true);
     try {
+      const updateData: any = {
+        first_name: editingSub.first_name || '',
+        last_name_paterno: editingSub.last_name_paterno || null,
+        last_name_materno: editingSub.last_name_materno || null,
+        birth_date: editingSub.birth_date || null,
+      };
+
       const { error } = await supabase
         .from('subscribers')
-        .update({
-          first_name: editingSub.first_name,
-          last_name_paterno: editingSub.last_name_paterno,
-          last_name_materno: editingSub.last_name_materno,
-          birth_date: editingSub.birth_date,
-        })
+        .update(updateData)
         .eq('id', editingSub.id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase Error:', error);
+        throw new Error(error.message);
+      }
+
       setSubscribers(prev => prev.map(s => s.id === editingSub.id ? editingSub : s));
       setIsModalOpen(false);
       setEditingSub(null);
-      alert('Suscriptor actualizado correctamente.');
-    } catch (err) {
-      alert('Error al actualizar.');
+      alert('¡Suscriptor actualizado con éxito!');
+    } catch (err: any) {
+      alert(`Error al actualizar: ${err.message || 'Verifica que las columnas existan en Supabase'}`);
     }
     setLoading(false);
   };
