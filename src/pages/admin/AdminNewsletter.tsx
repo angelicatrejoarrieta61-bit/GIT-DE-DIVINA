@@ -7,6 +7,8 @@ interface Subscriber {
   email: string;
   first_name: string;
   last_name_paterno?: string;
+  last_name_materno?: string;
+  birth_date?: string;
   created_at: string;
   source: string;
   status?: 'active' | 'unsubscribed';
@@ -37,6 +39,10 @@ export const AdminNewsletter: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
+
+  // Gestión de suscriptores
+  const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ── FIX 1: Un único useEffect de inicialización — orden garantizado ──
   useEffect(() => {
@@ -154,6 +160,43 @@ export const AdminNewsletter: React.FC = () => {
     } catch (err) {
       console.error(err);
       alert('Error al agregar correos. Verifica los permisos RLS de la tabla subscribers.');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteSubscriber = async (id: string) => {
+    if (!window.confirm('¿Eliminar suscriptor permanentemente?')) return;
+    try {
+      const { error } = await supabase.from('subscribers').delete().eq('id', id);
+      if (error) throw error;
+      setSubscribers(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      alert('Error al eliminar.');
+    }
+  };
+
+  const handleUpdateSubscriber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSub) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('subscribers')
+        .update({
+          first_name: editingSub.first_name,
+          last_name_paterno: editingSub.last_name_paterno,
+          last_name_materno: editingSub.last_name_materno,
+          birth_date: editingSub.birth_date,
+        })
+        .eq('id', editingSub.id);
+      
+      if (error) throw error;
+      setSubscribers(prev => prev.map(s => s.id === editingSub.id ? editingSub : s));
+      setIsModalOpen(false);
+      setEditingSub(null);
+      alert('Suscriptor actualizado correctamente.');
+    } catch (err) {
+      alert('Error al actualizar.');
     }
     setLoading(false);
   };
@@ -320,8 +363,8 @@ export const AdminNewsletter: React.FC = () => {
     <div className="admin-newsletter" style={{ display: 'flex', height: 'calc(100vh - 40px)', gap: 20, padding: '10px' }}>
 
       {/* ── IZQUIERDA: Suscriptores ── */}
-      <aside className="admin-card glass" style={{ width: 300, display: 'flex', flexDirection: 'column', padding: 20, flexShrink: 0 }}>
-        <h2 style={{ fontSize: 18, color: 'var(--c-lime)', marginBottom: 16 }}>Destinatarios</h2>
+      <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
+        <h2 style={{ fontSize: 14, color: 'var(--c-lime)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
 
         <input
           type="text"
@@ -329,40 +372,62 @@ export const AdminNewsletter: React.FC = () => {
           className="input-dark"
           value={searchSub}
           onChange={e => setSearchSub(e.target.value)}
-          style={{ marginBottom: 10, fontSize: 11, padding: '6px 10px', height: 'auto' }}
+          style={{ marginBottom: 8, fontSize: 10, padding: '4px 8px', height: 'auto', borderRadius: 4 }}
         />
 
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
-          <p style={{ fontSize: 11, color: '#aaa', margin: 0 }}>
-            Base actual ({subscribers.length} suscriptores)
-          </p>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
           {loading
-            ? <p style={{ fontSize: 12, color: '#666' }}>Cargando...</p>
-            : filteredSubs.map(s => (
-              <div key={s.id} style={{ padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 11 }}>
-                <div style={{ fontWeight: 700, color: '#fff' }}>{s.first_name || 'Sin nombre'}</div>
-                <div style={{ color: 'var(--c-lime)' }}>{s.email}</div>
+            ? <p style={{ fontSize: 10, color: '#666', textAlign: 'center', padding: 10 }}>Cargando...</p>
+            : filteredSubs.length === 0 
+              ? <p style={{ fontSize: 10, color: '#444', textAlign: 'center', padding: 10 }}>Sin resultados</p>
+              : filteredSubs.map(s => (
+              <div key={s.id} className="sub-row" style={{ 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 4, 
+                fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.02)'
+              }}>
+                <div 
+                  onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
+                  style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eee' }}
+                >
+                  <span style={{ fontWeight: 800, color: 'var(--c-lime)' }}>{s.first_name || '...'}</span>: {s.email}
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                  <button 
+                    onClick={() => { setEditingSub(s); setIsModalOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 0, fontSize: 12 }}
+                    title="Editar detalles"
+                  >
+                    ✏️
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteSubscriber(s.id)}
+                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: 0, fontSize: 12, opacity: 0.6 }}
+                    title="Borrar"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))
           }
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <h3 style={{ fontSize: 12, color: '#fff', marginBottom: 8 }}>Añadir correos manuales</h3>
+        <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
+          <h3 style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase' }}>Añadir correos</h3>
           <textarea
             className="input-dark"
-            placeholder="ejemplo1@correo.com, ejemplo2@correo.com..."
+            placeholder="correo1@ejemplo.com, correo2@ejemplo.com..."
             value={manualEmails}
             onChange={e => setManualEmails(e.target.value)}
-            style={{ width: '100%', height: 70, fontSize: 11, resize: 'none', marginBottom: 8 }}
+            style={{ width: '100%', height: 40, fontSize: 10, resize: 'none', marginBottom: 6, padding: 6, borderRadius: 4 }}
           />
           <button
             onClick={handleAddManualEmails}
-            className="btn btn-outline"
-            style={{ width: '100%', padding: '8px', fontSize: 11, fontWeight: 'bold' }}
+            style={{ ...blockBtn, width: '100%', padding: '6px 0', fontSize: 10 }}
             disabled={!manualEmails.trim() || loading}
           >
-            AGREGAR A LA BASE
+            AGREGAR SUSCRIPTORES
           </button>
         </div>
       </aside>
@@ -567,10 +632,79 @@ export const AdminNewsletter: React.FC = () => {
         ))}
       </aside>
 
+      {/* ── MODAL DE DETALLES/EDICIÓN ── */}
+      {isModalOpen && editingSub && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="admin-card glass" style={{ width: 400, padding: 24, position: 'relative', border: '1px solid var(--c-lime)' }}>
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              style={{ position: 'absolute', right: 16, top: 16, background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}
+            >
+              ×
+            </button>
+            <h2 style={{ color: 'var(--c-lime)', fontSize: 20, marginBottom: 4 }}>Detalles del Suscriptor</h2>
+            <p style={{ fontSize: 10, color: '#666', marginBottom: 20 }}>Solo el email es obligatorio. Los nombres son opcionales.</p>
+            
+            <form onSubmit={handleUpdateSubscriber} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Email (No editable)</label>
+                <input type="text" className="input-dark" value={editingSub.email} disabled style={{ opacity: 0.5 }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Nombres</label>
+                  <input 
+                    type="text" className="input-dark" 
+                    value={editingSub.first_name || ''} 
+                    onChange={e => setEditingSub({...editingSub, first_name: e.target.value})} 
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Apellido Paterno</label>
+                    <input 
+                      type="text" className="input-dark" 
+                      value={editingSub.last_name_paterno || ''} 
+                      onChange={e => setEditingSub({...editingSub, last_name_paterno: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Apellido Materno</label>
+                    <input 
+                      type="text" className="input-dark" 
+                      value={editingSub.last_name_materno || ''} 
+                      onChange={e => setEditingSub({...editingSub, last_name_materno: e.target.value})} 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Fecha de Nacimiento</label>
+                  <input 
+                    type="date" className="input-dark" 
+                    value={editingSub.birth_date || ''} 
+                    onChange={e => setEditingSub({...editingSub, birth_date: e.target.value})} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+                <button type="submit" className="btn btn-lime" style={{ flex: 1, padding: '12px' }}>
+                  GUARDAR CAMBIOS
+                </button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-outline" style={{ flex: 1, padding: '12px' }}>
+                  CANCELAR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .newsletter-block-wrapper:hover { background: rgba(196, 252, 21, 0.02); }
         .newsletter-block-actions { opacity: 0; transition: opacity 0.2s; }
         .newsletter-block-wrapper:hover .newsletter-block-actions { opacity: 1; }
+        .sub-row:hover { background: rgba(255,255,255,0.05) !important; }
         @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
     </div>
