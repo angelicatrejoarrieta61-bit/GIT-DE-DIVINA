@@ -1,0 +1,138 @@
+/* ─── CheckoutModal.css · Divina Store · Estética Premium ─── */
+
+:root {
+  --clip-lime: #c4fc15;
+  --clip-bg: rgba(10, 10, 10, 0.95);
+  --clip-glass: rgba(255, 255, 255, 0.03);
+  --clip-border: rgba(255, 255, 255, 0.1);
+}
+
+.checkout-modal__overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  padding: 20px;
+}
+
+.checkout-modal__container {
+  background: var(--clip-bg);
+  width: 100%; max-width: 460px;
+  border-radius: 24px;
+  border: 1px solid var(--clip-border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+  animation: modalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* --- Header --- */
+.checkout-modal__header {
+  padding: 24px;
+  background: linear-gradient(to bottom, rgba(196, 252, 21, 0.05), transparent);
+  border-bottom: 1px solid var(--clip-border);
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+
+.checkout-modal__brand {
+  display: block; font-size: 14px; color: var(--clip-lime);
+  text-transform: uppercase; letter-spacing: 2px; font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.checkout-modal__amount {
+  display: block; font-size: 28px; font-weight: 700; color: #fff;
+}
+
+.checkout-modal__description {
+  display: block; font-size: 13px; color: #888; margin-top: 2px;
+}
+
+.checkout-modal__close {
+  background: var(--clip-glass); border: 1px solid var(--clip-border);
+  color: #fff; width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s;
+}
+
+.checkout-modal__close:hover { background: rgba(255,0,0,0.2); border-color: rgba(255,0,0,0.3); }
+
+/* --- Forms --- */
+.checkout-modal__step { padding: 24px; }
+.checkout-modal__step-title { font-size: 18px; margin-bottom: 20px; color: #eee; }
+
+.checkout-modal__field { margin-bottom: 16px; }
+.checkout-modal__label { display: block; font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px; }
+
+.checkout-modal__input {
+  width: 100%; background: rgba(255,255,255,0.03);
+  border: 1px solid var(--clip-border); border-radius: 12px;
+  padding: 14px 16px; color: #fff; font-size: 15px; outline: none;
+  transition: all 0.2s;
+}
+
+.checkout-modal__input:focus { border-color: var(--clip-lime); background: rgba(255,255,255,0.06); }
+.checkout-modal__input--error { border-color: #ff4444 !important; }
+
+.checkout-modal__field-row { display: flex; gap: 12px; }
+.checkout-modal__field--half { flex: 1; }
+
+/* --- Card specific --- */
+.checkout-modal__card-number-wrapper { position: relative; }
+.checkout-modal__card-brand {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 800; color: #fff;
+}
+
+.checkout-modal__international-badge {
+  display: inline-block; margin-top: 8px; font-size: 11px;
+  color: #c4fc15; background: rgba(196, 252, 21, 0.1);
+  padding: 4px 10px; border-radius: 20px;
+}
+
+/* --- Buttons --- */
+.checkout-modal__btn-primary {
+  width: 100%; background: var(--clip-lime); color: #000;
+  border: none; padding: 16px; border-radius: 14px; font-weight: 700;
+  font-size: 16px; cursor: pointer; margin-top: 10px; transition: all 0.3s;
+}
+
+.checkout-modal__btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(196, 252, 21, 0.2); }
+.checkout-modal__btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.checkout-modal__btn-back {
+  width: 100%; background: transparent; border: none; color: #666;
+  padding: 12px; margin-top: 8px; cursor: pointer; font-size: 13px;
+}
+
+/* --- Success / Processing --- */
+.checkout-modal__spinner {
+  width: 50px; height: 50px; border: 3px solid rgba(196, 252, 21, 0.1);
+  border-top-color: var(--clip-lime); border-radius: 50%;
+  margin: 40px auto; animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.checkout-modal__success-icon {
+  width: 80px; height: 80px; background: var(--clip-lime); color: #000;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 40px; margin: 40px auto 20px;
+  box-shadow: 0 0 30px rgba(196, 252, 21, 0.4);
+}
+
+/* Mobile Bottom Sheet */
+@media (max-width: 600px) {
+  .checkout-modal__overlay { align-items: flex-end; padding: 0; }
+  .checkout-modal__container { border-radius: 30px 30px 0 0; animation: sheetIn 0.4s ease-out; }
+}
+
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
