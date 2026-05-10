@@ -388,6 +388,58 @@ export const AdminNewsletter: React.FC = () => {
     }
   };
 
+  const handleImportXLS = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const formatted = data.map(row => {
+          // Normalizar nombres de columnas (quitar espacios y minúsculas)
+          const findVal = (keys: string[]) => {
+            const key = Object.keys(row).find(k => keys.includes(k.toLowerCase().trim()));
+            return key ? row[key] : null;
+          };
+
+          return {
+            email: findVal(['email', 'correo', 'mail']),
+            first_name: findVal(['nombre', 'nombres', 'first name']),
+            last_name_paterno: findVal(['apellido paterno', 'apellido_paterno', 'paterno']),
+            last_name_materno: findVal(['apellido materno', 'apellido_materno', 'materno']),
+            birth_date: findVal(['fecha de nacimiento', 'fecha_nacimiento', 'birth date', 'nacimiento'])
+          };
+        }).filter(item => item.email); // Solo los que tengan email
+
+        if (formatted.length === 0) {
+          alert('No se encontraron correos válidos en el archivo.');
+          return;
+        }
+
+        setLoading(true);
+        const { error } = await supabase.from('subscribers').upsert(formatted, { onConflict: 'email' });
+        
+        if (error) throw error;
+        
+        alert(`¡Éxito! Se importaron ${formatted.length} suscriptores.`);
+        fetchSubscribers();
+      } catch (err) {
+        console.error('Error importando:', err);
+        alert('Error al leer el archivo. Asegúrate que sea un Excel o CSV válido.');
+      } finally {
+        setLoading(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredSubs.length) {
       setSelectedIds(new Set());
@@ -681,7 +733,13 @@ export const AdminNewsletter: React.FC = () => {
       {/* ── DERECHA: Base de Datos ── */}
       <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888' }} title="Importar Excel (XLS/CSV)">
+              <FileSpreadsheet size={16} />
+              <input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportXLS} style={{ display: 'none' }} />
+            </label>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 9, color: '#888' }}>Todos</span>
             <input 
