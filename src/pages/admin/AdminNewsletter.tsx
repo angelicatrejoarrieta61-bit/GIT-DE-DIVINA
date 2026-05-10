@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, getImageUrl } from '../../lib/supabase';
 import { AssetUploader } from '../../components/AssetUploader';
+import * as XLSX from 'xlsx';
 
 interface Subscriber {
   id: string;
@@ -388,6 +389,8 @@ export const AdminNewsletter: React.FC = () => {
     }
   };
 
+  };
+
   const handleImportXLS = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -735,8 +738,8 @@ export const AdminNewsletter: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
-            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888' }} title="Importar Excel (XLS/CSV)">
-              <FileSpreadsheet size={16} />
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888', fontSize: 14 }} title="Importar Excel (XLS/CSV)">
+              📥
               <input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportXLS} style={{ display: 'none' }} />
             </label>
           </div>
