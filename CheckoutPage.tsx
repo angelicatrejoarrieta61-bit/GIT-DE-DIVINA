@@ -47,23 +47,80 @@ const ClipLogo = () => (
   </svg>
 );
 
+interface CustomerForm {
+  nombre: string;
+  email: string;
+  telefono: string;
+  calle: string;
+  colonia: string;
+  ciudad: string;
+  estado: string;
+  cp: string;
+}
+
+const EMPTY_FORM: CustomerForm = {
+  nombre: '',
+  email: '',
+  telefono: '',
+  calle: '',
+  colonia: '',
+  ciudad: '',
+  estado: '',
+  cp: '',
+};
+
+function validateForm(f: CustomerForm): string | null {
+  if (!f.nombre.trim()) return 'El nombre es requerido.';
+  if (!f.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return 'Ingresa un email válido.';
+  if (!f.telefono.trim() || f.telefono.replace(/\D/g, '').length < 10) return 'El teléfono debe tener 10 dígitos.';
+  if (!f.calle.trim()) return 'La calle y número son requeridos.';
+  if (!f.colonia.trim()) return 'La colonia es requerida.';
+  if (!f.ciudad.trim()) return 'La ciudad es requerida.';
+  if (!f.estado.trim()) return 'El estado es requerido.';
+  if (!f.cp.trim() || f.cp.replace(/\D/g, '').length !== 5) return 'El código postal debe tener 5 dígitos.';
+  return null;
+}
+
 export const CheckoutPage: React.FC = () => {
   const { items, total, clearCart } = useCartStore();
   const cartTotal = total();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
+  const [touched, setTouched] = useState<Partial<Record<keyof CustomerForm, boolean>>>({});
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setTouched(prev => ({ ...prev, [e.target.name]: true }));
+  };
 
   const handlePagar = async () => {
+    setTouched({
+      nombre: true, email: true, telefono: true,
+      calle: true, colonia: true, ciudad: true, estado: true, cp: true,
+    });
+
+    const validationError = validateForm(form);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
+    const fullAddress = `${form.calle}, Col. ${form.colonia}, ${form.ciudad}, ${form.estado}, CP ${form.cp}`;
+
     try {
       const order = await createOrder({
-        customer_name: 'Cliente',
-        customer_email: '',
-        customer_phone: '',
-        customer_address: '',
+        customer_name: form.nombre.trim(),
+        customer_email: form.email.trim().toLowerCase(),
+        customer_phone: form.telefono.trim(),
+        customer_address: fullAddress,
         items,
         total: cartTotal,
         status: 'pending',
@@ -78,6 +135,8 @@ export const CheckoutPage: React.FC = () => {
           amount: cartTotal,
           description: `Divina Store MX — Orden ${order.id}`,
           orderId: order.id,
+          customerName: form.nombre.trim(),
+          customerEmail: form.email.trim().toLowerCase(),
           redirect_url: `${window.location.origin}/pago-exitoso?order=${order.id}`,
           error_url: `${window.location.origin}/pago-error?order=${order.id}`,
         }),
@@ -111,6 +170,8 @@ export const CheckoutPage: React.FC = () => {
     );
   }
 
+  const formValidationError = validateForm(form);
+
   return (
     <div className="checkout-page" style={{ paddingTop: 'var(--nav-h)' }}>
       <div className="page-width section">
@@ -127,6 +188,150 @@ export const CheckoutPage: React.FC = () => {
 
           <div className="checkout-page__left">
 
+            {/* FORMULARIO DE DATOS DEL CLIENTE */}
+            <div className="checkout-form-section">
+              <h2 className="checkout-form-section__title">Datos de contacto</h2>
+
+              <div className="checkout-form-grid">
+                <div className="checkout-form-field checkout-form-field--full">
+                  <label htmlFor="nombre">Nombre completo *</label>
+                  <input
+                    id="nombre"
+                    name="nombre"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="María García López"
+                    value={form.nombre}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.nombre && !form.nombre.trim() ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="email">Correo electrónico *</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="maria@ejemplo.com"
+                    value={form.email}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="telefono">Teléfono *</label>
+                  <input
+                    id="telefono"
+                    name="telefono"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="55 1234 5678"
+                    value={form.telefono}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.telefono && form.telefono.replace(/\D/g, '').length < 10 ? 'input-error' : ''}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* DIRECCIÓN DE ENTREGA */}
+            <div className="checkout-form-section">
+              <h2 className="checkout-form-section__title">Dirección de entrega</h2>
+
+              <div className="checkout-form-grid">
+                <div className="checkout-form-field checkout-form-field--full">
+                  <label htmlFor="calle">Calle y número *</label>
+                  <input
+                    id="calle"
+                    name="calle"
+                    type="text"
+                    autoComplete="address-line1"
+                    placeholder="Av. Insurgentes Sur 1234, Int. 5"
+                    value={form.calle}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.calle && !form.calle.trim() ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="colonia">Colonia *</label>
+                  <input
+                    id="colonia"
+                    name="colonia"
+                    type="text"
+                    autoComplete="address-line2"
+                    placeholder="Del Valle"
+                    value={form.colonia}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.colonia && !form.colonia.trim() ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="cp">Código postal *</label>
+                  <input
+                    id="cp"
+                    name="cp"
+                    type="text"
+                    autoComplete="postal-code"
+                    placeholder="03100"
+                    maxLength={5}
+                    value={form.cp}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.cp && form.cp.replace(/\D/g, '').length !== 5 ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="ciudad">Ciudad / Alcaldía *</label>
+                  <input
+                    id="ciudad"
+                    name="ciudad"
+                    type="text"
+                    autoComplete="address-level2"
+                    placeholder="Ciudad de México"
+                    value={form.ciudad}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.ciudad && !form.ciudad.trim() ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="checkout-form-field">
+                  <label htmlFor="estado">Estado *</label>
+                  <select
+                    id="estado"
+                    name="estado"
+                    autoComplete="address-level1"
+                    value={form.estado}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={touched.estado && !form.estado.trim() ? 'input-error' : ''}
+                  >
+                    <option value="">Selecciona un estado</option>
+                    {[
+                      'Aguascalientes','Baja California','Baja California Sur','Campeche',
+                      'Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima',
+                      'Durango','Estado de México','Guanajuato','Guerrero','Hidalgo',
+                      'Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca',
+                      'Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa',
+                      'Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'
+                    ].map(e => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* MÉTODOS DE PAGO */}
             <div className="checkout-accepted-cards">
               <span className="checkout-accepted-cards__label">Métodos de pago aceptados</span>
               <div className="checkout-accepted-cards__logos">
@@ -143,7 +348,7 @@ export const CheckoutPage: React.FC = () => {
             <div className="checkout-clip-info">
               <div className="checkout-clip-info__item">
                 <IconShield />
-                <span>Serás redirigido al sitio seguro de Clip donde podrás ingresar tus datos y pagar con tarjeta de crédito o débito.</span>
+                <span>Serás redirigido al sitio seguro de Clip donde podrás ingresar tus datos de pago con tarjeta de crédito o débito.</span>
               </div>
               <div className="checkout-clip-info__item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -170,7 +375,7 @@ export const CheckoutPage: React.FC = () => {
             <button
               onClick={handlePagar}
               className={`checkout-submit-btn ${loading ? 'loading' : ''}`}
-              disabled={loading}
+              disabled={loading || !!formValidationError}
             >
               {loading ? (
                 <span className="checkout-submit-btn__loading">
@@ -208,6 +413,7 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
 
+          {/* RESUMEN DE ORDEN */}
           <div className="checkout-page__summary">
             <div className="checkout-summary-card">
               <h2 className="checkout-summary-card__title">Tu pedido</h2>

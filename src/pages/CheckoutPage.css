@@ -633,3 +633,91 @@
   font-weight: 700;
   padding: 14px;
 }
+/* FORM SECTIONS */
+.checkout-form-section {
+  background: var(--color-surface, #f5f4f0);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.checkout-form-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text, #080808);
+  margin: 0 0 20px 0;
+}
+
+.checkout-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.checkout-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkout-form-field--full {
+  grid-column: 1 / -1;
+}
+
+.checkout-form-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text, #080808);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.checkout-form-field input,
+.checkout-form-field select {
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 14px;
+  color: var(--color-text, #080808);
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.checkout-form-field input:focus,
+.checkout-form-field select:focus {
+  border-color: var(--color-accent, #C8A882);
+  box-shadow: 0 0 0 3px rgba(200, 168, 130, 0.12);
+}
+
+.checkout-form-field input.input-error,
+.checkout-form-field select.input-error {
+  border-color: #e53e3e;
+  background: #fff5f5;
+}
+
+.checkout-form-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .checkout-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .checkout-form-field--full {
+    grid-column: 1;
+  }
+}
