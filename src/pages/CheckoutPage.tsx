@@ -99,17 +99,46 @@ export const CheckoutPage: React.FC = () => {
   }, []);
 
   // Inicializar SDK de Clip (Checkout Transparente)
+  const [clipStatus, setClipStatus] = useState<'loading' | 'ready' | 'error' | 'missing_key'>('loading');
+
   useEffect(() => {
     const CLIP_PUBLIC_KEY = import.meta.env.VITE_CLIP_API_KEY;
-    if (!CLIP_PUBLIC_KEY || typeof ClipSDK === 'undefined') return;
-    try {
-      const clip = new ClipSDK(CLIP_PUBLIC_KEY);
-      const card = clip.element.create('Card', { locale: 'es' });
-      card.mount('clip-card-container');
-      sdkCardRef.current = card;
-    } catch (e) {
-      console.error('Error inicializando Clip SDK:', e);
+    if (!CLIP_PUBLIC_KEY) {
+      setClipStatus('missing_key');
+      return;
     }
+
+    let attempts = 0;
+    const initClip = () => {
+      // Usamos (window as any).ClipSDK por si el tipado global falla o la carga es asíncrona
+      const SDK = (window as any).ClipSDK || (typeof ClipSDK !== 'undefined' ? ClipSDK : null);
+      
+      if (!SDK) {
+        attempts++;
+        if (attempts < 20) {
+          setTimeout(initClip, 250); // reintentar cada 250ms hasta 5 segundos
+        } else {
+          setClipStatus('error');
+        }
+        return;
+      }
+
+      try {
+        const clip = new SDK(CLIP_PUBLIC_KEY);
+        const card = clip.element.create('Card', { 
+          locale: 'es',
+          theme: 'dark' // Ajustamos el tema oscuro si Clip lo soporta
+        });
+        card.mount('clip-card-container');
+        sdkCardRef.current = card;
+        setClipStatus('ready');
+      } catch (e) {
+        console.error('Error inicializando Clip SDK:', e);
+        setClipStatus('error');
+      }
+    };
+
+    initClip();
   }, []);
 
   // Fetch ZIP info (Mexico)
@@ -347,8 +376,26 @@ export const CheckoutPage: React.FC = () => {
             <div className="checkout-card glass payment-card">
               <h2 className="checkout-card__title"><span className="lime-text">02</span> DATOS DE PAGO</h2>
               <p style={{ color: '#aaa', fontSize: 12, marginBottom: 12, marginTop: -8 }}>Tu información es cifrada con SSL 256-bit. Nunca almacenamos tu tarjeta.</p>
+              
+              {clipStatus === 'loading' && (
+                <div style={{ padding: 20, textAlign: 'center', color: '#888', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                  <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#FC4C02', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+                  Conectando con Clip...
+                </div>
+              )}
+              {clipStatus === 'missing_key' && (
+                <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
+                  ⚠️ Falta la llave de API de Clip. Contacta a soporte técnico.
+                </div>
+              )}
+              {clipStatus === 'error' && (
+                <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
+                  ⚠️ Error al cargar el formulario de pago seguro. Verifica tu conexión o recarga la página.
+                </div>
+              )}
+
               {/* El SDK de Clip monta el iFrame de captura de tarjeta aquí */}
-              <div id="clip-card-container" style={{ minHeight: 160, borderRadius: 8, overflow: 'hidden' }} />
+              <div id="clip-card-container" style={{ minHeight: clipStatus === 'ready' ? 160 : 0, opacity: clipStatus === 'ready' ? 1 : 0, borderRadius: 8, overflow: 'hidden', transition: 'opacity 0.3s' }} />
             </div>
 
             {error && <div className="checkout-page__error"><span>⚠</span><span>{error}</span></div>}
