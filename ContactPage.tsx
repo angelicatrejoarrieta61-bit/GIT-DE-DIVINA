@@ -91,15 +91,16 @@ export const ContactPage: React.FC = () => {
                 <h3 className="contact-card__title">WhatsApp</h3>
                 <p className="contact-card__text">+{whatsapp}</p>
 
-                href={`https://wa.me/${whatsapp}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-lime"
-                style={{ marginTop: 12 }}
-                aria-label="Enviar mensaje por WhatsApp a Divina Store MX"
+                <a
+                  href={`https://wa.me/${whatsapp}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-lime"
+                  style={{ marginTop: 12 }}
+                  aria-label="Enviar mensaje por WhatsApp a Divina Store MX"
                 >
-                Enviar mensaje
-              </a>
+                  Enviar mensaje
+                </a>
             </div>
 
             <div className="contact-card">

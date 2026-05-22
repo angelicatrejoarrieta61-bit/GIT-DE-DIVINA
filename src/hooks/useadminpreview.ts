@@ -14,7 +14,7 @@
  *   - ADMIN_PREVIEW_RELOAD_PRODUCTS → señal para refrescar productos (opcional)
  * ─────────────────────────────────────────────────────────────────────────────
  */
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 type ConfigSetter = React.Dispatch<React.SetStateAction<Record<string, string>>>;
 

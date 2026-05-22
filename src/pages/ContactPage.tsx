@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getStoreConfig } from '../lib/queries';
-import { getImageUrl } from '../lib/supabase';
+import { supabase, getImageUrl } from '../lib/supabase';
 import './ContactPage.css';
 import './CollectionPage.css';
 

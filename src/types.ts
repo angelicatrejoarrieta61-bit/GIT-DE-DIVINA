@@ -13,6 +13,8 @@ export interface Product {
   description?: string;
   category?: string;
   image_status?: string;
+  sku?: string;
+  collection?: Collection | null;
 }
 
 export interface Collection {
