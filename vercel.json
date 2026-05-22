@@ -2,6 +2,9 @@
   "functions": {
     "api/send-email.ts": {
       "maxDuration": 60
+    },
+    "api/create-payment.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
