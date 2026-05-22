@@ -8,7 +8,7 @@ import './CheckoutPage.css';
 // Declaración del tipo global del SDK de Clip
 declare const ClipSDK: new (apiKey: string) => {
   element: {
-    create: (type: string, options?: Record<string, string>) => {
+    create: (type: string, options?: Record<string, any>) => {
       mount: (id: string) => void;
       cardToken: () => Promise<{ id: string }>;
     };
@@ -127,7 +127,11 @@ export const CheckoutPage: React.FC = () => {
         const clip = new SDK(CLIP_PUBLIC_KEY);
         const card = clip.element.create('Card', { 
           locale: 'es',
-          theme: 'light' // Usamos tema claro que es el más robusto para fondo blanco
+          theme: 'light', // Usamos tema claro que es el más robusto para fondo blanco
+          paymentAmount: cartTotal,
+          terms: {
+            enabled: true
+          }
         });
         card.mount('clip-card-container');
         sdkCardRef.current = card;
