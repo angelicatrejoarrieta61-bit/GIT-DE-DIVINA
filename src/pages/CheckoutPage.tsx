@@ -214,7 +214,12 @@ export const CheckoutPage: React.FC = () => {
         throw new Error(`Error Clip: ${errMsg}`);
       }
 
-      // PASO 4: Pago exitoso — actualizar orden a 'paid'
+      if (chargeData.requires_action && chargeData.redirect_url) {
+        window.location.href = chargeData.redirect_url;
+        return;
+      }
+
+      // PASO 4: Pago exitoso sin 3DS — actualizar orden a 'paid'
       await updateOrderStatus(order.id, 'paid');
       clearCart();
       navigate(`/pago-exitoso?order=${order.id}`);

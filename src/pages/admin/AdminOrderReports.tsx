@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getOrders, updateOrderStatus } from '../../lib/queries';
+import { getOrders, updateOrderStatus, deleteAllOrders } from '../../lib/queries';
 import type { Order, CartItem } from '../../types';
 
 type StatusType = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
@@ -65,6 +65,20 @@ export const AdminOrderReports: React.FC = () => {
     await updateOrderStatus(id, s);
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: s } : o));
     setUpdatingId(null);
+  };
+
+  const handleDeleteAll = async () => {
+    if (window.confirm('🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los pedidos de la base de datos permanentemente. Esta acción no se puede deshacer.')) {
+      setLoading(true);
+      const success = await deleteAllOrders();
+      if (success) {
+        setOrders([]);
+        alert('Todos los pedidos han sido eliminados.');
+      } else {
+        alert('Error al intentar borrar los pedidos.');
+      }
+      setLoading(false);
+    }
   };
 
   /* ── Filtered orders ── */
@@ -177,7 +191,10 @@ export const AdminOrderReports: React.FC = () => {
         <div style={{ textAlign: 'right' }}>
            <p style={{ fontSize: '11px', color: '#888', margin: '0 0 4px' }}>Notificaciones de compras: <strong>admin@divinastore.com.mx</strong></p>
            <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px' }}>Gestión de Info/Newsletter: <strong>info@divinastore.com.mx</strong></p>
-           <button onClick={loadOrders} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>🔄 Actualizar</button>
+           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+             <button onClick={handleDeleteAll} style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff6b6b', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>🗑️ Empezar de Cero</button>
+             <button onClick={loadOrders} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>🔄 Actualizar</button>
+           </div>
         </div>
       </div>
 

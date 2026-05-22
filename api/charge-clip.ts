@@ -53,11 +53,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
 
-        if (!response.ok) {
-            console.error('[charge-clip] Clip error:', response.status, JSON.stringify(data));
-            return res.status(response.status).json({
-                error: data.message || data.error_description || data.description || data.error || `Error de Clip (${response.status})`,
+        if (!response.ok || data.status === 'declined' || data.status === 'ERROR') {
+            console.error('[charge-clip] Clip declined/error:', response.status, JSON.stringify(data));
+            return res.status(400).json({
+                error: data.decline_reason || data.message || data.error_description || data.description || data.error || `Pago declinado por el banco.`,
+                status: data.status,
                 clip_raw: data,
+            });
+        }
+
+        if (data.requires_action && data.redirect_url) {
+            return res.status(200).json({
+                success: true,
+                requires_action: true,
+                redirect_url: data.redirect_url,
+                transaction_id: data.transaction_id || data.id,
             });
         }
 

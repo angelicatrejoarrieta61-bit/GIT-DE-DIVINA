@@ -205,6 +205,12 @@ export const updateOrderStatus = async (id: string, status: Order['status']): Pr
   await supabase.from('orders').update({ status }).eq('id', id);
 };
 
+export const deleteAllOrders = async (): Promise<boolean> => {
+  const { error } = await supabase.from('orders').delete().neq('id', '0'); // Supabase requiere un filtro
+  if (error) { console.error(error); return false; }
+  return true;
+};
+
 // ─── STORE CONFIG ────────────────────────────────────────────────
 export const getStoreConfig = async (): Promise<Record<string, string>> => {
   try {
