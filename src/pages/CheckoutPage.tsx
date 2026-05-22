@@ -127,7 +127,7 @@ export const CheckoutPage: React.FC = () => {
         const clip = new SDK(CLIP_PUBLIC_KEY);
         const card = clip.element.create('Card', { 
           locale: 'es',
-          theme: 'dark' // Ajustamos el tema oscuro si Clip lo soporta
+          theme: 'light' // Usamos tema claro que es el más robusto para fondo blanco
         });
         card.mount('clip-card-container');
         sdkCardRef.current = card;
@@ -377,25 +377,36 @@ export const CheckoutPage: React.FC = () => {
               <h2 className="checkout-card__title"><span className="lime-text">02</span> DATOS DE PAGO</h2>
               <p style={{ color: '#aaa', fontSize: 12, marginBottom: 12, marginTop: -8 }}>Tu información es cifrada con SSL 256-bit. Nunca almacenamos tu tarjeta.</p>
               
-              {clipStatus === 'loading' && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#888', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-                  <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#FC4C02', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-                  Conectando con Clip...
-                </div>
-              )}
-              {clipStatus === 'missing_key' && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
-                  ⚠️ Falta la llave de API de Clip. Contacta a soporte técnico.
-                </div>
-              )}
-              {clipStatus === 'error' && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
-                  ⚠️ Error al cargar el formulario de pago seguro. Verifica tu conexión o recarga la página.
-                </div>
-              )}
+              <div style={{ position: 'relative', minHeight: 180 }}>
+                {clipStatus === 'loading' && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8, zIndex: 5 }}>
+                    <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#FC4C02', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+                    Conectando con Clip...
+                  </div>
+                )}
+                {clipStatus === 'missing_key' && (
+                  <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
+                    ⚠️ Falta la llave de API de Clip. Contacta a soporte técnico.
+                  </div>
+                )}
+                {clipStatus === 'error' && (
+                  <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
+                    ⚠️ Error al cargar el formulario de pago seguro. Verifica tu conexión o recarga la página.
+                  </div>
+                )}
 
-              {/* El SDK de Clip monta el iFrame de captura de tarjeta aquí */}
-              <div id="clip-card-container" style={{ minHeight: clipStatus === 'ready' ? 160 : 0, opacity: clipStatus === 'ready' ? 1 : 0, borderRadius: 8, overflow: 'hidden', transition: 'opacity 0.3s' }} />
+                {/* El SDK de Clip monta el iFrame de captura de tarjeta aquí */}
+                <div 
+                  id="clip-card-container" 
+                  className="checkout-clip-mount" 
+                  style={{ 
+                    display: (clipStatus === 'ready' || clipStatus === 'loading') ? 'block' : 'none', 
+                    borderRadius: 8, 
+                    overflow: 'hidden', 
+                    padding: '12px' 
+                  }} 
+                />
+              </div>
             </div>
 
             {error && <div className="checkout-page__error"><span>⚠</span><span>{error}</span></div>}
@@ -403,22 +414,22 @@ export const CheckoutPage: React.FC = () => {
             <div className="checkout-actions">
               <button
                 onClick={handlePagar}
-                className={`checkout-pagar-btn-official ${loading ? 'loading' : ''}`}
+                className="checkout-pagar-btn-official"
                 disabled={loading}
                 id="checkout-pay-btn"
               >
                 {loading ? (
-                  <div className="btn-loading-state">
+                  <>
                     <span className="checkout-spinner" />
                     Procesando pago...
-                  </div>
+                  </>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '14px 24px', background: 'var(--c-lime)', borderRadius: 12, fontFamily: 'var(--f-sub)', fontSize: 15, fontWeight: 800, color: '#000', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  <>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
                     Pagar ${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
-                  </div>
+                  </>
                 )}
               </button>
             </div>
