@@ -72,6 +72,25 @@ export const AdminLayout: React.FC = () => {
     void loadHomeOrder();
   }, []);
 
+  // Force scroll fix logic that we know works
+  useEffect(() => {
+    document.documentElement.style.overflowY = 'auto';
+    document.body.style.overflowY = 'auto';
+
+    const mainElement = document.querySelector('.admin-main') as HTMLElement;
+    if (mainElement) {
+      mainElement.style.cssText = 'flex:1;min-width:0;height:auto;overflow:visible;';
+    }
+
+    return () => {
+      // Clean up styles when leaving the admin layout
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = '';
+    };
+  }, [location.pathname]);
+
+
+
   // Notifica al iframe de preview para que actualice el orden en tiempo real
   const notifyPreviewOrder = (newOrder: string[]) => {
     const iframe = document.querySelector<HTMLIFrameElement>('iframe[title="Vista previa tienda"]');
