@@ -12,17 +12,14 @@ export const AdminLayout: React.FC = () => {
   const currentSection = query.get('section') || '';
   const currentPart = query.get('part') || '';
 
+  // Auth check
   useEffect(() => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         if (!session) navigate('/admin/login');
       })
-      .catch((err) => {
-        console.error('Session check error:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch((err) => console.error('Session check error:', err))
+      .finally(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) navigate('/admin/login');
@@ -31,30 +28,30 @@ export const AdminLayout: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Fix scroll bloqueado por Tailwind preflight en html/body
+  useEffect(() => {
+    document.documentElement.style.overflowY = 'auto';
+    document.body.style.overflowY = 'auto';
+    return () => {
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = '';
+    };
+  }, []);
+
+  // Custom sections
   useEffect(() => {
     const loadCustomSections = async () => {
       const { data } = await supabase.from('store_config').select('value').eq('key', 'admin_custom_sections').maybeSingle();
       if (!data?.value) return;
       try {
         const parsed = JSON.parse(data.value);
-        if (Array.isArray(parsed)) {
-          setCustomSections(parsed.filter((x) => x?.key && x?.label));
-        }
+        if (Array.isArray(parsed)) setCustomSections(parsed.filter((x) => x?.key && x?.label));
       } catch {
         setCustomSections([]);
       }
     };
     void loadCustomSections();
   }, []);
-  useEffect(() => {
-  document.documentElement.style.overflowY = 'auto';
-  document.body.style.overflowY = 'auto';
-  
-  return () => {
-    document.documentElement.style.overflowY = '';
-    document.body.style.overflowY = '';
-  };
-}, []);
 
   const persistCustomSections = async (next: Array<{ key: string; label: string }>) => {
     setCustomSections(next);
@@ -94,26 +91,10 @@ export const AdminLayout: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div
-      className="admin-layout"
-      style={{
-        display: 'flex',
-        height: '100vh',
-        maxHeight: '100vh',
-        overflow: 'hidden',
-        background: '#060606',
-      }}
-    >
-      {/* Sidebar */}
-      <aside
-        className="admin-sidebar glass"
-        style={{
-          height: '100vh',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          flexShrink: 0,
-        }}
-      >
+    <div className="admin-layout" style={{ display: 'flex', minHeight: '100vh', background: '#060606' }}>
+
+      {/* Sidebar — sin scroll, altura natural */}
+      <aside className="admin-sidebar glass" style={{ flexShrink: 0, overflow: 'visible' }}>
         <div className="admin-sidebar__brand">
           <span className="lime-text">DIVINA</span> ADMIN
         </div>
@@ -134,6 +115,7 @@ export const AdminLayout: React.FC = () => {
           >
             Home / Inicio
           </Link>
+
           {currentSection === 'home' && (
             <div className="admin-home-submenu">
               <Link
@@ -191,18 +173,11 @@ export const AdminLayout: React.FC = () => {
         </button>
       </aside>
 
-      {/* Main Content — inline styles ganan a cualquier CSS global o Tailwind */}
-      <main
-  className="admin-main"
-  style={{
-    flex: 1,
-    minWidth: 0,
-    height: 'auto',
-    overflow: 'visible',
-  }}
->
+      {/* Main — scroll natural de la página completa */}
+      <main className="admin-main" style={{ flex: 1, minWidth: 0, overflow: 'visible' }}>
         <Outlet />
       </main>
+
     </div>
   );
 };
