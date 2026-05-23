@@ -3,7 +3,8 @@ body:has(.admin-layout) { background: #060606; }
 
 .admin-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -155,10 +156,12 @@ body:has(.admin-layout) { background: #060606; }
 /* Main Area */
 .admin-main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  height: 100vh;
+  overflow-x: hidden;
+  height: 100%;
 }
 
 /* Admin generic components */
