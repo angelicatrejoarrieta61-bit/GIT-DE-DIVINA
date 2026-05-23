@@ -152,3 +152,115 @@
   .product-page__media { position: static; }
   .product-page__name { font-size: 26px; }
 }
+/* ============================================================
+   ProductPage — Nanotecnología de Información
+   Tema oscuro Divina Store MX
+   Pegar al FINAL de: src/pages/ProductPage.css
+   ============================================================ */
+
+/* ── Breadcrumb ── */
+.pp-breadcrumb { margin-bottom: 24px; }
+.pp-breadcrumb ol {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 4px; list-style: none; padding: 0; margin: 0;
+  font-size: 13px; color: rgba(255,255,255,0.4);
+}
+.pp-breadcrumb a { color: inherit; text-decoration: none; }
+.pp-breadcrumb a:hover { color: var(--c-lime); }
+.pp-breadcrumb__sep { opacity: 0.3; margin: 0 2px; }
+.pp-breadcrumb__current { color: rgba(255,255,255,0.85); font-weight: 500; }
+
+/* ── Routine badge ── */
+.pp-routine-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 20px;
+  background: rgba(185,255,0,0.12); color: var(--c-lime);
+  border: 1px solid rgba(185,255,0,0.25); margin-bottom: 8px;
+}
+
+/* ── Trust badges ── */
+.pp-trust-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.pp-badge {
+  font-size: 11px; font-weight: 500; padding: 3px 10px;
+  border-radius: 20px; border: 1px solid transparent;
+}
+.pp-badge--green  { background: rgba(46,204,113,0.1); color: #5ddc8e; border-color: rgba(46,204,113,0.25); }
+.pp-badge--blue   { background: rgba(100,150,255,0.1); color: #7aaeff; border-color: rgba(100,150,255,0.25); }
+.pp-badge--neutral { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.12); }
+
+/* ── Section label + chips ── */
+.pp-section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 0 0 8px 0;
+}
+.pp-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.pp-chip { font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
+.pp-chip--skin    { background: rgba(255,210,100,0.1); color: #f5c842; border: 1px solid rgba(255,210,100,0.2); }
+.pp-chip--concern { background: rgba(150,100,255,0.1); color: #b58aff; border: 1px solid rgba(150,100,255,0.2); }
+
+/* ── Section titles ── */
+.pp-section-title {
+  font-size: 18px; font-weight: 700; margin: 48px 0 20px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  letter-spacing: -0.01em; color: var(--c-white);
+}
+
+/* ── Ingredientes ── */
+.pp-ingredients__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.pp-ingredient-card {
+  padding: 16px; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; background: rgba(255,255,255,0.03);
+  transition: border-color 0.15s;
+}
+.pp-ingredient-card:hover { border-color: var(--c-lime); }
+.pp-ingredient-card__header {
+  display: flex; align-items: baseline;
+  justify-content: space-between; gap: 8px; margin-bottom: 4px;
+}
+.pp-ingredient-card__name { font-size: 14px; font-weight: 600; color: var(--c-white); }
+.pp-ingredient-card__pct {
+  font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 20px; background: var(--c-lime); color: #000; white-space: nowrap;
+}
+.pp-ingredient-card__aka { font-size: 11px; color: rgba(255,255,255,0.35); margin: 0 0 6px; }
+.pp-ingredient-card__benefit { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.5; margin: 0; }
+
+/* ── Cómo usar ── */
+.pp-how-to-use__text {
+  font-size: 15px; line-height: 1.75;
+  color: rgba(255,255,255,0.55); max-width: 680px;
+}
+
+/* ── FAQ ── */
+.pp-faq__list {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; overflow: hidden; max-width: 760px;
+}
+.pp-faq__item { border-bottom: 1px solid rgba(255,255,255,0.08); }
+.pp-faq__item:last-child { border-bottom: none; }
+.pp-faq__question {
+  width: 100%; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; padding: 16px 20px;
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: var(--c-white);
+  text-align: left; transition: background 0.15s;
+}
+.pp-faq__question:hover { background: rgba(255,255,255,0.04); }
+.pp-faq__question--open { background: rgba(255,255,255,0.04); }
+.pp-faq__answer { padding: 0 20px 16px; background: rgba(255,255,255,0.04); }
+.pp-faq__answer p { font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.55); margin: 0; }
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .pp-ingredients__grid { grid-template-columns: 1fr 1fr; }
+  .pp-section-title { font-size: 16px; margin-top: 36px; }
+}
+@media (max-width: 400px) {
+  .pp-ingredients__grid { grid-template-columns: 1fr; }
+}
