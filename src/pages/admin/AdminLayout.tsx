@@ -150,10 +150,25 @@ export const AdminLayout: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div className="admin-layout">
-      {/* Sidebar */}
-      <aside className="admin-sidebar glass">
-        <div className="admin-sidebar__brand" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <>
+      <style>{`
+        /* FORZAR SCROLL NATURAL (LO QUE FUNCIONÓ EN CONSOLA) */
+        html, body, #root { 
+          overflow-y: auto !important; 
+          height: auto !important; 
+          min-height: unset !important; 
+        }
+        .admin-main { 
+          flex: 1 !important; 
+          min-width: 0 !important; 
+          height: auto !important; 
+          overflow: visible !important; 
+        }
+      `}</style>
+      <div className="admin-layout">
+        {/* Sidebar */}
+        <aside className="admin-sidebar glass">
+          <div className="admin-sidebar__brand" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <div><span className="lime-text">DIVINA</span> ADMIN <span style={{fontSize: '8px', opacity: 0.5}}>v1.2</span></div>
           </div>
@@ -345,5 +360,6 @@ export const AdminLayout: React.FC = () => {
         <Outlet />
       </main>
     </div>
+    </>
   );
 };
