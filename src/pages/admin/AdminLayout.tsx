@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { Outlet, Link, useLocation, NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import './AdminLayout.css';
@@ -147,24 +147,47 @@ export const AdminLayout: React.FC = () => {
     navigate('/admin/login');
   };
 
+  useLayoutEffect(() => {
+    // Aplicamos exactamente el fix que funcionó en consola directamente al DOM
+    const applyScrollFix = () => {
+      document.documentElement.style.overflowY = 'auto';
+      document.documentElement.style.height = 'auto';
+      document.body.style.overflowY = 'auto';
+      document.body.style.height = 'auto';
+      
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.height = 'auto';
+        root.style.overflow = 'visible';
+      }
+
+      const adminMain = document.querySelector('.admin-main') as HTMLElement;
+      if (adminMain) {
+        adminMain.style.cssText = 'flex:1;min-width:0;height:auto;overflow:visible;';
+      }
+    };
+
+    // Aplicar inmediatamente y también después de un pequeño retraso por si React re-renderiza
+    applyScrollFix();
+    const timeoutId = setTimeout(applyScrollFix, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.documentElement.style.overflowY = '';
+      document.documentElement.style.height = '';
+      document.body.style.overflowY = '';
+      document.body.style.height = '';
+      if (document.getElementById('root')) {
+        document.getElementById('root')!.style.height = '';
+        document.getElementById('root')!.style.overflow = '';
+      }
+    };
+  }, [location.pathname]);
+
   if (loading) return null;
 
   return (
     <>
-      <style>{`
-        /* FORZAR SCROLL NATURAL (LO QUE FUNCIONÓ EN CONSOLA) */
-        html, body, #root { 
-          overflow-y: auto !important; 
-          height: auto !important; 
-          min-height: unset !important; 
-        }
-        .admin-main { 
-          flex: 1 !important; 
-          min-width: 0 !important; 
-          height: auto !important; 
-          overflow: visible !important; 
-        }
-      `}</style>
       <div className="admin-layout">
         {/* Sidebar */}
         <aside className="admin-sidebar glass">
