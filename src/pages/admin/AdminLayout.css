@@ -1,28 +1,24 @@
 /* Admin Layout System */
 body:has(.admin-layout), html:has(.admin-layout) { 
-  background: #060606 !important; 
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important; 
-  height: 100vh !important;
-  width: 100vw !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: auto !important;
+  min-height: unset !important;
+  background: #060606 !important;
 }
 
 #root:has(.admin-layout) {
-  height: 100vh !important;
-  width: 100vw !important;
-  overflow: hidden !important;
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
   display: flex;
 }
 
 .admin-layout {
   display: flex;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
+  min-height: 100vh;
+  width: 100%;
+  overflow: visible;
 }
 
 /* Sidebar */
@@ -33,6 +29,8 @@ body:has(.admin-layout), html:has(.admin-layout) {
   display: flex;
   flex-direction: column;
   padding: 10px 8px;
+  position: sticky;
+  top: 0;
   height: 100vh;
   overflow-y: auto;
   flex-shrink: 0;
@@ -172,13 +170,12 @@ body:has(.admin-layout), html:has(.admin-layout) {
   background: rgba(255,100,100,0.1);
 }
 
-/* Main Area — internal scroll */
+/* Main Area — Natural Scroll */
 .admin-main {
   flex: 1;
   min-width: 0;
-  height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  height: auto !important;
+  overflow: visible !important;
   background: #060606;
 }
 
@@ -231,14 +228,15 @@ body:has(.admin-layout), html:has(.admin-layout) {
   
   .admin-sidebar {
     width: 100%;
-    height: 250px;
+    height: auto;
+    position: static;
     border-right: none;
     border-bottom: 1px solid rgba(255,255,255,0.08);
   }
   
   .admin-main {
     flex: 1;
-    height: calc(100vh - 250px);
+    height: auto !important;
   }
 
   .admin-table th, .admin-table td {
