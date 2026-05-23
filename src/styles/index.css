@@ -256,39 +256,3 @@ h4, h5, h6 { font-family: var(--f-sub); }
   .section { padding-block: 52px; }
   .section-sm { padding-block: 32px; }
 }
-/* ─── Admin scroll fix ──────────────────────────────────── */
-/* El scroll es del html/body (natural de página).
-   El sidebar usa position:sticky para quedarse fijo. */
-html:has(.admin-layout) {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  height: auto !important;
-}
-
-body:has(.admin-layout) {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  height: auto !important;
-  min-height: unset !important;
-}
-
-#root:has(.admin-layout) {
-  height: auto !important;
-  overflow: visible !important;
-  min-height: 100vh !important;
-}
-
-/* Estas reglas ganan sobre AdminLayout.css gracias a !important */
-.admin-layout {
-  display: flex !important;
-  min-height: 100vh !important;
-  height: auto !important;
-  overflow: visible !important;
-}
-
-.admin-main {
-  flex: 1 !important;
-  min-width: 0 !important;
-  height: auto !important;
-  overflow: visible !important;
-}
