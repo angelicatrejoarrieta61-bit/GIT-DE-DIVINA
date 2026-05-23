@@ -153,115 +153,218 @@
   .product-page__name { font-size: 26px; }
 }
 /* ============================================================
-   ProductPage — Nanotecnología de Información
-   Tema oscuro Divina Store MX
-   Pegar al FINAL de: src/pages/ProductPage.css
+   ProductPage — Nanotecnología Semántica PRO
+   Tema: Dark Futurista / High-End Skincare
+   REEMPLAZA el contenido anterior del CSS semántico
    ============================================================ */
 
 /* ── Breadcrumb ── */
-.pp-breadcrumb { margin-bottom: 24px; }
+.pp-breadcrumb { margin-bottom: 32px; }
 .pp-breadcrumb ol {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: 4px; list-style: none; padding: 0; margin: 0;
-  font-size: 13px; color: rgba(255,255,255,0.4);
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.25);
 }
-.pp-breadcrumb a { color: inherit; text-decoration: none; }
+.pp-breadcrumb a { color: inherit; text-decoration: none; transition: color 0.2s; }
 .pp-breadcrumb a:hover { color: var(--c-lime); }
-.pp-breadcrumb__sep { opacity: 0.3; margin: 0 2px; }
-.pp-breadcrumb__current { color: rgba(255,255,255,0.85); font-weight: 500; }
+.pp-breadcrumb__sep { margin: 0 6px; opacity: 0.2; }
+.pp-breadcrumb__current { color: rgba(255,255,255,0.6); }
 
 /* ── Routine badge ── */
 .pp-routine-badge {
-  display: inline-block; font-size: 11px; font-weight: 600;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 4px 12px; border-radius: 20px;
-  background: rgba(185,255,0,0.12); color: var(--c-lime);
-  border: 1px solid rgba(185,255,0,0.25); margin-bottom: 8px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 2px; margin-bottom: 12px;
+  background: rgba(185,255,0,0.08);
+  color: var(--c-lime);
+  border: 1px solid rgba(185,255,0,0.2);
+  position: relative; overflow: hidden;
+}
+.pp-routine-badge::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--c-lime);
+  box-shadow: 0 0 8px var(--c-lime);
 }
 
 /* ── Trust badges ── */
-.pp-trust-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.pp-trust-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .pp-badge {
-  font-size: 11px; font-weight: 500; padding: 3px 10px;
-  border-radius: 20px; border: 1px solid transparent;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 2px; border: 1px solid transparent;
+  display: inline-flex; align-items: center; gap: 5px;
 }
-.pp-badge--green  { background: rgba(46,204,113,0.1); color: #5ddc8e; border-color: rgba(46,204,113,0.25); }
-.pp-badge--blue   { background: rgba(100,150,255,0.1); color: #7aaeff; border-color: rgba(100,150,255,0.25); }
-.pp-badge--neutral { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.12); }
+.pp-badge--green {
+  background: rgba(46,204,113,0.07); color: #4ddb8a;
+  border-color: rgba(46,204,113,0.2);
+}
+.pp-badge--blue {
+  background: rgba(100,150,255,0.07); color: #7aaeff;
+  border-color: rgba(100,150,255,0.2);
+}
+.pp-badge--neutral {
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4);
+  border-color: rgba(255,255,255,0.08);
+}
 
-/* ── Section label + chips ── */
+/* ── Section label ── */
 .pp-section-label {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 0 0 8px 0;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(255,255,255,0.25); margin: 0 0 10px 0;
 }
-.pp-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-.pp-chip { font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
-.pp-chip--skin    { background: rgba(255,210,100,0.1); color: #f5c842; border: 1px solid rgba(255,210,100,0.2); }
-.pp-chip--concern { background: rgba(150,100,255,0.1); color: #b58aff; border: 1px solid rgba(150,100,255,0.2); }
+
+/* ── Chips ── */
+.pp-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.pp-chip {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+  padding: 5px 14px; border-radius: 2px;
+}
+.pp-chip--skin {
+  background: rgba(255,200,80,0.07); color: #ffc850;
+  border: 1px solid rgba(255,200,80,0.18);
+}
+.pp-chip--concern {
+  background: rgba(160,120,255,0.07); color: #c0a0ff;
+  border: 1px solid rgba(160,120,255,0.18);
+}
+
+/* ── Divisor de secciones ── */
+.pp-section-divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, rgba(185,255,0,0.15), rgba(255,255,255,0.04) 60%, transparent);
+  margin: 56px 0 0;
+}
 
 /* ── Section titles ── */
 .pp-section-title {
-  font-size: 18px; font-weight: 700; margin: 48px 0 20px;
-  padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
-  letter-spacing: -0.01em; color: var(--c-white);
+  font-family: var(--f-heading);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  margin: 0 0 28px;
+  padding: 20px 0 0;
+  display: flex; align-items: center; gap: 12px;
+}
+.pp-section-title::before {
+  content: '';
+  display: inline-block; width: 24px; height: 1px;
+  background: var(--c-lime);
+  box-shadow: 0 0 6px var(--c-lime);
 }
 
 /* ── Ingredientes ── */
 .pp-ingredients__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
 }
 .pp-ingredient-card {
-  padding: 16px; border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px; background: rgba(255,255,255,0.03);
-  transition: border-color 0.15s;
+  padding: 20px 22px;
+  background: #0c0c0c;
+  transition: background 0.2s;
+  position: relative;
 }
-.pp-ingredient-card:hover { border-color: var(--c-lime); }
+.pp-ingredient-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 22px; right: 22px; height: 1px;
+  background: rgba(255,255,255,0.04);
+}
+.pp-ingredient-card:hover { background: rgba(185,255,0,0.03); }
+.pp-ingredient-card:hover .pp-ingredient-card__name { color: var(--c-lime); }
+
 .pp-ingredient-card__header {
-  display: flex; align-items: baseline;
+  display: flex; align-items: center;
   justify-content: space-between; gap: 8px; margin-bottom: 4px;
 }
-.pp-ingredient-card__name { font-size: 14px; font-weight: 600; color: var(--c-white); }
-.pp-ingredient-card__pct {
-  font-size: 11px; font-weight: 700; padding: 2px 8px;
-  border-radius: 20px; background: var(--c-lime); color: #000; white-space: nowrap;
+.pp-ingredient-card__name {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--c-white); transition: color 0.2s;
 }
-.pp-ingredient-card__aka { font-size: 11px; color: rgba(255,255,255,0.35); margin: 0 0 6px; }
-.pp-ingredient-card__benefit { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.5; margin: 0; }
+.pp-ingredient-card__pct {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+  padding: 2px 8px; border-radius: 2px;
+  background: var(--c-lime); color: #000;
+  white-space: nowrap; flex-shrink: 0;
+}
+.pp-ingredient-card__aka {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.2); margin: 0 0 8px;
+}
+.pp-ingredient-card__benefit {
+  font-size: 13px; line-height: 1.6;
+  color: rgba(255,255,255,0.45); margin: 0;
+}
 
 /* ── Cómo usar ── */
 .pp-how-to-use__text {
-  font-size: 15px; line-height: 1.75;
-  color: rgba(255,255,255,0.55); max-width: 680px;
+  font-size: 14px; line-height: 1.9;
+  color: rgba(255,255,255,0.45); max-width: 640px;
+  padding: 20px 24px;
+  border-left: 1px solid rgba(185,255,0,0.2);
+  background: rgba(185,255,0,0.02);
+  border-radius: 0 4px 4px 0;
 }
 
 /* ── FAQ ── */
 .pp-faq__list {
-  display: flex; flex-direction: column; gap: 0;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px; overflow: hidden; max-width: 760px;
+  display: flex; flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px; overflow: hidden;
+  max-width: 720px;
 }
-.pp-faq__item { border-bottom: 1px solid rgba(255,255,255,0.08); }
+.pp-faq__item { border-bottom: 1px solid rgba(255,255,255,0.05); }
 .pp-faq__item:last-child { border-bottom: none; }
+
 .pp-faq__question {
   width: 100%; display: flex; align-items: center;
-  justify-content: space-between; gap: 12px; padding: 16px 20px;
+  justify-content: space-between; gap: 16px;
+  padding: 18px 24px;
   background: none; border: none; cursor: pointer;
-  font-size: 14px; font-weight: 500; color: var(--c-white);
-  text-align: left; transition: background 0.15s;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.65); text-align: left;
+  transition: all 0.2s;
 }
-.pp-faq__question:hover { background: rgba(255,255,255,0.04); }
-.pp-faq__question--open { background: rgba(255,255,255,0.04); }
-.pp-faq__answer { padding: 0 20px 16px; background: rgba(255,255,255,0.04); }
-.pp-faq__answer p { font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.55); margin: 0; }
+.pp-faq__question:hover {
+  background: rgba(255,255,255,0.02);
+  color: var(--c-white);
+}
+.pp-faq__question--open {
+  background: rgba(185,255,0,0.03);
+  color: var(--c-white);
+}
+.pp-faq__question--open .pp-faq__icon { color: var(--c-lime); }
+
+.pp-faq__icon {
+  flex-shrink: 0; width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 50%;
+  color: rgba(255,255,255,0.3); transition: all 0.2s;
+}
+.pp-faq__question--open .pp-faq__icon {
+  border-color: rgba(185,255,0,0.3);
+  background: rgba(185,255,0,0.08);
+}
+
+.pp-faq__answer {
+  padding: 0 24px 18px 24px;
+  background: rgba(185,255,0,0.02);
+}
+.pp-faq__answer p {
+  font-size: 13px; line-height: 1.75;
+  color: rgba(255,255,255,0.4); margin: 0;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  padding-top: 14px;
+}
 
 /* ── Mobile ── */
 @media (max-width: 640px) {
-  .pp-ingredients__grid { grid-template-columns: 1fr 1fr; }
-  .pp-section-title { font-size: 16px; margin-top: 36px; }
-}
-@media (max-width: 400px) {
   .pp-ingredients__grid { grid-template-columns: 1fr; }
+  .pp-section-title { font-size: 11px; }
+  .pp-how-to-use__text { font-size: 13px; }
 }
 
