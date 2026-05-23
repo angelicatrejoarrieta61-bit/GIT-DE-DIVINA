@@ -3,20 +3,15 @@ body:has(.admin-layout) { background: #060606; }
 
 .admin-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden; /* solo el layout, no el contenido */
 }
 
 /* Sidebar */
 .admin-sidebar {
-  width: 280px;
-  background: rgba(10,10,10,0.8);
-  border-right: 1px solid rgba(255,255,255,0.08);
-  display: flex;
-  flex-direction: column;
-  padding: 10px 8px;
-  position: sticky;
-  top: 0;
   height: 100vh;
+  overflow-y: auto; /* sidebar también scrolleable si tiene muchos links */
+  flex-shrink: 0;
 }
 
 .admin-sidebar__brand {
@@ -155,9 +150,9 @@ body:has(.admin-layout) { background: #060606; }
 /* Main Area */
 .admin-main {
   flex: 1;
-  padding: 48px;
-  max-width: 1200px;
-  margin: 0 auto;
+  height: 100vh;
+  overflow-y: auto; /* ← ESTE ES EL FIX — sin esto no hay scroll */
+  overflow-x: hidden;
 }
 
 /* Admin generic components */

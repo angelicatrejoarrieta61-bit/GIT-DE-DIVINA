@@ -192,7 +192,14 @@ export const createOrder = async (order: Omit<Order, 'id' | 'created_at'>): Prom
   if (error) { console.error(error); return null; }
   return data;
 };
-
+export const deleteUnpaidOrders = async (): Promise<boolean> => {
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .not('status', 'in', '("paid","shipped","delivered")');
+  if (error) { console.error('[deleteUnpaidOrders]', error); return false; }
+  return true;
+};
 export const getOrders = async (): Promise<Order[]> => {
   const { data } = await supabase
     .from('orders')
