@@ -257,11 +257,18 @@ h4, h5, h6 { font-family: var(--f-sub); }
   .section-sm { padding-block: 32px; }
 }
 /* ─── Admin scroll fix ──────────────────────────────────── */
-body:has(.admin-layout) {
-  overflow: hidden;
+html:has(.admin-main),
+body:has(.admin-main) {
+  overflow: hidden !important;
+  height: 100% !important;
 }
 
-body:has(.admin-layout) .admin-main {
-  overflow-y: scroll;
-  height: 100vh;
+.admin-main {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  min-height: 0 !important;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
