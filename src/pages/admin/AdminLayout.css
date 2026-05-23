@@ -3,8 +3,8 @@ body:has(.admin-layout) { background: #060606; }
 
 .admin-layout {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  /* SIN overflow:hidden ni height fija — el scroll lo hace html/body */
 }
 
 /* Sidebar */
@@ -153,15 +153,12 @@ body:has(.admin-layout) { background: #060606; }
   background: rgba(255,100,100,0.1);
 }
 
-/* Main Area */
+/* Main Area — scroll natural de página, NO scroll interno */
 .admin-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  height: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 /* Admin generic components */
