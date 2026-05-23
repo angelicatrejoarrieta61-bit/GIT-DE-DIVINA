@@ -4,7 +4,8 @@ body:has(.admin-layout) { background: #060606; }
 .admin-layout {
   display: flex;
   height: 100vh;
-  overflow: hidden; /* solo el layout, no el contenido */
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -150,9 +151,11 @@ body:has(.admin-layout) { background: #060606; }
 /* Main Area */
 .admin-main {
   flex: 1;
+  min-width: 0;
   height: 100vh;
-  overflow-y: auto; /* ← ESTE ES EL FIX — sin esto no hay scroll */
+  overflow-y: auto !important;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Admin generic components */
