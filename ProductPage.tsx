@@ -79,10 +79,12 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         aria-expanded={open}
       >
         <span itemProp="name">{item.q}</span>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"
-          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+       <span className="pp-faq__icon">
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"
+    style={{ transform: open ? 'rotate(45deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+    <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+</span>
       </button>
       {open && (
         <div className="pp-faq__answer" itemScope itemType="https://schema.org/Answer">
