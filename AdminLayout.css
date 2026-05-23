@@ -3,16 +3,19 @@ body:has(.admin-layout) { background: #060606; }
 
 .admin-layout {
   display: flex;
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow: visible;
 }
 
 /* Sidebar */
 .admin-sidebar {
-  height: 100vh;
-  overflow-y: auto; /* sidebar también scrolleable si tiene muchos links */
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: hidden;
+  overflow-x: hidden;
 }
 
 .admin-sidebar__brand {
@@ -111,24 +114,10 @@ body:has(.admin-layout) { background: #060606; }
   background: rgba(196, 252, 21, 0.15);
 }
 
-.admin-tree {
-  margin: 0;
-}
-
-.admin-tree summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.admin-tree summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-tree__children {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
+.admin-tree { margin: 0; }
+.admin-tree summary { list-style: none; cursor: pointer; }
+.admin-tree summary::-webkit-details-marker { display: none; }
+.admin-tree__children { display: flex; flex-direction: column; gap: 0; }
 
 .admin-sidebar__logout {
   padding: 6px;
@@ -152,10 +141,7 @@ body:has(.admin-layout) { background: #060606; }
 .admin-main {
   flex: 1;
   min-width: 0;
-  height: 100vh;
-  overflow-y: auto !important;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 /* Admin generic components */

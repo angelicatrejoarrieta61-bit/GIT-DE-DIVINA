@@ -12,7 +12,6 @@ export const AdminLayout: React.FC = () => {
   const currentSection = query.get('section') || '';
   const currentPart = query.get('part') || '';
 
-  // Auth check
   useEffect(() => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
@@ -28,17 +27,6 @@ export const AdminLayout: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Fix scroll bloqueado por Tailwind preflight en html/body
-  useEffect(() => {
-    document.documentElement.style.overflowY = 'auto';
-    document.body.style.overflowY = 'auto';
-    return () => {
-      document.documentElement.style.overflowY = '';
-      document.body.style.overflowY = '';
-    };
-  }, []);
-
-  // Custom sections
   useEffect(() => {
     const loadCustomSections = async () => {
       const { data } = await supabase.from('store_config').select('value').eq('key', 'admin_custom_sections').maybeSingle();
@@ -91,10 +79,8 @@ export const AdminLayout: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div className="admin-layout" style={{ display: 'flex', minHeight: '100vh', background: '#060606' }}>
-
-      {/* Sidebar — sin scroll, altura natural */}
-      <aside className="admin-sidebar glass" style={{ flexShrink: 0, overflow: 'visible' }}>
+    <div className="admin-layout">
+      <aside className="admin-sidebar glass">
         <div className="admin-sidebar__brand">
           <span className="lime-text">DIVINA</span> ADMIN
         </div>
@@ -173,11 +159,9 @@ export const AdminLayout: React.FC = () => {
         </button>
       </aside>
 
-      {/* Main — scroll natural de la página completa */}
-      <main className="admin-main" style={{ flex: 1, minWidth: 0, overflow: 'visible' }}>
+      <main className="admin-main">
         <Outlet />
       </main>
-
     </div>
   );
 };
