@@ -256,3 +256,12 @@ h4, h5, h6 { font-family: var(--f-sub); }
   .section { padding-block: 52px; }
   .section-sm { padding-block: 32px; }
 }
+/* ─── Admin scroll fix ──────────────────────────────────── */
+body:has(.admin-layout) {
+  overflow: hidden;
+}
+
+body:has(.admin-layout) .admin-main {
+  overflow-y: scroll;
+  height: 100vh;
+}
