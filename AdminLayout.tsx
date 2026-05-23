@@ -12,7 +12,6 @@ export const AdminLayout: React.FC = () => {
   const currentSection = query.get('section') || '';
   const currentPart = query.get('part') || '';
 
-  // Check auth
   useEffect(() => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
@@ -70,21 +69,11 @@ export const AdminLayout: React.FC = () => {
     let key = base;
     let i = 2;
     const existing = new Set([
-      'home',
-      'inicio',
-      'cremas-faciales',
-      'limpiadores',
-      'fotoprotectores',
-      'grooming',
-      'catalogo',
-      'quienes-somos',
-      'contacto',
+      'home', 'inicio', 'cremas-faciales', 'limpiadores',
+      'fotoprotectores', 'grooming', 'catalogo', 'quienes-somos', 'contacto',
       ...customSections.map((s) => s.key),
     ]);
-    while (existing.has(key)) {
-      key = `${base}-${i}`;
-      i += 1;
-    }
+    while (existing.has(key)) { key = `${base}-${i}`; i += 1; }
     await persistCustomSections([...customSections, { key, label: clean }]);
   };
 
@@ -96,9 +85,26 @@ export const AdminLayout: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div className="admin-layout">
+    <div
+      className="admin-layout"
+      style={{
+        display: 'flex',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+        background: '#060606',
+      }}
+    >
       {/* Sidebar */}
-      <aside className="admin-sidebar glass">
+      <aside
+        className="admin-sidebar glass"
+        style={{
+          height: '100vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          flexShrink: 0,
+        }}
+      >
         <div className="admin-sidebar__brand">
           <span className="lime-text">DIVINA</span> ADMIN
         </div>
@@ -176,8 +182,18 @@ export const AdminLayout: React.FC = () => {
         </button>
       </aside>
 
-      {/* Main Content */}
-      <main className="admin-main">
+      {/* Main Content — inline styles ganan a cualquier CSS global o Tailwind */}
+      <main
+        className="admin-main"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          height: '100vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         <Outlet />
       </main>
     </div>
