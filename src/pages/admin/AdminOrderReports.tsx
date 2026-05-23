@@ -182,7 +182,7 @@ export const AdminOrderReports: React.FC = () => {
   );
 
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 1200, margin: '0 auto', overflowY: 'auto', minHeight: 0 }}>
+<div style={{ padding: '28px 24px', maxWidth: 1200, margin: '0 auto', minHeight: '101vh' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 28 }}>
         <div>
           <h2 style={{ fontSize: 22, color: 'var(--c-lime)', marginBottom: 6 }}>📊 Reportes de Pedidos y Clientes</h2>
