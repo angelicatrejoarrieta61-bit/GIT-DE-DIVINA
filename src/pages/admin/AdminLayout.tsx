@@ -72,22 +72,7 @@ export const AdminLayout: React.FC = () => {
     void loadHomeOrder();
   }, []);
 
-  // Force scroll fix logic that we know works
-  useEffect(() => {
-    document.documentElement.style.overflowY = 'auto';
-    document.body.style.overflowY = 'auto';
 
-    const mainElement = document.querySelector('.admin-main') as HTMLElement;
-    if (mainElement) {
-      mainElement.style.cssText = 'flex:1;min-width:0;height:auto;overflow:visible;';
-    }
-
-    return () => {
-      // Clean up styles when leaving the admin layout
-      document.documentElement.style.overflowY = '';
-      document.body.style.overflowY = '';
-    };
-  }, [location.pathname]);
 
 
 
@@ -165,9 +150,9 @@ export const AdminLayout: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div className="admin-layout">
+    <div className="admin-layout" style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0 }}>
       {/* Sidebar */}
-      <aside className="admin-sidebar glass">
+      <aside className="admin-sidebar glass" style={{ width: 250, height: '100vh', overflowY: 'auto', flexShrink: 0 }}>
         <div className="admin-sidebar__brand" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <div><span className="lime-text">DIVINA</span> ADMIN <span style={{fontSize: '8px', opacity: 0.5}}>v1.2</span></div>
@@ -356,7 +341,7 @@ export const AdminLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="admin-main">
+      <main className="admin-main" style={{ flex: 1, height: '100vh', overflowY: 'auto', overflowX: 'hidden' }}>
         <Outlet />
       </main>
     </div>
