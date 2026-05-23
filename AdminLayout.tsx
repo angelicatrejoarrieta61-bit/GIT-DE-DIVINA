@@ -46,6 +46,15 @@ export const AdminLayout: React.FC = () => {
     };
     void loadCustomSections();
   }, []);
+  useEffect(() => {
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.overflowY = 'auto';
+  
+  return () => {
+    document.documentElement.style.overflowY = '';
+    document.body.style.overflowY = '';
+  };
+}, []);
 
   const persistCustomSections = async (next: Array<{ key: string; label: string }>) => {
     setCustomSections(next);
@@ -184,16 +193,14 @@ export const AdminLayout: React.FC = () => {
 
       {/* Main Content — inline styles ganan a cualquier CSS global o Tailwind */}
       <main
-        className="admin-main"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          height: '100vh',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
+  className="admin-main"
+  style={{
+    flex: 1,
+    minWidth: 0,
+    height: 'auto',
+    overflow: 'visible',
+  }}
+>
         <Outlet />
       </main>
     </div>
