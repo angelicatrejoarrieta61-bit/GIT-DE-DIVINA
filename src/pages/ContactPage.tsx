@@ -180,10 +180,10 @@ export const ContactPage: React.FC = () => {
                 <h3 style={{ fontSize: 28, color: 'var(--c-lime)', fontFamily: 'var(--f-heading)', marginBottom: 12 }}>¡Mensaje Enviado!</h3>
                 {form.register ? (
                   <>
-                    <p style={{ color: '#aaa', fontSize: 15, marginBottom: 20 }}>Gracias por registrarte. Utiliza este cupón en tu próxima compra:</p>
+                    <p style={{ color: '#aaa', fontSize: 15, marginBottom: 20 }}>Gracias por registrarte. ¡Utiliza este cupón en tu próxima compra!</p>
                     <div className="contact-form__coupon">
                       <p>CUPÓN DE 10% DE DESCUENTO</p>
-                      <h4>DIVINA10</h4>
+                      <h4>DESCUENTO202610</h4>
                     </div>
                   </>
                 ) : (
@@ -213,9 +213,18 @@ export const ContactPage: React.FC = () => {
                   <label htmlFor="email">Correo electrónico</label>
                   <input id="email" type="email" className="input-dark" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
                 </div>
-                <label className="contact-form__register">
-                  <input type="checkbox" checked={form.register} onChange={e => setForm({ ...form, register: e.target.checked })} />
-                  <span>¿Deseas registrarte para nuestras promociones y un descuento del 10%?</span>
+                <label className="contact-form__register" htmlFor="contact-register-check">
+                  <input
+                    id="contact-register-check"
+                    type="checkbox"
+                    checked={form.register}
+                    onChange={e => setForm({ ...form, register: e.target.checked })}
+                    style={{ accentColor: '#c4fc15', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
+                  />
+                  <span>
+                    ¿Deseas registrarte para nuestras promociones y un <strong style={{ color: 'var(--c-lime)' }}>descuento del 10%</strong>?{' '}
+                    <span style={{ display: 'inline-block', background: 'var(--c-lime)', color: '#000', padding: '1px 6px', borderRadius: '4px', fontWeight: 900, letterSpacing: '1.5px', fontSize: 11 }}>DESCUENTO202610</span>
+                  </span>
                 </label>
                 <div className="contact-form__field">
                   <label htmlFor="message">Continuar con la duda o pregunta</label>

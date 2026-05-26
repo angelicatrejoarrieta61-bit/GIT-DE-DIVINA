@@ -110,13 +110,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
             {showCoupon ? (
               <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <div style={{ fontSize: 26, marginBottom: 6 }}>✅</div>
                 <h3 style={{ color: '#000', marginBottom: 8, fontSize: 14 }}>¡MENSAJE ENVIADO!</h3>
                 {form.register ? (
                   <>
-                    <p style={{ color: '#555', fontSize: 11, marginBottom: 10 }}>Gracias por registrarte. Usa este cupón:</p>
-                    <div style={{ background: 'var(--c-lime)', color: '#000', padding: '8px', borderRadius: '4px', fontWeight: 900, letterSpacing: '1px', fontSize: 14 }}>
-                      DIVINA10
+                    <p style={{ color: '#555', fontSize: 11, marginBottom: 10 }}>Gracias por registrarte. ¡Usa este cupón en tu próxima compra!</p>
+                    <div style={{ background: 'var(--c-lime)', color: '#000', padding: '10px 8px', borderRadius: '6px', fontWeight: 900, letterSpacing: '2px', fontSize: 15, border: '2px dashed rgba(0,0,0,0.2)' }}>
+                      DESCUENTO202610
                     </div>
+                    <p style={{ color: '#666', fontSize: 10, marginTop: 4 }}>10% de descuento en tu próxima compra</p>
                   </>
                 ) : (
                   <p style={{ color: '#555', fontSize: 11 }}>Te contactaremos lo más pronto posible.</p>
@@ -135,9 +137,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                 
                 <textarea placeholder="¿En qué podemos ayudarte?" required rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.2)', background: '#fff', color: '#000', fontSize: 12, resize: 'none' }} />
                 
-                <label style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: 10, color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.register} onChange={e => setForm({ ...form, register: e.target.checked })} style={{ marginTop: 2 }} />
-                  <span>Registrarme para recibir ofertas y 10% de descuento.</span>
+                <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: 11, color: '#000', cursor: 'pointer', padding: '9px 10px', background: 'rgba(196,252,21,0.15)', borderRadius: '7px', border: '1px solid rgba(196,252,21,0.45)' }}>
+                  <input type="checkbox" checked={form.register} onChange={e => setForm({ ...form, register: e.target.checked })} style={{ marginTop: 1, accentColor: '#5c7a00', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }} />
+                  <span>Regístrame para promociones y recibir <strong>10% de descuento</strong>{' '}<span style={{ display: 'inline-block', background: '#000', color: '#c4fc15', padding: '1px 5px', borderRadius: '3px', fontWeight: 900, letterSpacing: '1px', fontSize: 10 }}>DESCUENTO202610</span></span>
                 </label>
 
                 <button type="submit" style={{ background: '#000', color: 'var(--c-lime)', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 800, fontSize: 12, letterSpacing: '0.5px', cursor: 'pointer', marginTop: 4 }}>

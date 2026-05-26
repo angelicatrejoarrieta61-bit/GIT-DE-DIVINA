@@ -22,6 +22,7 @@ import { AdminOrderReports } from './pages/admin/AdminOrderReports';
 import { AdminMessages } from './pages/admin/AdminMessages';
 import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
+import { FloatingContactBubble } from './components/FloatingContactBubble';
 
 function RouteRedirector() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
       <main>{children}</main>
       <Footer />
       <CartDrawer />
+      <FloatingContactBubble />
     </StoreThemeProvider>
   );
 }
