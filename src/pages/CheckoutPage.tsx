@@ -388,16 +388,41 @@ export const CheckoutPage: React.FC = () => {
                 </div>
 
                 <div className="checkout-field full" style={{ marginTop: 4 }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textTransform: 'none', fontSize: 12, color: '#aaa', fontWeight: 400 }}>
-                    <input
-                      type="checkbox"
-                      name="accepts_marketing"
-                      checked={form.accepts_marketing}
-                      onChange={e => setForm(prev => ({ ...prev, accepts_marketing: e.target.checked }))}
-                      style={{ width: 15, height: 15, accentColor: 'var(--c-lime)', marginTop: 2, flexShrink: 0 }}
-                    />
-                    <span>Quiero recibir ofertas exclusivas, descuentos y novedades de Divina Store MX. Puedo darme de baja en cualquier momento.</span>
-                  </label>
+                  <div 
+                    onClick={() => setForm(prev => ({ ...prev, accepts_marketing: !prev.accepts_marketing }))}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <div 
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '4px',
+                        border: '2px solid var(--c-lime)',
+                        background: form.accepts_marketing ? 'var(--c-lime)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0,
+                        color: '#000',
+                        fontWeight: 900,
+                        fontSize: '11px',
+                        lineHeight: '1',
+                        marginTop: 2
+                      }}
+                    >
+                      {form.accepts_marketing && '✓'}
+                    </div>
+                    <span style={{ fontSize: 12, color: '#aaa', fontWeight: 400, lineHeight: '1.4' }}>
+                      Quiero recibir ofertas exclusivas, descuentos y novedades de Divina Store MX. Puedo darme de baja en cualquier momento.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
