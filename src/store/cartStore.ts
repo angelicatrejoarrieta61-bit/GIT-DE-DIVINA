@@ -13,6 +13,14 @@ interface CartStore {
   closeCart: () => void;
   total: () => number;
   itemCount: () => number;
+  
+  // Coupon state
+  couponCode: string | null;
+  discountPercentage: number;
+  applyCoupon: (code: string) => boolean;
+  removeCoupon: () => void;
+  discountAmount: () => number;
+  totalAfterDiscount: () => number;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -20,6 +28,8 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       isOpen: false,
+      couponCode: null,
+      discountPercentage: 0,
 
       addItem: (product, variant) => {
         const items = get().items;
@@ -55,7 +65,7 @@ export const useCartStore = create<CartStore>()(
         });
       },
 
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], couponCode: null, discountPercentage: 0 }),
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
 
@@ -64,6 +74,29 @@ export const useCartStore = create<CartStore>()(
 
       itemCount: () =>
         get().items.reduce((sum, i) => sum + i.quantity, 0),
+
+      applyCoupon: (code: string) => {
+        const cleanCode = code.trim().toUpperCase();
+        if (cleanCode === 'DESCUENTO202610') {
+          set({ couponCode: cleanCode, discountPercentage: 10 });
+          return true;
+        }
+        return false;
+      },
+
+      removeCoupon: () => {
+        set({ couponCode: null, discountPercentage: 0 });
+      },
+
+      discountAmount: () => {
+        const pct = get().discountPercentage;
+        if (pct <= 0) return 0;
+        return get().total() * (pct / 100);
+      },
+
+      totalAfterDiscount: () => {
+        return get().total() - get().discountAmount();
+      },
     }),
     { name: 'divina-cart' }
   )

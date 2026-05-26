@@ -14,13 +14,21 @@ export const CartDrawer: React.FC = () => {
     closeCart,
     removeItem,
     updateQty,
-    total
+    total,
+    couponCode,
+    discountPercentage,
+    applyCoupon,
+    removeCoupon,
+    discountAmount,
+    totalAfterDiscount
   } = useCartStore();
   const navigate = useNavigate();
 
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [footerImg, setFooterImg] = useState<string | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -31,6 +39,18 @@ export const CartDrawer: React.FC = () => {
     };
     fetchConfig();
   }, []);
+
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError('');
+    if (!couponInput.trim()) return;
+    const success = applyCoupon(couponInput);
+    if (success) {
+      setCouponInput('');
+    } else {
+      setCouponError('Código no válido');
+    }
+  };
 
   const cartTotal = total();
 
@@ -121,11 +141,49 @@ export const CartDrawer: React.FC = () => {
         {/* Footer */}
         {items.length > 0 && (
           <div className="cart-drawer__footer">
-            
-            <div className="cart-drawer__total-row">
-              <span>Total:</span>
-              <span>{formatCurrency(cartTotal)}</span>
+            {/* Sección de Cupón */}
+            <div className="cart-drawer__coupon-container">
+              {couponCode ? (
+                <div className="cart-drawer__coupon-applied">
+                  <span className="coupon-tag">🏷️ {couponCode} (-{discountPercentage}%)</span>
+                  <button onClick={removeCoupon} className="coupon-remove-btn" title="Eliminar cupón">✕</button>
+                </div>
+              ) : (
+                <form onSubmit={handleApplyCoupon} className="cart-drawer__coupon-form">
+                  <input
+                    type="text"
+                    placeholder="Código de descuento"
+                    value={couponInput}
+                    onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
+                    className="cart-drawer__coupon-input"
+                  />
+                  <button type="submit" className="cart-drawer__coupon-btn">Aplicar</button>
+                </form>
+              )}
+              {couponError && <p className="cart-drawer__coupon-error">{couponError}</p>}
             </div>
+
+            {couponCode ? (
+              <>
+                <div className="cart-drawer__row-item">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(cartTotal)}</span>
+                </div>
+                <div className="cart-drawer__row-item discount">
+                  <span>Descuento (10%):</span>
+                  <span>-{formatCurrency(discountAmount())}</span>
+                </div>
+                <div className="cart-drawer__total-row" style={{ marginTop: 4, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10 }}>
+                  <span>Total:</span>
+                  <span>{formatCurrency(totalAfterDiscount())}</span>
+                </div>
+              </>
+            ) : (
+              <div className="cart-drawer__total-row">
+                <span>Total:</span>
+                <span>{formatCurrency(cartTotal)}</span>
+              </div>
+            )}
             
             <button 
               onClick={handleCheckout} 

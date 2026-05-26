@@ -59,13 +59,39 @@ const MEXICAN_STATES = [
 ];
 
 export const CheckoutPage: React.FC = () => {
-  const { items, total, clearCart } = useCartStore();
-  const cartTotal = total();
+  const {
+    items,
+    total,
+    clearCart,
+    couponCode,
+    discountPercentage,
+    applyCoupon,
+    removeCoupon,
+    discountAmount,
+    totalAfterDiscount
+  } = useCartStore();
+
+  const finalTotal = couponCode ? totalAfterDiscount() : total();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [config, setConfig] = useState<Record<string, string>>({});
   const sdkCardRef = useRef<any>(null);
+
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError('');
+    if (!couponInput.trim()) return;
+    const success = applyCoupon(couponInput);
+    if (success) {
+      setCouponInput('');
+    } else {
+      setCouponError('Código no válido');
+    }
+  };
 
   const [form, setForm] = useState({
     name: '',
@@ -123,7 +149,7 @@ export const CheckoutPage: React.FC = () => {
         const card = clip.element.create('Card', {
           locale: 'es',
           theme: 'light',
-          amount: cartTotal, // ← FIX: propiedad correcta
+          amount: finalTotal, // ← FIX: propiedad correcta
         });
         card.mount('clip-card-container');
         sdkCardRef.current = card;
@@ -136,7 +162,7 @@ export const CheckoutPage: React.FC = () => {
 
     initClip();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartTotal]);
+  }, [finalTotal]);
 
   // ── ZIP AUTOCOMPLETE ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,7 +232,7 @@ export const CheckoutPage: React.FC = () => {
         customer_zip: form.zip,
         customer_reference: form.reference,
         items,
-        total: cartTotal,
+        total: finalTotal,
         status: 'pending',
         accepts_marketing: form.accepts_marketing,
       });
@@ -218,7 +244,7 @@ export const CheckoutPage: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: cartTotal,
+          amount: finalTotal,
           orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
           cardTokenId,
@@ -431,7 +457,7 @@ export const CheckoutPage: React.FC = () => {
                 ) : (
                   <>
                     <IconLock />
-                    Pagar ${cartTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                    Pagar ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
                   </>
                 )}
               </button>
@@ -469,10 +495,66 @@ export const CheckoutPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <div className="summary-total-row">
-                <span>TOTAL</span>
-                <span className="total-amount">${cartTotal.toLocaleString('es-MX')} <small>MXN</small></span>
+
+              {/* Sección de Cupón en Checkout */}
+              <div className="checkout-coupon-section" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16, marginBottom: 16 }}>
+                {couponCode ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(196, 252, 21, 0.1)', border: '1px dashed var(--c-lime)', borderRadius: '8px', padding: '10px 12px' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-lime)' }}>🏷️ {couponCode} (-{discountPercentage}%)</span>
+                    <button onClick={removeCoupon} style={{ color: '#ff4444', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', background: 'none', border: 'none' }}>✕</button>
+                  </div>
+                ) : (
+                  <div>
+                    <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="Código de descuento"
+                        value={couponInput}
+                        onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
+                        style={{
+                          flex: 1,
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          color: '#fff',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          outline: 'none',
+                          textTransform: 'uppercase',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <button type="submit" className="btn btn-lime" style={{ padding: '10px 16px', borderRadius: '8px', fontSize: 11, letterSpacing: 'normal', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Aplicar</button>
+                    </form>
+                    {couponError && <p style={{ color: '#ff4444', fontSize: 11, marginTop: 4, marginLeft: 4, fontWeight: 'bold' }}>{couponError}</p>}
+                  </div>
+                )}
               </div>
+
+              {couponCode ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#aaa' }}>
+                    <span>Subtotal</span>
+                    <span>${total().toLocaleString('es-MX')} MXN</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--c-lime)' }}>
+                    <span>Descuento (10%)</span>
+                    <span>-${discountAmount().toLocaleString('es-MX')} MXN</span>
+                  </div>
+                  <div className="summary-total-row" style={{ borderTop: 'none', paddingTop: 0, marginTop: 4 }}>
+                    <span>TOTAL</span>
+                    <span className="total-amount">${finalTotal.toLocaleString('es-MX')} <small>MXN</small></span>
+                  </div>
+                </div>
+              ) : (
+                <div className="summary-total-row">
+                  <span>TOTAL</span>
+                  <span className="total-amount">${total().toLocaleString('es-MX')} <small>MXN</small></span>
+                </div>
+              )}
+
               <div className="checkout-msi-mini">💳 Hasta 12 MSI según tu banco</div>
               <div className="summary-clip-secure">
                 <svg viewBox="0 0 32 14" width="32" height="14">
