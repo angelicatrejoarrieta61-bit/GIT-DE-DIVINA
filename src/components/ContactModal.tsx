@@ -137,10 +137,46 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                 
                 <textarea placeholder="¿En qué podemos ayudarte?" required rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.2)', background: '#fff', color: '#000', fontSize: 12, resize: 'none' }} />
                 
-                <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: 11, color: '#000', cursor: 'pointer', padding: '9px 10px', background: 'rgba(196,252,21,0.15)', borderRadius: '7px', border: '1px solid rgba(196,252,21,0.45)' }}>
-                  <input type="checkbox" checked={form.register} onChange={e => setForm({ ...form, register: e.target.checked })} style={{ marginTop: 1, accentColor: '#5c7a00', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }} />
+                <div 
+                  onClick={() => setForm({ ...form, register: !form.register })}
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'center',
+                    fontSize: 11,
+                    color: '#000',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '9px 10px',
+                    background: 'rgba(196,252,21,0.15)',
+                    borderRadius: '7px',
+                    border: '1px solid rgba(196,252,21,0.45)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div 
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '4px',
+                      border: '2px solid #5c7a00',
+                      background: form.register ? '#5c7a00' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                      color: '#fff',
+                      fontWeight: 900,
+                      fontSize: '11px',
+                      lineHeight: '1'
+                    }}
+                  >
+                    {form.register && '✓'}
+                  </div>
                   <span>Regístrame para promociones y recibir <strong>10% de descuento</strong>{' '}<span style={{ display: 'inline-block', background: '#000', color: '#c4fc15', padding: '1px 5px', borderRadius: '3px', fontWeight: 900, letterSpacing: '1px', fontSize: 10 }}>DESCUENTO202610</span></span>
-                </label>
+                </div>
 
                 <button type="submit" style={{ background: '#000', color: 'var(--c-lime)', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 800, fontSize: 12, letterSpacing: '0.5px', cursor: 'pointer', marginTop: 4 }}>
                   ENVIAR MENSAJE

@@ -213,19 +213,49 @@ export const ContactPage: React.FC = () => {
                   <label htmlFor="email">Correo electrónico</label>
                   <input id="email" type="email" className="input-dark" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
                 </div>
-                <label className="contact-form__register" htmlFor="contact-register-check">
-                  <input
-                    id="contact-register-check"
-                    type="checkbox"
-                    checked={form.register}
-                    onChange={e => setForm({ ...form, register: e.target.checked })}
-                    style={{ accentColor: '#c4fc15', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
-                  />
-                  <span>
+                <div 
+                  onClick={() => setForm({ ...form, register: !form.register })}
+                  className="contact-form__register"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '10px 12px',
+                    background: 'rgba(196, 252, 21, 0.04)',
+                    border: '1px solid rgba(196, 252, 21, 0.2)',
+                    borderRadius: '8px',
+                    margin: '4px 0',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div 
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '4px',
+                      border: '2px solid var(--c-lime)',
+                      background: form.register ? 'var(--c-lime)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                      color: '#000',
+                      fontWeight: 900,
+                      fontSize: '12px',
+                      lineHeight: '1'
+                    }}
+                  >
+                    {form.register && '✓'}
+                  </div>
+                  <span style={{ fontSize: '13px', color: 'var(--c-white)', fontWeight: 500 }}>
                     ¿Deseas registrarte para nuestras promociones y un <strong style={{ color: 'var(--c-lime)' }}>descuento del 10%</strong>?{' '}
-                    <span style={{ display: 'inline-block', background: 'var(--c-lime)', color: '#000', padding: '1px 6px', borderRadius: '4px', fontWeight: 900, letterSpacing: '1.5px', fontSize: 11 }}>DESCUENTO202610</span>
+                    <span style={{ display: 'inline-block', background: 'var(--c-lime)', color: '#000', padding: '1px 6px', borderRadius: '4px', fontWeight: 900, letterSpacing: '1.5px', fontSize: 11, marginLeft: '6px' }}>DESCUENTO202610</span>
                   </span>
-                </label>
+                </div>
                 <div className="contact-form__field">
                   <label htmlFor="message">Continuar con la duda o pregunta</label>
                   <textarea id="message" className="input-dark" rows={4} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} required />
