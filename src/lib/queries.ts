@@ -213,7 +213,7 @@ export const updateOrderStatus = async (id: string, status: Order['status']): Pr
 };
 
 export const deleteAllOrders = async (): Promise<boolean> => {
-  const { error } = await supabase.from('orders').delete().neq('id', '0'); // Supabase requiere un filtro
+  const { error } = await supabase.from('orders').delete().not('id', 'is', null); // Evita error de casteo de UUID
   if (error) { console.error(error); return false; }
   return true;
 };
