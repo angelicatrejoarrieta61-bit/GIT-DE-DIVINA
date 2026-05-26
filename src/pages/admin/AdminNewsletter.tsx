@@ -456,6 +456,36 @@ export const AdminNewsletter: React.FC = () => {
     setSelectedIds(next);
   };
 
+  const loadDiscountTemplate = () => {
+    if (blocks.length > 0 && !window.confirm('¿Reemplazar el diseño actual con la plantilla de Código de Descuento?')) {
+      return;
+    }
+    const productIds = dbProducts.slice(0, 3).map(p => p.id);
+    const template: NewsletterBlock[] = [
+      { id: Date.now().toString() + '-1', type: 'greeting', content: { prefix: '¡Hola, ', suffix: '!', color: '#c4fc15' } },
+      { id: Date.now().toString() + '-2', type: 'title', content: { text: '¡Tu Descuento Especial en Divina Store!', align: 'center', color: '#ffffff' } },
+      { id: Date.now().toString() + '-3', type: 'text', content: { text: 'Queremos consentirte con una selección exclusiva de nuestros mejores productos de skincare. Usa el código de descuento <strong>DESCUENTO202610</strong> al finalizar tu compra para obtener un 10% de descuento en toda la tienda.', align: 'center' } },
+      { id: Date.now().toString() + '-4', type: 'products', content: { productIds } },
+      { id: Date.now().toString() + '-5', type: 'button', content: { text: 'APLICAR DESCUENTO', url: 'https://divinastore.com.mx/catalog', color: '#c4fc15' } }
+    ];
+    setBlocks(template);
+  };
+
+  const loadBirthdayTemplate = () => {
+    if (blocks.length > 0 && !window.confirm('¿Reemplazar el diseño actual con la plantilla de Cumpleaños?')) {
+      return;
+    }
+    const productIds = dbProducts.slice(0, 3).map(p => p.id);
+    const template: NewsletterBlock[] = [
+      { id: Date.now().toString() + '-1', type: 'greeting', content: { prefix: '¡Feliz Cumpleaños, ', suffix: '! 🎂✨', color: '#c4fc15' } },
+      { id: Date.now().toString() + '-2', type: 'title', content: { text: '¡Queremos celebrar tu día especial!', align: 'center', color: '#ffffff' } },
+      { id: Date.now().toString() + '-3', type: 'text', content: { text: '¡Te deseamos lo mejor en tu cumpleaños! Para celebrarlo contigo, te regalamos envío gratis y un regalo sorpresa en tu próximo pedido usando el código <strong>CUMPLEDIVINA</strong>. Disfruta de la mejor rutina de skincare.', align: 'center' } },
+      { id: Date.now().toString() + '-4', type: 'products', content: { productIds } },
+      { id: Date.now().toString() + '-5', type: 'button', content: { text: 'RECLAMAR MI REGALO', url: 'https://divinastore.com.mx/catalog', color: '#c4fc15' } }
+    ];
+    setBlocks(template);
+  };
+
   // Bloques de tipo products para el selector del panel derecho
   const productBlocks = blocks.filter(b => b.type === 'products');
 

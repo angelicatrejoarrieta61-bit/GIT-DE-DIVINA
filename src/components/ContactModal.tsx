@@ -11,7 +11,7 @@ interface ContactModalProps {
 
 export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const [render, setRender] = useState(isOpen);
-  const [whatsapp, setWhatsapp] = useState('5215647438328');
+  const [whatsapp, setWhatsapp] = useState('525513848670');
   const [contactEmail, setContactEmail] = useState('admin@divinastore.com.mx');
   
   const [form, setForm] = useState({ 

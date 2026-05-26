@@ -1201,7 +1201,7 @@ export const AdminConfig: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           <div>
                             <label style={lbl}>Teléfono WhatsApp (con código de país, sin +)</label>
-                            <input type="text" className="input-dark" value={configs.contact_whatsapp || '5215647438328'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 5215647438328" />
+                            <input type="text" className="input-dark" value={configs.contact_whatsapp || '525513848670'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 525513848670" />
                             <p className="muted-text" style={{ fontSize: 11, marginTop: 4 }}>Los clientes del formulario serán redirigidos a este número.</p>
                           </div>
                           <div>
@@ -1225,7 +1225,7 @@ export const AdminConfig: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
                         <label style={lbl}>Teléfono WhatsApp (con código de país, sin +)</label>
-                        <input type="text" className="input-dark" value={configs.contact_whatsapp || '5215647438328'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 5215647438328" />
+                        <input type="text" className="input-dark" value={configs.contact_whatsapp || '525513848670'} onChange={e => updateConfig('contact_whatsapp', e.target.value)} placeholder="Ej. 525513848670" />
                       </div>
                       <div>
                         <label style={lbl}>Email de Contacto</label>

@@ -10,7 +10,7 @@ const COUPON = 'DESCUENTO202610';
 export const FloatingContactBubble: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [render, setRender] = useState(false);
-  const [whatsapp, setWhatsapp] = useState('5215647438328');
+  const [whatsapp, setWhatsapp] = useState('525513848670');
   const [contactEmail, setContactEmail] = useState('admin@divinastore.com.mx');
   const [form, setForm] = useState({
     name: '',

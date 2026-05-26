@@ -13,7 +13,7 @@ export const ContactPage: React.FC = () => {
     message: '',
     register: false
   });
-  const [whatsapp, setWhatsapp] = useState('5215647438328');
+  const [whatsapp, setWhatsapp] = useState('525513848670');
   const [contactEmail, setContactEmail] = useState('admin@divinastore.com.mx');
   const [showCoupon, setShowCoupon] = useState(false);
   
