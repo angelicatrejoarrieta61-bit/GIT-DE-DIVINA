@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getOrders, updateOrderStatus, deleteAllOrders } from '../../lib/queries';
+import { getOrders, updateOrderStatus, deleteUnpaidOrders } from '../../lib/queries';
 import type { Order, CartItem } from '../../types';
 
 type StatusType = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
@@ -68,14 +68,14 @@ export const AdminOrderReports: React.FC = () => {
   };
 
   const handleDeleteAll = async () => {
-    if (window.confirm('🚨 ¿ESTÁS SEGURO? Esto borrará TODOS los pedidos de la base de datos permanentemente. Esta acción no se puede deshacer.')) {
+    if (window.confirm('🚨 ¿ESTÁS SEGURO? Esto borrará todos los pedidos de prueba (no pagados) de la base de datos permanentemente. Se conservarán únicamente los pedidos aprobados/pagados.')) {
       setLoading(true);
-      const success = await deleteAllOrders();
+      const success = await deleteUnpaidOrders();
       if (success) {
-        setOrders([]);
-        alert('Todos los pedidos han sido eliminados.');
+        await loadOrders();
+        alert('Los pedidos de prueba (no pagados) han sido eliminados de forma permanente.');
       } else {
-        alert('Error al intentar borrar los pedidos.');
+        alert('Error al intentar borrar los pedidos de prueba.');
       }
       setLoading(false);
     }
