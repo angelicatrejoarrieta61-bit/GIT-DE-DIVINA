@@ -247,15 +247,15 @@ export const AdminNewsletter: React.FC = () => {
 
     blocks.forEach(b => {
       if (b.type === 'greeting') {
-        html += `<h2 style="color:${b.content.color || '#c4fc15'};text-align:center;margin:10px 0;font-size:22px;">
+        html += `<h2 style="color:${b.content.color || '#c4fc15'};text-align:center;margin:6px 0;font-size:15px;">
           ${b.content.prefix || '¡Hola, '}{{nombre}}${b.content.suffix || '!'}
         </h2>`;
       }
       if (b.type === 'title') {
-        html += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:5px 0;font-size:24px;">${b.content.text}</h1>`;
+        html += `<h1 style="color:${b.content.color || '#fff'};text-align:center;margin:4px 0;font-size:17px;">${b.content.text}</h1>`;
       }
       if (b.type === 'text') {
-        html += `<p style="color:#ccc;text-align:center;line-height:1.4;margin:5px 0;font-size:14px;">${b.content.text}</p>`;
+        html += `<p style="color:#ccc;text-align:center;line-height:1.4;margin:4px 0;font-size:11px;">${b.content.text}</p>`;
       }
       if (b.type === 'spacer') {
         html += `<div style="height:${b.content.height || 10}px;"></div>`;
@@ -266,8 +266,8 @@ export const AdminNewsletter: React.FC = () => {
         </div>`;
       }
       if (b.type === 'button') {
-        html += `<div style="text-align:center;margin:15px 0;">
-          <a href="${b.content.url}" style="display:inline-block;background:${b.content.color || '#c4fc15'};color:#000;padding:10px 20px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:13px;">
+        html += `<div style="text-align:center;margin:10px 0;">
+          <a href="${b.content.url}" style="display:inline-block;background:${b.content.color || '#c4fc15'};color:#000;padding:7px 16px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:11px;">
             ${b.content.text}
           </a>
         </div>`;
@@ -275,15 +275,15 @@ export const AdminNewsletter: React.FC = () => {
       if (b.type === 'products') {
         const pIds: string[] = b.content.productIds || [];
         if (pIds.length > 0) {
-          html += `<div style="display:flex;gap:8px;justify-content:center;margin:15px 0;">`;
+          html += `<div style="display:flex;gap:6px;justify-content:center;margin:10px 0;">`;
           pIds.forEach(pid => {
             const p = dbProducts.find(x => x.id === pid);
             if (!p) return;
             html += `
-              <div style="background:#111;padding:10px;border-radius:4px;text-align:center;flex:1;">
-                ${p.image_url ? `<img src="${getImageUrl(p.image_url)}" style="width:100px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:8px;"/>` : ''}
-                <div style="font-weight:bold;color:#fff;margin-bottom:4px;font-size:11px;">${p.name}</div>
-                <div style="color:#c4fc15;font-size:12px;">$${p.price.toFixed(2)}</div>
+              <div style="background:#111;padding:7px;border-radius:4px;text-align:center;flex:1;">
+                ${p.image_url ? `<img src="${getImageUrl(p.image_url)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;margin-bottom:5px;"/>` : ''}
+                <div style="font-weight:bold;color:#fff;margin-bottom:3px;font-size:10px;">${p.name}</div>
+                <div style="color:#c4fc15;font-size:10px;">$${p.price.toFixed(2)}</div>
               </div>`;
           });
           html += `</div>`;
