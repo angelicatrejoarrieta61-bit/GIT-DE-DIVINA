@@ -513,6 +513,52 @@ export const AdminNewsletter: React.FC = () => {
           </button>
         </div>
 
+        {/* ── Plantillas de Campaña ── */}
+        <div style={{ marginTop: 14 }}>
+          <h2 style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
+            Plantillas rápidas
+          </h2>
+          <button
+            onClick={loadDiscountTemplate}
+            style={{
+              ...blockBtn,
+              width: '100%',
+              marginBottom: 6,
+              padding: '9px 4px',
+              background: 'linear-gradient(135deg, #1a3300, #2a5500)',
+              border: '1px solid #c4fc15',
+              color: '#c4fc15',
+              fontSize: 9,
+              gap: 4,
+              flexDirection: 'column',
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🏷️</span>
+            <span>CÓDIGO DESCUENTO</span>
+            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>con 3 productos + cupón</span>
+          </button>
+          <button
+            onClick={loadBirthdayTemplate}
+            style={{
+              ...blockBtn,
+              width: '100%',
+              padding: '9px 4px',
+              background: 'linear-gradient(135deg, #1a0033, #33004d)',
+              border: '1px solid #c47afc',
+              color: '#c47afc',
+              fontSize: 9,
+              gap: 4,
+              flexDirection: 'column',
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🎂</span>
+            <span>CUMPLEAÑOS</span>
+            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>saludo especial + regalo</span>
+          </button>
+        </div>
+
         {/* ── Selector por bloque ── */}
         {productBlocks.length > 0 && productBlocks.map(pb => (
           <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
@@ -589,17 +635,17 @@ export const AdminNewsletter: React.FC = () => {
       {/* ── CENTRO: Editor Visual ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, overflow: 'hidden' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900 }}>
-              GUARDAR BORRADOR
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 12px', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleSaveDraft} className="btn btn-outline" style={{ padding: '5px 12px', fontWeight: 700, fontSize: 10, letterSpacing: 0.5 }}>
+              💾 BORRADOR
             </button>
-            <button onClick={handleTestConnection} className="btn btn-outline" style={{ padding: '10px 24px', fontWeight: 900, borderColor: '#444' }}>
-              PROBAR CONEXION SMTP
+            <button onClick={handleTestConnection} className="btn btn-outline" style={{ padding: '5px 12px', fontWeight: 700, fontSize: 10, letterSpacing: 0.5, borderColor: '#444' }}>
+              🔌 PROBAR SMTP
             </button>
           </div>
-          <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '10px 24px', fontWeight: 900 }}>
-            {sending ? 'ENVIANDO...' : `LANZAR A ${selectedIds.size} SELECCIONADOS`}
+          <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '5px 14px', fontWeight: 800, fontSize: 10, letterSpacing: 0.5 }}>
+            {sending ? '⏳ ENVIANDO...' : `🚀 LANZAR A ${selectedIds.size} SELECCIONADOS`}
           </button>
         </div>
 
