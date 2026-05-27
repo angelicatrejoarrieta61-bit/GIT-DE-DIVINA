@@ -616,8 +616,8 @@ export const AdminNewsletter: React.FC = () => {
         )}
 
         {/* ── Plantillas rápidas de Campaña (ABAJO DEL TODO) ── */}
-        <div style={{ marginTop: 18, borderTop: '1px solid #1a1a1a', paddingTop: 14 }}>
-          <h2 style={{ fontSize: 10, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
+        <div style={{ marginTop: 18, borderTop: '1px solid #1a1a1a', paddingTop: 10 }}>
+          <h2 style={{ fontSize: 9, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
             Plantillas rápidas
           </h2>
           <button
@@ -625,39 +625,39 @@ export const AdminNewsletter: React.FC = () => {
             style={{
               ...blockBtn,
               width: '100%',
-              marginBottom: 6,
-              padding: '9px 4px',
+              marginBottom: 5,
+              padding: '6px 8px',
               background: 'linear-gradient(135deg, #1a3300, #2a5500)',
               border: '1px solid #c4fc15',
               color: '#c4fc15',
               fontSize: 9,
-              gap: 4,
-              flexDirection: 'column',
-              lineHeight: 1.3,
+              flexDirection: 'row',
+              gap: 6,
+              justifyContent: 'flex-start',
+              textAlign: 'left',
             }}
           >
-            <span style={{ fontSize: 16 }}>🏷️</span>
+            <span style={{ fontSize: 13, flexShrink: 0 }}>🏷️</span>
             <span>CÓDIGO DESCUENTO</span>
-            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>con 3 productos + cupón</span>
           </button>
           <button
             onClick={loadBirthdayTemplate}
             style={{
               ...blockBtn,
               width: '100%',
-              padding: '9px 4px',
+              padding: '6px 8px',
               background: 'linear-gradient(135deg, #1a0033, #33004d)',
               border: '1px solid #c47afc',
               color: '#c47afc',
               fontSize: 9,
-              gap: 4,
-              flexDirection: 'column',
-              lineHeight: 1.3,
+              flexDirection: 'row',
+              gap: 6,
+              justifyContent: 'flex-start',
+              textAlign: 'left',
             }}
           >
-            <span style={{ fontSize: 16 }}>🎂</span>
+            <span style={{ fontSize: 13, flexShrink: 0 }}>🎂</span>
             <span>CUMPLEAÑOS</span>
-            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>saludo especial + regalo</span>
           </button>
         </div>
       </aside>
