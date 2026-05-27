@@ -513,57 +513,38 @@ export const AdminNewsletter: React.FC = () => {
           </button>
         </div>
 
-        {/* ── Plantillas de Campaña ── */}
-        <div style={{ marginTop: 14 }}>
-          <h2 style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
-            Plantillas rápidas
-          </h2>
-          <button
-            onClick={loadDiscountTemplate}
-            style={{
-              ...blockBtn,
-              width: '100%',
-              marginBottom: 6,
-              padding: '9px 4px',
-              background: 'linear-gradient(135deg, #1a3300, #2a5500)',
-              border: '1px solid #c4fc15',
-              color: '#c4fc15',
-              fontSize: 9,
-              gap: 4,
-              flexDirection: 'column',
-              lineHeight: 1.3,
-            }}
-          >
-            <span style={{ fontSize: 16 }}>🏷️</span>
-            <span>CÓDIGO DESCUENTO</span>
-            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>con 3 productos + cupón</span>
-          </button>
-          <button
-            onClick={loadBirthdayTemplate}
-            style={{
-              ...blockBtn,
-              width: '100%',
-              padding: '9px 4px',
-              background: 'linear-gradient(135deg, #1a0033, #33004d)',
-              border: '1px solid #c47afc',
-              color: '#c47afc',
-              fontSize: 9,
-              gap: 4,
-              flexDirection: 'column',
-              lineHeight: 1.3,
-            }}
-          >
-            <span style={{ fontSize: 16 }}>🎂</span>
-            <span>CUMPLEAÑOS</span>
-            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>saludo especial + regalo</span>
-          </button>
-        </div>
+        {/* ── Config de Bloques BOTON (URL) ── */}
+        {blocks.filter(b => b.type === 'button').map(bb => (
+          <div key={bb.id} style={{ marginTop: 10, background: '#000', padding: 10, borderRadius: 8, border: '1px solid #2a2a2a' }}>
+            <h3 style={{ fontSize: 10, color: '#f0a000', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              🔗 Vínculo del Botón
+            </h3>
+            <label style={{ fontSize: 9, color: '#666', display: 'block', marginBottom: 3 }}>Texto del botón:</label>
+            <input
+              className="input-dark"
+              type="text"
+              value={bb.content.text || ''}
+              onChange={e => updateBlock(bb.id, { text: e.target.value })}
+              placeholder="Texto del botón..."
+              style={{ width: '100%', fontSize: 10, marginBottom: 6, backgroundColor: '#000', color: '#fff', border: '1px solid #333', padding: '4px 6px', borderRadius: 4, boxSizing: 'border-box' }}
+            />
+            <label style={{ fontSize: 9, color: '#666', display: 'block', marginBottom: 3 }}>URL / Liga:</label>
+            <input
+              className="input-dark"
+              type="url"
+              value={bb.content.url || ''}
+              onChange={e => updateBlock(bb.id, { url: e.target.value })}
+              placeholder="https://divinastore.com.mx/..."
+              style={{ width: '100%', fontSize: 10, backgroundColor: '#000', color: '#fff', border: '1px solid #333', padding: '4px 6px', borderRadius: 4, boxSizing: 'border-box' }}
+            />
+          </div>
+        ))}
 
-        {/* ── Selector por bloque ── */}
+        {/* ── Selector de PRODUCTOS A AÑADIR (solo cuando existe bloque products) ── */}
         {productBlocks.length > 0 && productBlocks.map(pb => (
           <div key={pb.id} style={{ marginTop: 12, background: '#000', padding: 12, borderRadius: 8, border: '1px solid #1a1a1a' }}>
-            <h3 style={{ fontSize: 11, color: 'var(--c-lime)', margin: '0 0 8px' }}>
-              Bloque ···{pb.id.slice(-4)}
+            <h3 style={{ fontSize: 10, color: 'var(--c-lime)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              📦 Productos a Añadir
             </h3>
             <select
               className="input-dark"
@@ -575,16 +556,19 @@ export const AdminNewsletter: React.FC = () => {
                 e.target.value = '';
               }}
             >
-              <option value="">+ Seleccionar...</option>
+              <option value="">+ Seleccionar producto...</option>
               {dbProducts.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+            <div style={{ fontSize: 9, color: '#555', marginBottom: 6 }}>
+              {(pb.content.productIds || []).length}/3 productos añadidos
+            </div>
             <button
               onClick={() => updateBlock(pb.id, { productIds: [] })}
-              style={{ ...blockBtn, width: '100%', padding: '6px 0' }}
+              style={{ ...blockBtn, width: '100%', padding: '5px 0', background: '#1a0000', border: '1px solid #440000', color: '#ff6666' }}
             >
-              LIMPIAR
+              ✕ LIMPIAR PRODUCTOS
             </button>
           </div>
         ))}
@@ -630,6 +614,52 @@ export const AdminNewsletter: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* ── Plantillas rápidas de Campaña (ABAJO DEL TODO) ── */}
+        <div style={{ marginTop: 18, borderTop: '1px solid #1a1a1a', paddingTop: 14 }}>
+          <h2 style={{ fontSize: 10, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>
+            Plantillas rápidas
+          </h2>
+          <button
+            onClick={loadDiscountTemplate}
+            style={{
+              ...blockBtn,
+              width: '100%',
+              marginBottom: 6,
+              padding: '9px 4px',
+              background: 'linear-gradient(135deg, #1a3300, #2a5500)',
+              border: '1px solid #c4fc15',
+              color: '#c4fc15',
+              fontSize: 9,
+              gap: 4,
+              flexDirection: 'column',
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🏷️</span>
+            <span>CÓDIGO DESCUENTO</span>
+            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>con 3 productos + cupón</span>
+          </button>
+          <button
+            onClick={loadBirthdayTemplate}
+            style={{
+              ...blockBtn,
+              width: '100%',
+              padding: '9px 4px',
+              background: 'linear-gradient(135deg, #1a0033, #33004d)',
+              border: '1px solid #c47afc',
+              color: '#c47afc',
+              fontSize: 9,
+              gap: 4,
+              flexDirection: 'column',
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🎂</span>
+            <span>CUMPLEAÑOS</span>
+            <span style={{ color: '#888', textTransform: 'none', fontWeight: 400 }}>saludo especial + regalo</span>
+          </button>
+        </div>
       </aside>
 
       {/* ── CENTRO: Editor Visual ── */}
