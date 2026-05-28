@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getBlogPosts, type BlogPost } from '../lib/blog-queries';
+import { getBlogPosts, type BlogPost } from '../../lib/blog-queries';
 
 // Imagen de portada por defecto si el post no tiene una
 const FALLBACK_IMG =
