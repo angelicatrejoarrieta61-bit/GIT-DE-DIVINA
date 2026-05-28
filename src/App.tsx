@@ -6,7 +6,6 @@ import { CartDrawer } from './components/CartDrawer';
 import { HomePage } from './pages/HomePage';
 import { CollectionPage } from './pages/CollectionPage';
 import { ProductPage } from './pages/ProductPage';
-import { CatalogPage } from './pages/CatalogPage';
 import { QuienesSomosPage } from './pages/QuienesSomosPage';
 import { ContactPage } from './pages/ContactPage';
 import { CheckoutPage } from './pages/CheckoutPage';
@@ -74,7 +73,6 @@ export default function App() {
         <Route path="/"                  element={<PublicLayout><HomePage /></PublicLayout>} />
         <Route path="/coleccion/:slug"   element={<PublicLayout><CollectionPage /></PublicLayout>} />
         <Route path="/producto/:slug"    element={<PublicLayout><ProductPage /></PublicLayout>} />
-        <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
         <Route path="/quienes-somos"     element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
         <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
         <Route path="/checkout"          element={<PublicLayout><CheckoutPage /></PublicLayout>} />
