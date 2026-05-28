@@ -11,73 +11,82 @@ interface HeaderLink {
   path: string;
 }
 
+// ── Blog añadido al final de la navegación por defecto ───────
 const DEFAULT_HEADER_LINKS: HeaderLink[] = [
-  { label: 'INICIO', path: '/' },
-  { label: 'CREMAS FACIALES', path: '/coleccion/cremas-faciales' },
-  { label: 'LIMPIADORES', path: '/coleccion/limpiadores' },
-  { label: 'FOTOPROTECTORES', path: '/coleccion/fotoprotectores' },
-  { label: 'GROOMING', path: '/coleccion/grooming' },
-  { label: 'CATÁLOGO', path: '/catalogo' },
-  { label: 'QUIÉNES SOMOS', path: '/quienes-somos' },
-  { label: 'CONTACTO', path: '/contacto' }
+  { label: 'INICIO',           path: '/' },
+  { label: 'CREMAS FACIALES',  path: '/coleccion/cremas-faciales' },
+  { label: 'LIMPIADORES',      path: '/coleccion/limpiadores' },
+  { label: 'FOTOPROTECTORES',  path: '/coleccion/fotoprotectores' },
+  { label: 'GROOMING',         path: '/coleccion/grooming' },
+  { label: 'CATÁLOGO',         path: '/catalogo' },
+  { label: 'QUIÉNES SOMOS',    path: '/quienes-somos' },
+  { label: 'BLOG',             path: '/blog' },
+  { label: 'CONTACTO',         path: '/contacto' },
 ];
 
 export const Header: React.FC = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const [lastY, setLastY] = useState(0);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled,    setScrolled]    = useState(false);
+  const [visible,     setVisible]     = useState(true);
+  const [lastY,       setLastY]       = useState(0);
+  const [mobileOpen,  setMobileOpen]  = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl,     setLogoUrl]     = useState<string | null>(null);
   const [homeIconUrl, setHomeIconUrl] = useState<string | null>(null);
   const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>(DEFAULT_HEADER_LINKS);
+
   const { itemCount, openCart } = useCartStore();
   const count = itemCount();
 
-
-
-  // Scroll behavior
+  // ── Scroll: ocultar al bajar, mostrar al subir ───────────
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 20);
+      setVisible(y < lastY || y < 80);
+      setLastY(y);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [lastY]);
 
+  // ── Configuración dinámica desde Supabase ────────────────
   useEffect(() => {
     getCollections().then(setCollections);
     getStoreConfig().then(cfg => {
-      setLogoUrl(cfg.logo_url);
-      setHomeIconUrl(cfg.header_home_icon);
+      setLogoUrl(cfg.logo_url || null);
+      setHomeIconUrl(cfg.header_home_icon || null);
       if (cfg.header_links) {
         try {
           const links = JSON.parse(cfg.header_links);
-          if (Array.isArray(links)) setHeaderLinks(links);
+          // Siempre garantizamos que BLOG esté en los links del admin
+          if (Array.isArray(links)) {
+            const hasBlog = links.some((l: HeaderLink) => l.path === '/blog');
+            setHeaderLinks(hasBlog ? links : [...links, { label: 'BLOG', path: '/blog' }]);
+          }
         } catch {}
       }
     });
 
+    // Live preview desde admin
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'ADMIN_PREVIEW_UPDATE') {
         const payload = e.data.payload;
-        if (payload.logo_url !== undefined) {
-          setLogoUrl(payload.logo_url);
-        }
-        if (payload.header_home_icon !== undefined) {
-          setHomeIconUrl(payload.header_home_icon);
-        }
+        if (payload.logo_url !== undefined)        setLogoUrl(payload.logo_url);
+        if (payload.header_home_icon !== undefined) setHomeIconUrl(payload.header_home_icon);
         if (payload.header_links) {
           try {
             const links = JSON.parse(payload.header_links);
-            if (Array.isArray(links)) setHeaderLinks(links);
+            if (Array.isArray(links)) {
+              const hasBlog = links.some((l: HeaderLink) => l.path === '/blog');
+              setHeaderLinks(hasBlog ? links : [...links, { label: 'BLOG', path: '/blog' }]);
+            }
           } catch {}
         }
       }
     };
     window.addEventListener('message', handleMessage);
 
+    // Realtime Supabase
     const channel = supabase
       .channel('header-config-live')
       .on(
@@ -90,7 +99,10 @@ export const Header: React.FC = () => {
           if (cfg.header_links) {
             try {
               const links = JSON.parse(cfg.header_links);
-              if (Array.isArray(links)) setHeaderLinks(links);
+              if (Array.isArray(links)) {
+                const hasBlog = links.some((l: HeaderLink) => l.path === '/blog');
+                setHeaderLinks(hasBlog ? links : [...links, { label: 'BLOG', path: '/blog' }]);
+              }
             } catch {}
           }
         }
@@ -105,9 +117,12 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header className={`header ${scrolled ? 'header--scrolled' : ''}`}>
+      <header
+        className={`header ${scrolled ? 'header--scrolled' : ''} ${!visible ? 'header--hidden' : ''}`}
+      >
         <div className="header__inner page-width">
-          {/* Hamburger (Left on mobile) */}
+
+          {/* Hamburger — izquierda en móvil */}
           <button
             className={`header__hamburger ${mobileOpen ? 'open' : ''}`}
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -119,12 +134,12 @@ export const Header: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="header__logo" aria-label="Divina Store MX">
             {logoUrl ? (
-              <img 
-                src={getImageUrl(logoUrl, { width: 180, quality: 90 })} 
+              <img
+                src={getImageUrl(logoUrl, { width: 180, quality: 90 })}
                 srcSet={getImageSrcSet(logoUrl, [180, 360], { quality: 90 })}
                 sizes="180px"
-                alt="Divina Store" 
-                style={{ height: 'var(--logo-h)', maxHeight: 100, width: 'auto', objectFit: 'contain' }} 
+                alt="Divina Store"
+                style={{ height: 'var(--logo-h)', maxHeight: 100, width: 'auto', objectFit: 'contain' }}
               />
             ) : (
               <>
@@ -137,17 +152,24 @@ export const Header: React.FC = () => {
           {/* Desktop Nav */}
           <nav className="header__nav" aria-label="Navegación principal">
             {headerLinks.map((link, idx) => (
-              <NavLink 
-                key={idx} 
-                to={link.path} 
-                className={({ isActive }) => `header__nav-link ${isActive ? 'active' : ''}`} 
+              <NavLink
+                key={idx}
+                to={link.path}
+                className={({ isActive }) => `header__nav-link ${isActive ? 'active' : ''}`}
                 end={link.path === '/'}
               >
                 {link.path === '/' && homeIconUrl ? (
-                  <img 
-                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })} 
-                    alt="Inicio" 
-                    style={{ height: '2.8em', maxHeight: '36px', width: 'auto', objectFit: 'contain', display: 'block', filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))' }}
+                  <img
+                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
+                    alt="Inicio"
+                    style={{
+                      height: '2.8em',
+                      maxHeight: '36px',
+                      width: 'auto',
+                      objectFit: 'contain',
+                      display: 'block',
+                      filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))',
+                    }}
                   />
                 ) : (
                   link.label
@@ -158,16 +180,15 @@ export const Header: React.FC = () => {
 
           {/* Actions */}
           <div className="header__actions">
-
             <button
               className="header__cart-btn"
               onClick={openCart}
               aria-label={`Carrito, ${count} productos`}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <path d="M16 10a4 4 0 01-8 0"/>
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 01-8 0" />
               </svg>
               {count > 0 && <span className="header__cart-count">{count}</span>}
             </button>
@@ -177,18 +198,18 @@ export const Header: React.FC = () => {
         {/* Mobile Menu */}
         <div className={`header__mobile-menu ${mobileOpen ? 'open' : ''}`}>
           {headerLinks.map((link, idx) => (
-            <NavLink 
-              key={idx} 
-              to={link.path} 
+            <NavLink
+              key={idx}
+              to={link.path}
               onClick={() => setMobileOpen(false)}
               end={link.path === '/'}
               style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               {link.path === '/' && homeIconUrl ? (
                 <>
-                  <img 
-                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })} 
-                    alt="Inicio" 
+                  <img
+                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
+                    alt="Inicio"
                     style={{ height: '2.5em', maxHeight: '32px', width: 'auto', objectFit: 'contain' }}
                   />
                   <span>{link.label}</span>

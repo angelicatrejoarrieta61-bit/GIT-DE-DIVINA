@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { CartDrawer } from './components/CartDrawer';
@@ -12,7 +12,6 @@ import { ContactPage } from './pages/ContactPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentErrorPage } from './pages/PaymentErrorPage';
-import { GenericPage } from './pages/GenericPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminProducts } from './pages/admin/AdminProducts';
@@ -22,12 +21,16 @@ import { AdminOrderReports } from './pages/admin/AdminOrderReports';
 import { AdminMessages } from './pages/admin/AdminMessages';
 import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
+import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
+
+// ── Blog ──────────────────────────────────────────────────────
+import { BlogPage }     from './pages/blog/BlogPage';
+import { BlogPostPage } from './pages/blog/BlogPostPage';
 
 function RouteRedirector() {
   const navigate = useNavigate();
   const location = useLocation();
-  
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const targetPath = params.get('admin_path');
@@ -58,25 +61,29 @@ export default function App() {
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<GenericPage />} /> {/* Placeholder, we'll redirect in AdminLayout or just leave it */}
-          <Route path="import" element={<AdminImport />} />
-          <Route path="config" element={<AdminConfig />} />
-          <Route path="reportes" element={<AdminOrderReports />} />
-          <Route path="mensajes" element={<AdminMessages />} />
+          <Route index element={<Navigate to="/admin/config?section=site-general" replace />} />
+          <Route path="productos"  element={<AdminProducts />} />
+          <Route path="import"     element={<AdminImport />} />
+          <Route path="config"     element={<AdminConfig />} />
+          <Route path="reportes"   element={<AdminOrderReports />} />
+          <Route path="mensajes"   element={<AdminMessages />} />
           <Route path="newsletter" element={<AdminNewsletter />} />
         </Route>
 
         {/* Public routes */}
-        <Route path="/" element={<PublicLayout><HomePage /></PublicLayout>} />
-        <Route path="/coleccion/:slug" element={<PublicLayout><CollectionPage /></PublicLayout>} />
-        <Route path="/producto/:slug" element={<PublicLayout><ProductPage /></PublicLayout>} />
-        <Route path="/catalogo" element={<PublicLayout><CatalogPage /></PublicLayout>} />
-        <Route path="/quienes-somos" element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
-        <Route path="/contacto" element={<PublicLayout><ContactPage /></PublicLayout>} />
-        <Route path="/checkout" element={<PublicLayout><CheckoutPage /></PublicLayout>} />
-        <Route path="/pago-exitoso" element={<PublicLayout><PaymentSuccessPage /></PublicLayout>} />
-        <Route path="/pago-error" element={<PublicLayout><PaymentErrorPage /></PublicLayout>} />
-        <Route path="/pages/:slug" element={<PublicLayout><GenericPage /></PublicLayout>} />
+        <Route path="/"                  element={<PublicLayout><HomePage /></PublicLayout>} />
+        <Route path="/coleccion/:slug"   element={<PublicLayout><CollectionPage /></PublicLayout>} />
+        <Route path="/producto/:slug"    element={<PublicLayout><ProductPage /></PublicLayout>} />
+        <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
+        <Route path="/quienes-somos"     element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
+        <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
+        <Route path="/checkout"          element={<PublicLayout><CheckoutPage /></PublicLayout>} />
+        <Route path="/pago-exitoso"      element={<PublicLayout><PaymentSuccessPage /></PublicLayout>} />
+        <Route path="/pago-error"        element={<PublicLayout><PaymentErrorPage /></PublicLayout>} />
+
+        {/* ── Blog ── */}
+        <Route path="/blog"       element={<PublicLayout><BlogPage /></PublicLayout>} />
+        <Route path="/blog/:slug" element={<PublicLayout><BlogPostPage /></PublicLayout>} />
       </Routes>
     </BrowserRouter>
   );
