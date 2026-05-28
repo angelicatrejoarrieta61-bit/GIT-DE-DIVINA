@@ -1,302 +1,225 @@
 /**
- * BlogPostPage.tsx — Vista individual de un artículo
- * Ruta: /blog/:slug
- *
- * Features:
- * - Barra de progreso de lectura
- * - Tabla de contenidos generada dinámicamente
- * - Posts relacionados al final
- * - Meta semántico (h1, article, time) para SEO
+ * BlogPostPage.tsx — Vista individual de artículo
+ * Diseño premium oscuro consistente con Divina Store MX
  */
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getBlogPostBySlug, getRelatedPosts, type BlogPost } from '../../lib/blog-queries';
 
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&q=80';
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&q=80';
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-/** Calcula tiempo de lectura estimado */
 function readingTime(html: string): number {
-  const text = html.replace(/<[^>]+>/g, ' ');
-  const words = text.trim().split(/\s+/).length;
+  const words = html.replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length;
   return Math.max(1, Math.round(words / 200));
 }
 
-/** Extrae h2 del HTML para tabla de contenidos */
-function extractHeadings(html: string): { id: string; text: string }[] {
-  const matches = [...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/gi)];
-  return matches.map((m, i) => ({
-    id: `heading-${i}`,
-    text: m[1].replace(/<[^>]+>/g, ''),
-  }));
-}
-
-/** Inyecta IDs a los h2 del HTML para anchor links */
 function injectHeadingIds(html: string): string {
   let i = 0;
-  return html.replace(/<h2([^>]*)>/gi, () => `<h2 id="heading-${i++}">`);
+  return html.replace(/<h2([^>]*)>/gi, () => `<h2 id="heading-${i++}" style="font-family:var(--f-heading);font-size:clamp(18px,2.5vw,24px);color:var(--c-white);margin:48px 0 16px;line-height:1.2;">`);
 }
 
-// ─── Barra de progreso ────────────────────────────────────────
 function ReadingProgress() {
   const [progress, setProgress] = useState(0);
-
   useEffect(() => {
     const handler = () => {
       const el = document.documentElement;
-      const scrolled = el.scrollTop;
-      const total    = el.scrollHeight - el.clientHeight;
-      setProgress(total > 0 ? (scrolled / total) * 100 : 0);
+      const total = el.scrollHeight - el.clientHeight;
+      setProgress(total > 0 ? (el.scrollTop / total) * 100 : 0);
     };
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
-
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-100">
-      <div
-        className="h-full bg-lime-500 transition-all duration-100"
-        style={{ width: `${progress}%` }}
-      />
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: '2px', background: 'rgba(255,255,255,0.08)' }}>
+      <div style={{ height: '100%', background: 'var(--c-lime)', width: `${progress}%`, transition: 'width 0.1s linear' }} />
     </div>
   );
 }
 
-// ─── Tarjeta relacionada ──────────────────────────────────────
-function RelatedCard({ post }: { post: BlogPost }) {
-  return (
-    <Link
-      to={`/blog/${post.slug}`}
-      className="group flex gap-3 rounded-xl overflow-hidden hover:bg-lime-50 transition-colors p-2 -m-2"
-    >
-      <img
-        src={post.cover_image || FALLBACK_IMG}
-        alt={post.title}
-        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-        loading="lazy"
-      />
-      <div>
-        <p className="text-gray-800 text-sm font-semibold leading-snug group-hover:text-lime-700 transition-colors line-clamp-2">
-          {post.title}
-        </p>
-        <span className="text-gray-400 text-xs">{formatDate(post.created_at)}</span>
-      </div>
-    </Link>
-  );
-}
-
-// ─── Página ───────────────────────────────────────────────────
 export function BlogPostPage() {
-  const { slug }          = useParams<{ slug: string }>();
-  const navigate          = useNavigate();
-  const [post, setPost]   = useState<BlogPost | null>(null);
+  const { slug }    = useParams<{ slug: string }>();
+  const navigate    = useNavigate();
+  const [post, setPost]     = useState<BlogPost | null>(null);
   const [related, setRelated] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const contentRef        = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
     window.scrollTo(0, 0);
-
     getBlogPostBySlug(slug).then(data => {
       if (!data) { navigate('/blog', { replace: true }); return; }
       setPost(data);
-
       getRelatedPosts(data.category, slug, 3).then(setRelated);
       setLoading(false);
     });
   }, [slug, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-lime-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '32px', height: '32px', border: '2px solid var(--c-lime)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 
   if (!post) return null;
 
-  const mins     = readingTime(post.content);
-  const headings = extractHeadings(post.content);
-  const html     = injectHeadingIds(post.content);
+  const mins = readingTime(post.content);
+  const html = injectHeadingIds(post.content)
+    .replace(/<h3([^>]*)>/gi, '<h3 style="font-family:var(--f-sub);font-size:18px;font-weight:700;color:var(--c-white);margin:32px 0 12px;">')
+    .replace(/<p>/gi, '<p style="color:rgba(255,255,255,0.72);font-size:16px;line-height:1.8;margin-bottom:20px;">')
+    .replace(/<ul>/gi, '<ul style="color:rgba(255,255,255,0.72);font-size:16px;line-height:1.8;margin-bottom:20px;padding-left:20px;list-style:disc;">')
+    .replace(/<li>/gi, '<li style="margin-bottom:8px;">');
 
   return (
     <>
       <ReadingProgress />
-
-      <div className="min-h-screen bg-white">
-
-        {/* ── Breadcrumb ── */}
-        <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
-          <nav className="flex items-center gap-2 text-sm text-gray-400">
-            <Link to="/" className="hover:text-lime-600 transition-colors">Inicio</Link>
-            <span>/</span>
-            <Link to="/blog" className="hover:text-lime-600 transition-colors">Blog</Link>
-            <span>/</span>
-            <span className="text-gray-600 line-clamp-1">{post.title}</span>
-          </nav>
-        </div>
+      <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
 
         {/* ── Hero imagen ── */}
-        <div className="max-w-6xl mx-auto px-4 pb-8">
-          <div className="relative rounded-2xl overflow-hidden h-64 md:h-96 bg-gray-100">
-            <img
-              src={post.cover_image || FALLBACK_IMG}
-              alt={post.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        <div style={{ position: 'relative', height: 'clamp(260px, 45vw, 480px)', overflow: 'hidden' }}>
+          <img src={post.cover_image || FALLBACK_IMG} alt={post.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%)' }} />
+          {/* Breadcrumb encima */}
+          <div style={{ position: 'absolute', top: '24px', left: 0, right: 0 }}>
+            <div className="page-width">
+              <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--f-sub)' }}>
+                <Link to="/" style={{ color: 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--c-lime)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'}>Inicio</Link>
+                <span>/</span>
+                <Link to="/blog" style={{ color: 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--c-lime)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)'}>Blog</Link>
+                <span>/</span>
+                <span style={{ color: 'rgba(255,255,255,0.8)' }}>{post.category}</span>
+              </nav>
+            </div>
           </div>
         </div>
 
-        {/* ── Layout: contenido + sidebar ── */}
-        <div className="max-w-6xl mx-auto px-4 pb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-12">
-
-            {/* ── Artículo principal ── */}
+        {/* ── Contenido ── */}
+        <div className="page-width" style={{ paddingBlock: '48px 80px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr min(680px, 100%) 1fr', gap: '0 32px' }}>
+            <div /> {/* spacer izquierdo */}
             <article>
               {/* Meta */}
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <span className="text-xs font-semibold bg-lime-100 text-lime-800 px-3 py-1 rounded-full">
-                  {post.category}
-                </span>
-                <time
-                  dateTime={post.created_at}
-                  className="text-gray-400 text-sm"
-                >
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <span style={{
+                  fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
+                  color: 'var(--c-black)', background: 'var(--c-lime)',
+                  padding: '4px 12px', borderRadius: '100px', fontFamily: 'var(--f-sub)',
+                }}>{post.category}</span>
+                <time style={{ color: 'var(--c-text-muted)', fontSize: '13px', fontFamily: 'var(--f-sub)' }}>
                   {formatDate(post.created_at)}
                 </time>
-                <span className="text-gray-300">·</span>
-                <span className="text-gray-400 text-sm">{mins} min de lectura</span>
+                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                <span style={{ color: 'var(--c-text-muted)', fontSize: '13px', fontFamily: 'var(--f-sub)' }}>
+                  {mins} min de lectura
+                </span>
               </div>
 
               {/* Título */}
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-gray-900 leading-tight mb-4">
-                {post.title}
-              </h1>
+              <h1 style={{
+                fontFamily: 'var(--f-heading)',
+                fontSize: 'clamp(26px, 4vw, 42px)',
+                lineHeight: 1.05, color: 'var(--c-white)', marginBottom: '24px',
+              }}>{post.title}</h1>
 
               {/* Autor */}
-              <div className="flex items-center gap-3 mb-8 pb-8 border-b border-gray-100">
-                <div className="w-9 h-9 rounded-full bg-lime-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {post.author.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm text-gray-600 font-medium">{post.author}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px', paddingBottom: '40px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'var(--c-lime)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--c-black)', fontWeight: 800, fontSize: '13px', fontFamily: 'var(--f-sub)',
+                }}>{post.author.charAt(0).toUpperCase()}</div>
+                <span style={{ color: 'var(--c-text-muted)', fontSize: '14px', fontFamily: 'var(--f-sub)' }}>
+                  {post.author}
+                </span>
               </div>
 
-              {/* Contenido HTML */}
-              <div
-                ref={contentRef}
-                className="prose prose-gray prose-lg max-w-none
-                  prose-headings:font-bold prose-headings:text-gray-900
-                  prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4
-                  prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
-                  prose-p:text-gray-600 prose-p:leading-relaxed prose-p:mb-5
-                  prose-li:text-gray-600 prose-li:leading-relaxed
-                  prose-ul:my-4 prose-ul:pl-4
-                  prose-a:text-lime-600 prose-a:no-underline hover:prose-a:underline
-                  prose-strong:text-gray-800"
-                dangerouslySetInnerHTML={{ __html: html }}
-              />
+              {/* HTML del artículo */}
+              <div dangerouslySetInnerHTML={{ __html: html }} />
 
               {/* Tags */}
               {post.tags.length > 0 && (
-                <div className="mt-10 pt-6 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                <div style={{ marginTop: '48px', paddingTop: '32px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--c-text-muted)', fontFamily: 'var(--f-sub)', marginBottom: '12px' }}>
                     Etiquetas
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {post.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full"
-                      >
-                        #{tag}
-                      </span>
+                      <span key={tag} className="badge badge-dark">#{tag}</span>
                     ))}
                   </div>
                 </div>
               )}
 
               {/* CTA Productos */}
-              <div className="mt-10 rounded-2xl bg-lime-50 border border-lime-200 p-6 flex flex-col sm:flex-row items-center gap-5">
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900 mb-1">
+              <div style={{
+                marginTop: '48px', borderRadius: '16px',
+                background: 'var(--c-surface-2)', border: '1px solid rgba(196,252,21,0.2)',
+                padding: '28px 32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '20px',
+              }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <p style={{ fontFamily: 'var(--f-heading)', fontSize: '18px', color: 'var(--c-white)', marginBottom: '6px' }}>
                     Encuentra los productos que necesitas
                   </p>
-                  <p className="text-gray-500 text-sm">
-                    Explora nuestro catálogo de cuidado de piel seleccionado para vivir en CDMX.
+                  <p style={{ color: 'var(--c-text-muted)', fontSize: '13px' }}>
+                    Catálogo seleccionado para vivir en CDMX.
                   </p>
                 </div>
-                <Link
-                  to="/catalogo"
-                  className="flex-shrink-0 bg-lime-500 hover:bg-lime-600 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors"
-                >
-                  Ver catálogo →
+                <Link to="/catalogo" className="btn btn-lime" style={{ flexShrink: 0 }}>
+                  Ver catálogo
+                </Link>
+              </div>
+
+              {/* Artículos relacionados */}
+              {related.length > 0 && (
+                <div style={{ marginTop: '64px' }}>
+                  <h3 style={{ fontFamily: 'var(--f-heading)', fontSize: '20px', marginBottom: '24px' }}>
+                    También te puede <span style={{ color: 'var(--c-lime)' }}>interesar</span>
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                    {related.map(r => (
+                      <Link key={r.id} to={`/blog/${r.slug}`} style={{
+                        display: 'flex', gap: '12px', alignItems: 'flex-start',
+                        padding: '12px', borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                        background: 'var(--c-surface-2)',
+                        transition: 'border-color 0.2s',
+                      }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-lime)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'}
+                      >
+                        <img src={r.cover_image || FALLBACK_IMG} alt={r.title}
+                          style={{ width: '56px', height: '56px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontFamily: 'var(--f-sub)', fontSize: '13px', fontWeight: 600, color: 'var(--c-white)', lineHeight: 1.3, marginBottom: '4px' }}>
+                            {r.title}
+                          </p>
+                          <span style={{ color: 'var(--c-lime)', fontSize: '11px', fontFamily: 'var(--f-sub)', fontWeight: 700 }}>LEER →</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Volver */}
+              <div style={{ marginTop: '48px' }}>
+                <Link to="/blog" className="btn btn-outline" style={{ fontSize: '11px' }}>
+                  ← Volver al blog
                 </Link>
               </div>
             </article>
-
-            {/* ── Sidebar ── */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-8">
-
-                {/* Tabla de contenidos */}
-                {headings.length > 0 && (
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                      En este artículo
-                    </p>
-                    <nav className="space-y-2">
-                      {headings.map(h => (
-                        <a
-                          key={h.id}
-                          href={`#${h.id}`}
-                          className="block text-sm text-gray-500 hover:text-lime-700 hover:translate-x-1 transition-all duration-200 leading-snug"
-                        >
-                          {h.text}
-                        </a>
-                      ))}
-                    </nav>
-                  </div>
-                )}
-
-                {/* Posts relacionados */}
-                {related.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                      También te puede interesar
-                    </p>
-                    <div className="space-y-4">
-                      {related.map(r => (
-                        <RelatedCard key={r.id} post={r} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Volver al blog */}
-                <Link
-                  to="/blog"
-                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-lime-600 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Volver al blog
-                </Link>
-              </div>
-            </aside>
+            <div /> {/* spacer derecho */}
           </div>
         </div>
       </div>
