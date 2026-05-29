@@ -23,6 +23,7 @@ import { AdminBlog } from './pages/admin/AdminBlog';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
+import { CatalogPage } from './pages/CatalogPage';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/coleccion/:slug"   element={<PublicLayout><CollectionPage /></PublicLayout>} />
         <Route path="/producto/:slug"    element={<PublicLayout><ProductPage /></PublicLayout>} />
         <Route path="/quienes-somos"     element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
+        <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
         <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
         <Route path="/checkout"          element={<PublicLayout><CheckoutPage /></PublicLayout>} />
         <Route path="/pago-exitoso"      element={<PublicLayout><PaymentSuccessPage /></PublicLayout>} />
