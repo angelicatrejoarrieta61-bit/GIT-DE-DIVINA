@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 export const AdminLogin: React.FC = () => {
-  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,24 +17,6 @@ export const AdminLogin: React.FC = () => {
     setMessage('');
 
     try {
-      if (isRegistering) {
-        // Flujo de Registro
-        const { error, data } = await supabase.auth.signUp({ 
-          email, 
-          password 
-        });
-        
-        if (error) {
-          setError(error.message);
-        } else {
-          if (data.user?.identities?.length === 0) {
-             setError('Este correo ya está registrado.');
-          } else {
-             setMessage('¡Cuenta creada! Revisa tu correo, o si "Auto Confirm" está activado en Supabase, ya puedes iniciar sesión.');
-             setIsRegistering(false); // Cambiar a modo Login
-          }
-        }
-      } else {
         // Flujo de Iniciar Sesión
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         
@@ -44,7 +25,6 @@ export const AdminLogin: React.FC = () => {
         } else {
           navigate('/admin/config?section=site-general');
         }
-      }
     } catch (err: any) {
       console.error("Error crítico de red/login:", err);
       setError(err?.message || 'Error de conexión. Revisa tu internet o la configuración de Supabase.');
@@ -60,9 +40,8 @@ export const AdminLogin: React.FC = () => {
           DIVINA ADMIN
         </h1>
         <p style={{ color: 'var(--c-text-muted)', textAlign: 'center', marginBottom: 24 }}>
-          {isRegistering ? 'Crea tu usuario maestro' : 'Ingresa a tu panel de control'}
+          Ingresa a tu panel de control
         </p>
-        
         {error && <p style={{ color: '#ff6b6b', background: 'rgba(255,100,100,0.1)', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</p>}
         {message && <p style={{ color: 'var(--c-lime)', background: 'rgba(196,252,21,0.1)', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{message}</p>}
         
@@ -77,15 +56,7 @@ export const AdminLogin: React.FC = () => {
         </div>
 
         <button type="submit" className="btn btn-lime" style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }} disabled={loading}>
-          {loading ? 'Cargando...' : (isRegistering ? 'Crear Cuenta' : 'Ingresar')}
-        </button>
-
-        <button 
-          type="button" 
-          onClick={() => { setIsRegistering(!isRegistering); setError(''); setMessage(''); }} 
-          style={{ width: '100%', background: 'none', border: 'none', color: 'var(--c-text-muted)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
-        >
-          {isRegistering ? 'Ya tengo cuenta, iniciar sesión' : 'No tengo cuenta, registrarme'}
+          {loading ? 'Cargando...' : 'Ingresar'}
         </button>
       </form>
     </div>
