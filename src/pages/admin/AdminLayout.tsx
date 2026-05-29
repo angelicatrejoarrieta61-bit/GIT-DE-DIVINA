@@ -236,6 +236,13 @@ export const AdminLayout: React.FC = () => {
             📊 Reportes de Pedidos
           </NavLink>
 
+          <NavLink
+            to="/admin/usuarios"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            👥 Gestión de Usuarios
+          </NavLink>
+
           <div style={{ margin: '12px 0', height: '1px', background: 'rgba(255,255,255,0.08)' }} />
 
           <p className="admin-sidebar__label">CONFIGURACIÓN</p>
