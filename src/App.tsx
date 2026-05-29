@@ -19,6 +19,7 @@ import { AdminConfig } from './pages/admin/AdminConfig';
 import { AdminOrderReports } from './pages/admin/AdminOrderReports';
 import { AdminMessages } from './pages/admin/AdminMessages';
 import { AdminNewsletter } from './pages/admin/AdminNewsletter';
+import { AdminBlog } from './pages/admin/AdminBlog';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="reportes"   element={<AdminOrderReports />} />
           <Route path="mensajes"   element={<AdminMessages />} />
           <Route path="newsletter" element={<AdminNewsletter />} />
+          <Route path="blog"       element={<AdminBlog />} />
         </Route>
 
         {/* Public routes */}
