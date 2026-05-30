@@ -28,22 +28,17 @@ export const StoreThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const sub = cfg.font_sub || 'Barlow Semi Condensed';
       const body = cfg.font_body || 'Catamaran';
 
-      // Inject Google Fonts link safely
-      const addFont = (fontFamily: string, id: string) => {
-        let link = document.getElementById(id) as HTMLLinkElement;
-        if (!link) {
-          link = document.createElement('link');
-          link.id = id;
-          link.rel = 'stylesheet';
-          document.head.appendChild(link);
-        }
-        // Using v1 API which is more forgiving with weights:
-        link.href = `https://fonts.googleapis.com/css?family=${fontFamily.replace(/ /g, '+')}:300,400,500,600,700,800&display=swap`;
-      };
+      // Inject Google Fonts link
+      const fontUrl = `https://fonts.googleapis.com/css2?family=${heading.replace(/ /g, '+')}:wght@400;600;700;800&family=${sub.replace(/ /g, '+')}:wght@300;400;500;600;700&family=${body.replace(/ /g, '+')}:wght@300;400;500;600;700;800&display=swap`;
 
-      addFont(heading, 'dynamic-font-heading');
-      addFont(sub, 'dynamic-font-sub');
-      addFont(body, 'dynamic-font-body');
+      let link = document.getElementById('dynamic-google-fonts') as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.id = 'dynamic-google-fonts';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      link.href = fontUrl;
 
       // Apply CSS Variables
       root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
