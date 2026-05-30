@@ -1,18 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { getProducts } from '../lib/queries';
-import { getImageUrl } from '../lib/supabase';
+import { Link } from 'react-router-dom';
+import { getProducts, getStoreConfig } from '../lib/queries';
+import { getImageUrl, supabase } from '../lib/supabase';
 import { ProductCard } from '../components/ProductCard';
 import type { Product } from '../types';
 import './CatalogPage.css';
+import './CollectionPage.css';
 
 export const CatalogPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getProducts(48).then(p => { setProducts(p); setLoading(false); });
+  }, []);
+
+  useEffect(() => {
+    getStoreConfig().then(setConfig);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'ADMIN_PREVIEW_UPDATE') {
+        const payload = event.data.payload;
+        setConfig(prev => ({ ...prev, ...payload }));
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    const channel = supabase.channel('catalog_config_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_config' }, () => {
+        getStoreConfig().then(setConfig);
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filtered = products.filter(p =>
@@ -70,6 +96,21 @@ export const CatalogPage: React.FC = () => {
     } : {})
   };
 
+  const blockId = 'catalogo';
+  
+  const bgImg = config[`col_${blockId}_hero_img`] 
+    ? getImageUrl(config[`col_${blockId}_hero_img`], { width: 1920, quality: 80 }) 
+    : undefined;
+
+  const bgX = config[`col_${blockId}_hero_img_x`] || '0';
+  const bgY = config[`col_${blockId}_hero_img_y`] || '0';
+  const cardX = config[`col_${blockId}_hero_card_x`] || '0';
+  const cardY = config[`col_${blockId}_hero_card_y`] || '0';
+  const cardScale = config[`col_${blockId}_hero_card_scale`] ? parseInt(config[`col_${blockId}_hero_card_scale`]) / 100 : 1;
+
+  const catTitle = config[`col_${blockId}_hero_title`] || 'Catálogo Completo';
+  const catSub = config[`col_${blockId}_hero_subtitle`] || 'Explora todos nuestros productos de skincare y grooming';
+
   return (
     <>
       <Helmet>
@@ -86,11 +127,39 @@ export const CatalogPage: React.FC = () => {
         <script type="application/ld+json">{JSON.stringify(catalogSchema)}</script>
       </Helmet>
 
-      <div className="catalog-page" style={{ paddingTop: 'var(--nav-h)' }}>
-        <div className="catalog-page__banner">
-          <div className="page-width catalog-page__banner-content">
-            <h1 className="catalog-page__title">Catalogo <span className="lime-text">Completo</span></h1>
-            <p className="muted-text">Explora todos nuestros productos de skincare y grooming</p>
+      <div className="collection-page catalog-page" style={{ paddingTop: 'var(--nav-h)' }}>
+        {/* Banner */}
+        <div className="collection-page__banner">
+          {bgImg && (
+            <img 
+              src={bgImg} 
+              alt="Hero Background" 
+              className="collection-page__bg-img"
+              style={{ 
+                '--bg-x': `${bgX}px`, 
+                '--bg-y': `${bgY}px`
+              } as React.CSSProperties} 
+            />
+          )}
+          <div className="collection-page__banner-overlay" style={{ zIndex: 2 }} />
+          <div 
+            className="page-width collection-page__banner-content glass"
+            style={{
+              '--card-x': `${cardX}px`,
+              '--card-y': `${cardY}px`,
+              '--card-scale': cardScale
+            } as React.CSSProperties}
+          >
+            <div className="divider" style={{ marginBottom: 16 }} />
+            <h1 className="collection-page__title">
+              {catTitle}
+            </h1>
+            {catSub && (
+              <p className="collection-page__desc muted-text">{catSub}</p>
+            )}
+            <p className="collection-page__count muted-text" style={{ marginTop: 12, fontSize: 11, letterSpacing: '0.1em' }}>
+              {loading ? '...' : `${filtered.length} PRODUCTOS`}
+            </p>
           </div>
         </div>
 
