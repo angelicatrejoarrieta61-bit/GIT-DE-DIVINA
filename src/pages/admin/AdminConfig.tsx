@@ -958,6 +958,18 @@ export const AdminConfig: React.FC = () => {
                         <Sl label="Posición X Imagen" cfg={`col_${blockId}_hero_img_x`} min={-600} max={600} />
                         <Sl label="Posición Y Imagen" cfg={`col_${blockId}_hero_img_y`} min={-300} max={300} />
                       </div>
+                      <div style={{ marginTop: 12 }}>
+                        <label style={lbl}>Escala de la Imagen: {configs[`col_${blockId}_hero_img_scale`] || '1'}</label>
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={3.0}
+                          step={0.05}
+                          value={configs[`col_${blockId}_hero_img_scale`] || '1'}
+                          onChange={(e) => updateConfig(`col_${blockId}_hero_img_scale`, e.target.value)}
+                          style={{ width: '100%', accentColor: 'var(--c-lime)' }}
+                        />
+                      </div>
                     </div>
 
                     <div style={box}>

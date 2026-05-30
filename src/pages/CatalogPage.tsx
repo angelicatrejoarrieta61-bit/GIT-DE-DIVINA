@@ -104,12 +104,15 @@ export const CatalogPage: React.FC = () => {
 
   const bgX = config[`col_${blockId}_hero_img_x`] || '0';
   const bgY = config[`col_${blockId}_hero_img_y`] || '0';
+  const bgScale = config[`col_${blockId}_hero_img_scale`] || '1';
   const cardX = config[`col_${blockId}_hero_card_x`] || '0';
   const cardY = config[`col_${blockId}_hero_card_y`] || '0';
   const cardScale = config[`col_${blockId}_hero_card_scale`] ? parseInt(config[`col_${blockId}_hero_card_scale`]) / 100 : 1;
 
   const catTitle = config[`col_${blockId}_hero_title`] || 'Catálogo Completo';
   const catSub = config[`col_${blockId}_hero_subtitle`] || 'Explora todos nuestros productos de skincare y grooming';
+
+  const showCard = !(config[`col_${blockId}_hero_title`] === '' && config[`col_${blockId}_hero_subtitle`] === '');
 
   return (
     <>
@@ -158,32 +161,36 @@ export const CatalogPage: React.FC = () => {
                   zIndex: 2,
                   display: 'block',
                   margin: '0 auto',
-                  transform: `translate(${bgX}px, ${bgY}px)`
+                  transform: `translate(${bgX}px, ${bgY}px) scale(${bgScale})`
                 }} 
               />
             </>
           )}
           <div className="collection-page__banner-overlay" style={{ zIndex: 3 }} />
-          <div 
-            className="page-width collection-page__banner-content glass"
-            style={{
-              '--card-x': `${cardX}px`,
-              '--card-y': `${cardY}px`,
-              '--card-scale': cardScale,
-              zIndex: 4
-            } as React.CSSProperties}
-          >
-            <div className="divider" style={{ marginBottom: 16 }} />
-            <h1 className="collection-page__title">
-              {catTitle}
-            </h1>
-            {catSub && (
-              <p className="collection-page__desc muted-text">{catSub}</p>
-            )}
-            <p className="collection-page__count muted-text" style={{ marginTop: 12, fontSize: 11, letterSpacing: '0.1em' }}>
-              {loading ? '...' : `${filtered.length} PRODUCTOS`}
-            </p>
-          </div>
+          {showCard && (
+            <div 
+              className="page-width collection-page__banner-content glass"
+              style={{
+                '--card-x': `${cardX}px`,
+                '--card-y': `${cardY}px`,
+                '--card-scale': cardScale,
+                zIndex: 4
+              } as React.CSSProperties}
+            >
+              <div className="divider" style={{ marginBottom: 16 }} />
+              {config[`col_${blockId}_hero_title`] !== '' && (
+                <h1 className="collection-page__title">
+                  {catTitle}
+                </h1>
+              )}
+              {config[`col_${blockId}_hero_subtitle`] !== '' && catSub && (
+                <p className="collection-page__desc muted-text">{catSub}</p>
+              )}
+              <p className="collection-page__count muted-text" style={{ marginTop: 12, fontSize: 11, letterSpacing: '0.1em' }}>
+                {loading ? '...' : `${filtered.length} PRODUCTOS`}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="page-width section-sm">
