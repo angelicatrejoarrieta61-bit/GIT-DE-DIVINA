@@ -151,31 +151,42 @@ export const Header: React.FC = () => {
 
           {/* Desktop Nav */}
           <nav className="header__nav" aria-label="Navegación principal">
-            {headerLinks.map((link, idx) => (
-              <NavLink
-                key={idx}
-                to={link.path}
-                className={({ isActive }) => `header__nav-link ${isActive ? 'active' : ''}`}
-                end={link.path === '/'}
-              >
-                {link.path === '/' && homeIconUrl ? (
-                  <img
-                    src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
-                    alt="Inicio"
-                    style={{
-                      height: '2.8em',
-                      maxHeight: '36px',
-                      width: 'auto',
-                      objectFit: 'contain',
-                      display: 'block',
-                      filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))',
-                    }}
-                  />
-                ) : (
-                  link.label
-                )}
-              </NavLink>
-            ))}
+            {(() => {
+              const servicePaths = ['/quienes-somos', '/contacto', '/blog'];
+              const firstServiceIdx = headerLinks.findIndex(l => servicePaths.includes(l.path));
+              return headerLinks.map((link, idx) => {
+                const isService = servicePaths.includes(link.path);
+                return (
+                  <React.Fragment key={idx}>
+                    {idx === firstServiceIdx && (
+                      <span className="header__nav-separator" />
+                    )}
+                    <NavLink
+                      to={link.path}
+                      className={({ isActive }) => `header__nav-link ${isService ? 'header__nav-link--service' : ''} ${isActive ? 'active' : ''}`}
+                      end={link.path === '/'}
+                    >
+                      {link.path === '/' && homeIconUrl ? (
+                        <img
+                          src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
+                          alt="Inicio"
+                          style={{
+                            height: '2.8em',
+                            maxHeight: '36px',
+                            width: 'auto',
+                            objectFit: 'contain',
+                            display: 'block',
+                            filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))',
+                          }}
+                        />
+                      ) : (
+                        link.label
+                      )}
+                    </NavLink>
+                  </React.Fragment>
+                );
+              });
+            })()}
           </nav>
 
           {/* Actions */}

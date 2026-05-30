@@ -79,6 +79,32 @@
   color: var(--c-lime);
 }
 
+.header__nav-separator {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 8px;
+  display: inline-block;
+  align-self: center;
+}
+
+.header__nav-link--service {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-size: calc(var(--header-menu-size, 13px) - 1px);
+  margin: 0 2px;
+  transition: all 0.25s ease-in-out;
+}
+
+.header__nav-link--service:hover,
+.header__nav-link--service.active {
+  background: rgba(196, 252, 21, 0.08) !important;
+  border-color: rgba(196, 252, 21, 0.3) !important;
+  color: var(--c-lime);
+}
+
 /* Actions */
 .header__actions {
   display: flex;
