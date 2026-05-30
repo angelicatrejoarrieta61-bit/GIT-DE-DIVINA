@@ -5,10 +5,11 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadAsset, getImageUrl } from '../../lib/supabase';
 import {
   getAdminBlogPosts,
   createBlogPost,
+  updateBlogPost,
   deleteBlogPost,
   toggleBlogPostPublished,
   type BlogPost,
@@ -60,6 +61,7 @@ function ArticleContent({ html }: { html: string }) {
 
 // ─── Sub-componente: Panel de artículo (preview o existente) ────
 interface ArticlePanelProps {
+  key?:         string | number;
   post:         PreviewPost | BlogPost;
   isPreview?:   boolean;
   publishing?:  boolean;
@@ -67,13 +69,41 @@ interface ArticlePanelProps {
   onDiscard?:   () => void;
   onToggle?:    () => void;
   onDelete?:    () => void;
+  onUpdateCoverImage?: (newUrl: string) => Promise<void> | void;
 }
 
 function ArticlePanel({
   post, isPreview = false, publishing = false,
-  onPublish, onDiscard, onToggle, onDelete,
+  onPublish, onDiscard, onToggle, onDelete, onUpdateCoverImage,
 }: ArticlePanelProps) {
   const blogPost = post as BlogPost;
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    setUploadError('');
+    try {
+      const fileSlug = post.slug || 'blog-post';
+      const path = await uploadAsset(file, fileSlug);
+      if (path) {
+        const fullUrl = getImageUrl(path);
+        if (onUpdateCoverImage) {
+          await onUpdateCoverImage(fullUrl);
+        }
+      } else {
+        setUploadError('No se pudo subir la imagen.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUploadError('Error al subir la imagen.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: '820px', margin: '0 auto', padding: '32px 28px 60px' }}>
@@ -149,17 +179,152 @@ function ArticlePanel({
         )}
       </div>
 
-      {/* Imagen de portada */}
-      {post.cover_image && (
-        <div style={{ borderRadius: '18px', overflow: 'hidden', marginBottom: '28px', height: '280px' }}>
+      {/* Imagen de portada interactiva */}
+      <div style={{
+        position: 'relative',
+        borderRadius: '18px',
+        overflow: 'hidden',
+        marginBottom: '28px',
+        height: '280px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(255,255,255,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: uploadingImage ? 'not-allowed' : 'pointer',
+      }}>
+        {post.cover_image ? (
           <img
             src={post.cover_image}
             alt={post.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: uploadingImage ? 'blur(4px) brightness(0.5)' : 'none',
+              transition: 'filter 0.3s ease',
+            }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
+        ) : (
+          <div style={{ textAlign: 'center', color: 'var(--c-text-muted)', padding: '40px' }}>
+            <span style={{ fontSize: '48px', display: 'block', marginBottom: '12px' }}>📷</span>
+            <span style={{ fontFamily: 'var(--f-sub)', fontSize: '13px', fontWeight: 600, color: 'var(--c-lime)' }}>
+              Agregar Imagen de Portada
+            </span>
+            <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '4px' }}>
+              Formatos recomendados: PNG, JPG, WEBP
+            </span>
+          </div>
+        )}
+
+        {/* Overlay de carga */}
+        {uploadingImage && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(10,10,10,0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+          }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              border: '2px solid var(--c-lime)',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <span style={{ fontSize: '12px', color: 'var(--c-lime)', fontFamily: 'var(--f-sub)', fontWeight: 600 }}>
+              Subiendo imagen a Supabase...
+            </span>
+          </div>
+        )}
+
+        {/* Botón/Capa interactiva para disparar input de archivo */}
+        {!uploadingImage && (
+          <label
+            htmlFor="blog-cover-file-input"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: post.cover_image ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.1)',
+              transition: 'background 0.2s',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => {
+              if (post.cover_image) {
+                e.currentTarget.style.background = 'rgba(0,0,0,0.5)';
+                const childBtn = e.currentTarget.querySelector('.hover-btn') as HTMLElement;
+                if (childBtn) childBtn.style.opacity = '1';
+              }
+            }}
+            onMouseLeave={e => {
+              if (post.cover_image) {
+                e.currentTarget.style.background = 'rgba(0,0,0,0)';
+                const childBtn = e.currentTarget.querySelector('.hover-btn') as HTMLElement;
+                if (childBtn) childBtn.style.opacity = '0';
+              }
+            }}
+          >
+            {post.cover_image && (
+              <span
+                className="hover-btn"
+                style={{
+                  background: 'rgba(0,0,0,0.75)',
+                  color: 'var(--c-white)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  borderRadius: '30px',
+                  padding: '8px 16px',
+                  fontSize: '12px',
+                  fontFamily: 'var(--f-sub)',
+                  fontWeight: 600,
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                📷 Cambiar Portada
+              </span>
+            )}
+          </label>
+        )}
+
+        {/* Input de archivo real pero oculto */}
+        <input
+          id="blog-cover-file-input"
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          disabled={uploadingImage}
+          style={{ display: 'none' }}
+        />
+      </div>
+
+      {/* Error de carga si ocurre */}
+      {uploadError && (
+        <div style={{
+          color: '#ff8080',
+          background: 'rgba(255,80,80,0.08)',
+          border: '1px solid rgba(255,80,80,0.18)',
+          borderRadius: '10px',
+          padding: '10px 14px',
+          fontSize: '12px',
+          marginBottom: '20px',
+          fontFamily: 'var(--f-sub)',
+        }}>
+          ⚠️ {uploadError}
         </div>
       )}
 
@@ -409,6 +574,27 @@ export function AdminBlog() {
     await deleteBlogPost(post.id);
     if (selectedPost?.id === post.id) setSelectedPost(null);
     await loadPosts();
+  };
+
+  // ── Actualizar imagen de portada de post existente ───────────
+  const handleUpdateCoverImage = async (postId: string, newUrl: string) => {
+    try {
+      const success = await updateBlogPost(postId, { cover_image: newUrl });
+      if (!success) throw new Error('Error al actualizar en la base de datos');
+      
+      setSuccessMsg('✅ Imagen de portada actualizada correctamente');
+      setTimeout(() => setSuccessMsg(''), 5000);
+      
+      setSelectedPost(prev => prev?.id === postId ? { ...prev, cover_image: newUrl } : prev);
+      await loadPosts();
+    } catch (err) {
+      setError(`❌ Error al actualizar portada: ${String(err)}`);
+    }
+  };
+
+  // ── Actualizar imagen de portada del preview temporal ────────
+  const handleUpdatePreviewCover = (newUrl: string) => {
+    setPreview(prev => prev ? { ...prev, cover_image: newUrl } : null);
   };
 
   const selectedProduct = products.find(p => p.id === selectedProdId);
@@ -691,20 +877,24 @@ export function AdminBlog() {
         {/* Preview del post generado */}
         {!generating && preview && (
           <ArticlePanel
+            key="preview"
             post={preview}
             isPreview
             publishing={publishing}
             onPublish={handlePublish}
             onDiscard={() => setPreview(null)}
+            onUpdateCoverImage={handleUpdatePreviewCover}
           />
         )}
 
         {/* Post existente seleccionado */}
         {!generating && !preview && selectedPost && (
           <ArticlePanel
+            key={selectedPost.id}
             post={selectedPost}
             onToggle={() => handleToggle(selectedPost)}
             onDelete={() => handleDelete(selectedPost)}
+            onUpdateCoverImage={(url) => handleUpdateCoverImage(selectedPost.id, url)}
           />
         )}
       </main>

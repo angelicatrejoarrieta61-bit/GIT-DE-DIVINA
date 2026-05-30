@@ -22,15 +22,12 @@ export const AdminUsers: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'list' }
-      });
+      const { data, error: fnError } = await supabase.rpc('get_admin_users');
       if (fnError) throw new Error(fnError.message);
-      if (!data?.success) throw new Error(data?.error || 'Error al obtener usuarios');
       
-      setUsers(data.users || []);
+      setUsers(data || []);
     } catch (err: any) {
-      setError(err.message || 'Error al conectar con la Edge Function. Verifica que hiciste deploy.');
+      setError(err.message || 'Error al obtener usuarios. Asegúrate de haber ejecutado el código SQL.');
     } finally {
       setLoading(false);
     }
@@ -47,11 +44,11 @@ export const AdminUsers: React.FC = () => {
     setCreating(true);
     setError('');
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'create', email: newEmail, password: newPassword }
+      const { error: fnError } = await supabase.rpc('create_admin_user', {
+        new_email: newEmail,
+        new_password: newPassword
       });
       if (fnError) throw new Error(fnError.message);
-      if (!data?.success) throw new Error(data?.error || 'Error al crear usuario');
       
       setNewEmail('');
       setNewPassword('');
@@ -67,11 +64,10 @@ export const AdminUsers: React.FC = () => {
     if (!confirm(`¿Estás seguro de eliminar permanentemente al usuario ${email}?`)) return;
     
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'delete', userId }
+      const { error: fnError } = await supabase.rpc('delete_admin_user', {
+        target_user_id: userId
       });
       if (fnError) throw new Error(fnError.message);
-      if (!data?.success) throw new Error(data?.error || 'Error al eliminar usuario');
       
       await fetchUsers();
     } catch (err: any) {
