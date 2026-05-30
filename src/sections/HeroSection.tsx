@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
 import './HeroSection.css';
@@ -18,8 +18,43 @@ export const HeroSection: React.FC<Props> = ({
   btn1 = 'Explorar Catálogo',
   btn2 = 'Ver Cremas & Sérums',
 }) => {
+  const [leftColor, setLeftColor] = useState('rgba(6,6,6,1)');
+  const [rightColor, setRightColor] = useState('rgba(6,6,6,1)');
+
+  useEffect(() => {
+    if (!imageUrl) return;
+    const imgUrl = getImageUrl(imageUrl, { width: 400, quality: 60 });
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imgUrl;
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const leftPixel = ctx.getImageData(0, Math.floor(img.height / 2), 1, 1).data;
+          const rightPixel = ctx.getImageData(img.width - 1, Math.floor(img.height / 2), 1, 1).data;
+          setLeftColor(`rgb(${leftPixel[0]}, ${leftPixel[1]}, ${leftPixel[2]})`);
+          setRightColor(`rgb(${rightPixel[0]}, ${rightPixel[1]}, ${rightPixel[2]})`);
+        }
+      } catch (e) {
+        console.warn('Canvas color extraction failed:', e);
+      }
+    };
+  }, [imageUrl]);
+
   return (
-    <section className="hero" id="hero" aria-label="Hero principal">
+    <section 
+      className="hero" 
+      id="hero" 
+      aria-label="Hero principal"
+      style={{
+        background: `linear-gradient(to right, ${leftColor} 0%, ${leftColor} 25%, ${rightColor} 75%, ${rightColor} 100%)`
+      }}
+    >
       {/* Background */}
       <div className="hero__media">
         {imageUrl ? (
