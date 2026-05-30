@@ -419,6 +419,20 @@ export const AdminConfig: React.FC = () => {
         getAdminProducts()
       ]);
       setConfigs(c);
+      // ── Apply saved fonts to Admin document immediately on load ──
+      {
+        const heading = c.font_heading || 'Francois One';
+        const sub     = c.font_sub     || 'Barlow Semi Condensed';
+        const body    = c.font_body    || 'Catamaran';
+        const fontUrl = `https://fonts.googleapis.com/css2?family=${heading.replace(/ /g,'+')}:wght@400;600;700;800&family=${sub.replace(/ /g,'+')}:wght@300;400;500;600;700&family=${body.replace(/ /g,'+')}:wght@300;400;500;600;700;800&display=swap`;
+        let lnk = document.getElementById('admin-dynamic-fonts') as HTMLLinkElement | null;
+        if (!lnk) { lnk = document.createElement('link'); lnk.id = 'admin-dynamic-fonts'; lnk.rel = 'stylesheet'; document.head.appendChild(lnk); }
+        lnk.href = fontUrl;
+        const root = document.documentElement;
+        root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
+        root.style.setProperty('--f-sub',     `"${sub}", sans-serif`);
+        root.style.setProperty('--f-body',    `"${body}", sans-serif`);
+      }
       setCollections(col);
       setProducts(prods);
       setOrders(ords);
@@ -467,7 +481,35 @@ export const AdminConfig: React.FC = () => {
   };
 
   const updateConfig = async (key: string, value: string) => {
-    setConfigs(prev => ({ ...prev, [key]: value }));
+    setConfigs(prev => {
+      const next = { ...prev, [key]: value };
+
+      // ── Apply font CSS vars immediately to THIS document (Admin panel) ──
+      if (key === 'font_heading' || key === 'font_sub' || key === 'font_body') {
+        const heading  = key === 'font_heading' ? value : (next.font_heading  || 'Francois One');
+        const sub      = key === 'font_sub'     ? value : (next.font_sub      || 'Barlow Semi Condensed');
+        const body     = key === 'font_body'    ? value : (next.font_body     || 'Catamaran');
+
+        // Load fonts into admin document
+        const fontUrl = `https://fonts.googleapis.com/css2?family=${heading.replace(/ /g,'+')}:wght@400;600;700;800&family=${sub.replace(/ /g,'+')}:wght@300;400;500;600;700&family=${body.replace(/ /g,'+')}:wght@300;400;500;600;700;800&display=swap`;
+        let link = document.getElementById('admin-dynamic-fonts') as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.id  = 'admin-dynamic-fonts';
+          link.rel = 'stylesheet';
+          document.head.appendChild(link);
+        }
+        link.href = fontUrl;
+
+        // Apply CSS variables on admin document root
+        const root = document.documentElement;
+        root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
+        root.style.setProperty('--f-sub',     `"${sub}", sans-serif`);
+        root.style.setProperty('--f-body',    `"${body}", sans-serif`);
+      }
+
+      return next;
+    });
   };
 
   const saveFrost = async (data: typeof DEFAULT_FROST) => {
