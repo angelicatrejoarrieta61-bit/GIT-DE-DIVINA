@@ -1,4 +1,4 @@
-@ -1,16 +1,24 @@
+@ -1,28 +1,39 @@
 /**
  * BlogPostPage.tsx — Vista individual de artículo
  * Diseño premium oscuro consistente con Divina Store MX
@@ -26,7 +26,9 @@ function formatDate(iso: string): string {
 }
 
 function readingTime(html: string): number {
-@ -20,9 +28,12 @@ function readingTime(html: string): number {
+  const words = html.replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length;
+  return Math.max(1, Math.round(words / 200));
+}
 
 function injectHeadingIds(html: string): string {
   let i = 0;
