@@ -134,3 +134,89 @@ export const toggleBlogPostPublished = async (
 ): Promise<boolean> => {
   return updateBlogPost(id, { published });
 };
+/**
+ * AGREGAR ESTA FUNCION AL ARCHIVO EXISTENTE: src/lib/blog-queries.ts
+ *
+ * Busca productos en Supabase cuya marca o tags coincidan con los
+ * tags del articulo del blog o su categoria.
+ * Se usa en BlogPostPage para mostrar productos reales relacionados.
+ */
+
+import { supabase } from './supabase';
+import type { Product } from '../types';
+
+export async function getProductsByBrandOrTags(
+  tags: string[],
+  category: string,
+  limit = 4
+): Promise<Product[]> {
+  // Extraer marcas conocidas de los tags del post
+  const KNOWN_BRANDS = ['ISDIN', 'La Roche-Posay', 'Vichy', 'CeraVe', 'Eucerin', 'Neutrogena', 'Avene'];
+
+  const brandMatches = tags
+    .map(t => KNOWN_BRANDS.find(b => t.toLowerCase().includes(b.toLowerCase())))
+    .filter(Boolean) as string[];
+
+  // Mapeo de categoria del blog → keyword de busqueda en productos
+  const CATEGORY_KEYWORD_MAP: Record<string, string> = {
+    'Cuidado de Piel': 'hidratante',
+    'Rutinas':         'sérum',
+    'Ingredientes':    'activo',
+    'Consejos':        'piel',
+  };
+
+  const categoryKeyword = CATEGORY_KEYWORD_MAP[category] ?? '';
+
+  // 1. Si hay coincidencia de marca, busca por marca primero
+  if (brandMatches.length > 0) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, slug, brand, price, compare_price, image_url, images, tags, in_stock, description')
+      .in('brand', brandMatches)
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && data && data.length >= 2) {
+      return data as Product[];
+    }
+  }
+
+  // 2. Busca por tags del post que coincidan con tags de producto
+  if (tags.length > 0) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, slug, brand, price, compare_price, image_url, images, tags, in_stock, description')
+      .overlaps('tags', tags)
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && data && data.length >= 2) {
+      return data as Product[];
+    }
+  }
+
+  // 3. Fallback: productos por keyword de categoria en nombre o descripcion
+  if (categoryKeyword) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, slug, brand, price, compare_price, image_url, images, tags, in_stock, description')
+      .or(`name.ilike.%${categoryKeyword}%,description.ilike.%${categoryKeyword}%`)
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && data) return data as Product[];
+  }
+
+  // 4. Ultimo recurso: best sellers
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, slug, brand, price, compare_price, image_url, images, tags, in_stock, description')
+    .eq('in_stock', true)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  return (data as Product[]) ?? [];
+}
