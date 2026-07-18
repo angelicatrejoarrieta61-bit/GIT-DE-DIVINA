@@ -42,7 +42,7 @@ function injectHeadingIds(html: string): string {
 function ReadingProgress() {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
-@ -35,29 +46,106 @@ function ReadingProgress() {
+function ReadingProgress() {
     return () => window.removeEventListener('scroll', handler);
   }, []);
   return (
@@ -151,7 +151,7 @@ export function BlogPostPage() {
   }, [slug, navigate]);
 
   if (loading) return (
-@ -70,6 +158,49 @@ export function BlogPostPage() {
+ export function BlogPostPage() {
   if (!post) return null;
 
   const mins = readingTime(post.content);
@@ -201,7 +201,7 @@ export function BlogPostPage() {
   const html = injectHeadingIds(post.content)
     .replace(/<h3([^>]*)>/gi, '<h3 style="font-family:var(--f-sub);font-size:18px;font-weight:700;color:var(--c-white);margin:32px 0 12px;">')
     .replace(/<p>/gi, '<p style="color:rgba(255,255,255,0.72);font-size:16px;line-height:1.8;margin-bottom:20px;">')
-@ -78,45 +209,93 @@ export function BlogPostPage() {
+ export function BlogPostPage() {
 
   return (
     <>
@@ -312,7 +312,7 @@ export function BlogPostPage() {
                   {formatDate(post.created_at)}
                 </time>
                 <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-@ -125,43 +304,86 @@ export function BlogPostPage() {
+ export function BlogPostPage() {
                 </span>
               </div>
 
@@ -417,7 +417,7 @@ export function BlogPostPage() {
                 <div style={{
                   marginTop: '48px', borderRadius: '16px',
                   background: 'var(--c-surface-2)', border: '1px solid rgba(196,252,21,0.2)',
-@ -179,11 +401,29 @@ export function BlogPostPage() {
+ export function BlogPostPage() {
                     Ver catálogo
                   </Link>
                 </div>
@@ -449,7 +449,7 @@ export function BlogPostPage() {
                     También te puede <span style={{ color: 'var(--c-lime)' }}>interesar</span>
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-@ -194,17 +434,23 @@ export function BlogPostPage() {
+ export function BlogPostPage() {
                         border: '1px solid rgba(255,255,255,0.07)',
                         background: 'var(--c-surface-2)',
                         transition: 'border-color 0.2s',
