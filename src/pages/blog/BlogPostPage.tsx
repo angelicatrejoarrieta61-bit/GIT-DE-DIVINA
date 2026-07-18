@@ -1,4 +1,4 @@
-@ -1,28 +1,39 @@
+
 /**
  * BlogPostPage.tsx — Vista individual de artículo
  * Diseño premium oscuro consistente con Divina Store MX
@@ -478,7 +478,7 @@ export function BlogPostPage() {
                         </div>
                       </Link>
                     ))}
-@ -219,7 +465,7 @@ export function BlogPostPage() {
+export function BlogPostPage() {
                 </Link>
               </div>
             </article>
