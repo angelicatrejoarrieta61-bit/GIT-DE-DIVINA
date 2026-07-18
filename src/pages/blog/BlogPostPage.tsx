@@ -1,5 +1,5 @@
 
-/**
+/*
  * BlogPostPage.tsx — Vista individual de artículo
  * Diseño premium oscuro consistente con Divina Store MX
  * BlogPostPage.tsx — Divina Store MX
