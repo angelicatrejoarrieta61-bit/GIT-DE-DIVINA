@@ -17,11 +17,10 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/checkout", "destination": "/index.html" },
-    { "source": "/pago-exitoso", "destination": "/index.html" },
-    { "source": "/pago-error", "destination": "/index.html" },
-    { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/(.*)", "destination": "/index.html" }
+    { "source": "/checkout", "destination": "/" },
+    { "source": "/pago-exitoso", "destination": "/" },
+    { "source": "/pago-error", "destination": "/" },
+    { "source": "/admin", "destination": "/" },
+    { "source": "/admin/:path*", "destination": "/" }
   ]
 }
