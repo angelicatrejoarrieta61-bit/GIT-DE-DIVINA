@@ -4,6 +4,7 @@ import { useCartStore } from '../store/cartStore';
 import { createOrder, updateOrderStatus, getStoreConfig } from '../lib/queries';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
+import { analyticsItems, trackEvent } from '../lib/analytics';
 
 declare const ClipSDK: new (apiKey: string) => {
   element: {
@@ -267,6 +268,7 @@ export const CheckoutPage: React.FC = () => {
 
       // PASO 4: Pago exitoso
       await updateOrderStatus(order.id, 'paid');
+      trackEvent('purchase', { transaction_id: order.id, currency: 'MXN', value: finalTotal, coupon: couponCode || undefined, items: analyticsItems(items) });
       clearCart();
       navigate(`/pago-exitoso?order=${order.id}`);
 

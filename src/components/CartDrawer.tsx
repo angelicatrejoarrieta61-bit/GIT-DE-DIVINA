@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl, supabase } from '../lib/supabase';
 import { getStoreConfig } from '../lib/queries';
 import './CartDrawer.css';
+import { analyticsItems, trackEvent } from '../lib/analytics';
 
 type CheckoutState = 'idle' | 'loading' | 'error';
 
@@ -64,9 +65,10 @@ export const CartDrawer: React.FC = () => {
 
   const handleCheckout = useCallback(() => {
     if (!items.length) return;
+    trackEvent('begin_checkout', { currency: 'MXN', value: totalAfterDiscount(), coupon: couponCode || undefined, items: analyticsItems(items) });
     closeCart();
     navigate('/checkout');
-  }, [items, closeCart, navigate]);
+  }, [items, closeCart, navigate, totalAfterDiscount, couponCode]);
 
   return (
     <>

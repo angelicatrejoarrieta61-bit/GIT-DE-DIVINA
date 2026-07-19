@@ -20,6 +20,7 @@ import {
 } from '../../lib/blog-queries';
 import { getImageUrl } from '../../lib/supabase';
 import type { Product } from '../../types';
+import { NotFoundPage } from '../NotFoundPage';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&q=80';
 
@@ -312,7 +313,7 @@ export function BlogPostPage() {
   }, [slug, navigate]);
 
   if (loading) return <PostSkeleton />;
-  if (!post) return null;
+  if (!post) return <NotFoundPage />;
 
   const mins = readingTime(post.content);
   const canonical = `${SITE}/blog/${post.slug}`;

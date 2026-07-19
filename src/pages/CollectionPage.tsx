@@ -7,6 +7,7 @@ import { ProductCard } from '../components/ProductCard';
 import type { Product, Collection } from '../types';
 import { Seo } from '../components/Seo';
 import { buildCollectionSemantic } from '../lib/useSemantic';
+import { NotFoundPage } from './NotFoundPage';
 import './CollectionPage.css';
 
 export const CollectionPage: React.FC = () => {
@@ -85,6 +86,8 @@ export const CollectionPage: React.FC = () => {
   }, [slug]);
 
   const blockId = slug;
+
+  if (!loading && !collection) return <NotFoundPage />;
   
   const bgImg = config[`col_${blockId}_hero_img`] 
     ? getImageUrl(config[`col_${blockId}_hero_img`], { width: 1920, quality: 80 }) 

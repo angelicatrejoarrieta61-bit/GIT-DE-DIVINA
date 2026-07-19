@@ -4,6 +4,7 @@ import { useCartStore } from '../store/cartStore';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
 import type { Product } from '../types';
 import './ProductCard.css';
+import { analyticsItem, trackEvent } from '../lib/analytics';
 
 interface Props {
   product: Product;
@@ -17,6 +18,7 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
     e.preventDefault();
     e.stopPropagation();
     addItem(product);
+    trackEvent('add_to_cart', { currency: 'MXN', value: product.price, items: [analyticsItem(product)] });
   };
 
   const discount = product.compare_price && product.compare_price > product.price

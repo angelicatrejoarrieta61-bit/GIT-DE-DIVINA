@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { CartDrawer } from './components/CartDrawer';
@@ -26,6 +27,7 @@ import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
 import { CatalogPage } from './pages/CatalogPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { trackPageView } from './lib/analytics';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -56,14 +58,28 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AnalyticsRouteTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    const timer = window.setTimeout(() => trackPageView(`${location.pathname}${location.search}`), 0);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.search]);
+  return null;
+}
+
+function NoIndex({ children }: { children: React.ReactNode }) {
+  return <><Helmet><meta name="robots" content="noindex, nofollow" /></Helmet>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <RouteRedirector />
+      <AnalyticsRouteTracker />
       <Routes>
         {/* Admin routes — no header/footer */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin/login" element={<NoIndex><AdminLogin /></NoIndex>} />
+        <Route path="/admin" element={<NoIndex><AdminLayout /></NoIndex>}>
           <Route index element={<Navigate to="/admin/config?section=site-general" replace />} />
           <Route path="productos"  element={<AdminProducts />} />
           <Route path="import"     element={<AdminImport />} />
@@ -82,9 +98,9 @@ export default function App() {
         <Route path="/quienes-somos"     element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
         <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
         <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
-        <Route path="/checkout"          element={<PublicLayout><CheckoutPage /></PublicLayout>} />
-        <Route path="/pago-exitoso"      element={<PublicLayout><PaymentSuccessPage /></PublicLayout>} />
-        <Route path="/pago-error"        element={<PublicLayout><PaymentErrorPage /></PublicLayout>} />
+        <Route path="/checkout"          element={<NoIndex><PublicLayout><CheckoutPage /></PublicLayout></NoIndex>} />
+        <Route path="/pago-exitoso"      element={<NoIndex><PublicLayout><PaymentSuccessPage /></PublicLayout></NoIndex>} />
+        <Route path="/pago-error"        element={<NoIndex><PublicLayout><PaymentErrorPage /></PublicLayout></NoIndex>} />
 
         {/* ── Blog ── */}
         <Route path="/blog"       element={<PublicLayout><BlogPage /></PublicLayout>} />

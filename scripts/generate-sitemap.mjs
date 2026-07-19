@@ -10,8 +10,8 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('No se puede generar sitemap.xml: faltan las variables de Supabase.');
 }
 
-async function fetchSlugs(table, filter = '') {
-  const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${table}?select=slug${filter}`;
+async function fetchRows(table, select, filter = '') {
+  const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${table}?select=${encodeURIComponent(select)}${filter}`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: supabaseKey,
@@ -22,13 +22,13 @@ async function fetchSlugs(table, filter = '') {
     throw new Error(`No se pudieron leer ${table}: HTTP ${response.status}`);
   }
   const data = await response.json();
-  return data.map(row => row.slug).filter(Boolean);
+  return data;
 }
 
 // Consultas consecutivas: evita conexiones simultáneas innecesarias durante el build.
-const collections = await fetchSlugs('collections');
-const products = await fetchSlugs('products', '&in_stock=eq.true');
-const posts = await fetchSlugs('blog_posts', '&published=eq.true');
+const collections = await fetchRows('collections', 'slug,name,description,image_url');
+const products = await fetchRows('products', 'slug,name,brand,price,description,image_url,in_stock', '&in_stock=eq.true');
+const posts = await fetchRows('blog_posts', 'slug,title,excerpt,cover_image,category,author,created_at', '&published=eq.true');
 
 const urls = [
   ['/', 'daily', '1.0'],
@@ -36,9 +36,9 @@ const urls = [
   ['/quienes-somos', 'monthly', '0.6'],
   ['/contacto', 'monthly', '0.5'],
   ['/blog', 'weekly', '0.7'],
-  ...collections.map(slug => [`/coleccion/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
-  ...products.map(slug => [`/producto/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
-  ...posts.map(slug => [`/blog/${encodeURIComponent(slug)}`, 'monthly', '0.6']),
+  ...collections.map(({ slug }) => [`/coleccion/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
+  ...products.map(({ slug }) => [`/producto/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
+  ...posts.map(({ slug }) => [`/blog/${encodeURIComponent(slug)}`, 'monthly', '0.6']),
 ];
 
 const uniqueUrls = [...new Map(urls.map(entry => [entry[0], entry])).values()];
@@ -55,4 +55,5 @@ ${uniqueUrls.map(([path, changefreq, priority]) => `  <url>
 `;
 
 await writeFile(new URL('../public/sitemap.xml', import.meta.url), xml, 'utf8');
+await writeFile(new URL('./.seo-data.json', import.meta.url), JSON.stringify({ collections, products, posts }), 'utf8');
 console.log(`sitemap.xml generado con ${uniqueUrls.length} URLs de ${SITE_URL}`);

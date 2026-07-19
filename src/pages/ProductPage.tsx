@@ -17,8 +17,10 @@ import { getProductBySlug } from '../lib/queries';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
 import { useCartStore } from '../store/cartStore';
 import { buildProductSemantic } from '../lib/useSemantic';
+import { Seo } from '../components/Seo';
 import type { Product } from '../types';
 import './ProductPage.css';
+import { analyticsItem, trackEvent, trackOnce } from '../lib/analytics';
 
 // ── Tipos extendidos para los campos nuevos ──────────────────────────────────
 interface IngredientInfo {
@@ -113,9 +115,14 @@ export const ProductPage: React.FC = () => {
     });
   }, [slug]);
 
+  useEffect(() => {
+    if (product) trackOnce(`view_item:${product.id}`, 'view_item', { currency: 'MXN', value: product.price, items: [analyticsItem(product)] });
+  }, [product]);
+
   const handleAdd = () => {
     if (!product) return;
     for (let i = 0; i < qty; i++) addItem(product);
+    trackEvent('add_to_cart', { currency: 'MXN', value: product.price * qty, items: [analyticsItem(product, qty)] });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -134,9 +141,13 @@ export const ProductPage: React.FC = () => {
   );
 
   if (!product) return (
-    <div style={{ paddingTop: 'calc(var(--nav-h) + 60px)', textAlign: 'center' }} className="page-width section">
-      <h2>Producto no encontrado</h2>
-    </div>
+    <>
+      <Seo title="Producto no encontrado | Divina Store" description="El producto solicitado no existe o ya no está disponible." path={`/producto/${slug || ''}`} noindex />
+      <div style={{ paddingTop: 'calc(var(--nav-h) + 60px)', textAlign: 'center' }} className="page-width section">
+        <h1>Producto no encontrado</h1>
+        <Link to="/catalogo" className="btn btn-lime">Ver catálogo</Link>
+      </div>
+    </>
   );
 
   const semantic = buildProductSemantic(product as never, slug!);
