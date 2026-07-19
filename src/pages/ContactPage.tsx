@@ -98,7 +98,7 @@ export const ContactPage: React.FC = () => {
             message: form.message,
             subscribe: form.register,
           }),
-        }).catch(() => {}); // Falla silenciosamente si SMTP no está configurado
+        }).catch(() => {}); // El mensaje del cliente ya fue guardado aunque falle la notificación por correo.
 
       } catch(err) { 
         console.error('Contact form error:', err);

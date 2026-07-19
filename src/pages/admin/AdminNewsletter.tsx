@@ -38,6 +38,8 @@ export const AdminNewsletter: React.FC = () => {
   const [manualEmails, setManualEmails] = useState('');
   const [dbProducts, setDbProducts] = useState<{ id: string; name: string; price: number; image_url: string }[]>([]);
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(DEFAULT_BLOCKS);
+  const [subject, setSubject] = useState('Novedades exclusivas de Divina Store');
+  const [isPromoterTemplate, setIsPromoterTemplate] = useState(false);
 
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -304,6 +306,10 @@ export const AdminNewsletter: React.FC = () => {
 
   // ── FIX 4: total se fija DESPUÉS de conocer la lista real ──
   const handleSend = async () => {
+    if (isPromoterTemplate) {
+      alert('La plantilla de promotor se envía automáticamente al completar el registro. No necesita lanzarse como campaña manual.');
+      return;
+    }
     const list = subscribers.filter(s => selectedIds.has(s.id));
 
     if (list.length === 0) {
@@ -314,6 +320,14 @@ export const AdminNewsletter: React.FC = () => {
 
     setSending(true);
     setSendProgress({ current: 0, total: list.length });
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setSending(false);
+      alert('Tu sesión de administrador venció. Vuelve a iniciar sesión.');
+      return;
+    }
 
     const baseHtml = buildHtml();
     let errors = 0;
@@ -332,10 +346,10 @@ export const AdminNewsletter: React.FC = () => {
         try {
           const res = await fetch('/api/send-email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
             body: JSON.stringify({
               type: 'campaign',
-              subject: 'Novedades exclusivas de Divina Store',
+              subject,
               to: s.email,
               htmlBody: personalizedHtml,
             }),
@@ -343,8 +357,8 @@ export const AdminNewsletter: React.FC = () => {
 
           if (!res.ok) {
             const data = await res.json();
-            // Error 451 temporal — esperar y reintentar
-            if (String(data.error).includes('451')) {
+            // Resend puede limitar temporalmente el ritmo de envíos.
+            if (res.status === 429 || res.status >= 500) {
               await new Promise(r => setTimeout(r, 2500));
               continue;
             }
@@ -353,8 +367,8 @@ export const AdminNewsletter: React.FC = () => {
 
           sent = true;
           setSendProgress(prev => ({ ...prev, current: i + 1 }));
-          // Pausa entre correos para no saturar el SMTP de HostGator
-          await new Promise(r => setTimeout(r, 1200));
+          // Espacio corto entre solicitudes para respetar el límite de Resend.
+          await new Promise(r => setTimeout(r, 650));
         } catch (err) {
           if (attempts >= 3) {
             console.error(`Error definitivo → ${s.email}:`, err);
@@ -376,16 +390,22 @@ export const AdminNewsletter: React.FC = () => {
 
   const handleTestConnection = async () => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        alert('Tu sesión de administrador venció. Vuelve a iniciar sesión.');
+        return;
+      }
       const res = await fetch('/api/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ type: 'test' }),
       });
       const data = await res.json();
-      if (data.ok) alert(`EXITO: ${data.message}`);
-      else alert(`ERROR: ${data.error}\n\nConfig: ${JSON.stringify(data.config, null, 2)}`);
+      if (data.ok) alert(`ÉXITO: ${data.message}`);
+      else alert(`ERROR: ${data.error}`);
     } catch {
-      alert('Fallo total de conexión con la API /send-email.');
+      alert('No fue posible conectar con el servicio de correo Resend.');
     }
   };
 
@@ -469,6 +489,8 @@ export const AdminNewsletter: React.FC = () => {
       { id: Date.now().toString() + '-5', type: 'button', content: { text: 'APLICAR DESCUENTO', url: 'https://divinastore.com.mx/catalog', color: '#c4fc15' } }
     ];
     setBlocks(template);
+    setSubject('Un descuento especial para ti | Divina Store');
+    setIsPromoterTemplate(false);
   };
 
   const loadBirthdayTemplate = () => {
@@ -484,6 +506,24 @@ export const AdminNewsletter: React.FC = () => {
       { id: Date.now().toString() + '-5', type: 'button', content: { text: 'RECLAMAR MI REGALO', url: 'https://divinastore.com.mx/catalog', color: '#c4fc15' } }
     ];
     setBlocks(template);
+    setSubject('¡Feliz cumpleaños! Tenemos una sorpresa para ti');
+    setIsPromoterTemplate(false);
+  };
+
+  const loadPromoterTemplate = () => {
+    if (blocks.length > 0 && !window.confirm('¿Mostrar la plantilla automática de bienvenida para promotores?')) return;
+    const now = Date.now().toString();
+    const template: NewsletterBlock[] = [
+      { id: `${now}-1`, type: 'greeting', content: { prefix: '¡Hola, ', suffix: '!', color: '#c4fc15' } },
+      { id: `${now}-2`, type: 'title', content: { text: '¡Ya eres parte del Programa DIVINA!', align: 'center', color: '#ffffff' } },
+      { id: `${now}-3`, type: 'text', content: { text: 'Comparte tu código o liga personal. Cada venta pagada de cualquier producto te genera una comisión del <strong>12%</strong>.', align: 'center' } },
+      { id: `${now}-4`, type: 'title', content: { text: 'TU CÓDIGO: {{codigo_promotor}}', align: 'center', color: '#c4fc15' } },
+      { id: `${now}-5`, type: 'button', content: { text: 'ABRIR MI LIGA PERSONAL', url: 'https://divinastore.com.mx/?ref={{codigo_promotor}}', color: '#c4fc15' } },
+      { id: `${now}-6`, type: 'text', content: { text: 'La venta debe estar pagada. Los pedidos cancelados o reembolsados no generan comisión. La atribución dura 30 días.', align: 'center' } },
+    ];
+    setBlocks(template);
+    setSubject('Ya estás dentro: tu código DIVINA es {{codigo_promotor}}');
+    setIsPromoterTemplate(true);
   };
 
   // Bloques de tipo products para el selector del panel derecho
@@ -659,6 +699,26 @@ export const AdminNewsletter: React.FC = () => {
             <span style={{ fontSize: 13, flexShrink: 0 }}>🎂</span>
             <span>CUMPLEAÑOS</span>
           </button>
+          <button
+            onClick={loadPromoterTemplate}
+            style={{
+              ...blockBtn,
+              width: '100%',
+              marginTop: 5,
+              padding: '6px 8px',
+              background: 'linear-gradient(135deg, #243000, #101600)',
+              border: '1px solid #c4fc15',
+              color: '#c4fc15',
+              fontSize: 9,
+              flexDirection: 'row',
+              gap: 6,
+              justifyContent: 'flex-start',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 13, flexShrink: 0 }}>🤝</span>
+            <span>PROMOTOR AUTOMÁTICO</span>
+          </button>
         </div>
       </aside>
 
@@ -671,13 +731,32 @@ export const AdminNewsletter: React.FC = () => {
               💾 BORRADOR
             </button>
             <button onClick={handleTestConnection} className="btn btn-outline" style={{ padding: '5px 12px', fontWeight: 700, fontSize: 10, letterSpacing: 0.5, borderColor: '#444' }}>
-              🔌 PROBAR SMTP
+              ✉️ PROBAR RESEND
             </button>
           </div>
           <button onClick={handleSend} disabled={sending} className="btn btn-lime" style={{ padding: '5px 14px', fontWeight: 800, fontSize: 10, letterSpacing: 0.5 }}>
             {sending ? '⏳ ENVIANDO...' : `🚀 LANZAR A ${selectedIds.size} SELECCIONADOS`}
           </button>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px' }}>
+          <label htmlFor="newsletter-subject" style={{ color: '#888', fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>ASUNTO</label>
+          <input
+            id="newsletter-subject"
+            className="input-dark"
+            value={subject}
+            onChange={event => { setSubject(event.target.value); if (isPromoterTemplate) setIsPromoterTemplate(false); }}
+            maxLength={180}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <span style={{ color: '#c4fc15', fontSize: 9, fontWeight: 800, whiteSpace: 'nowrap' }}>ENVÍO CON RESEND</span>
+        </div>
+
+        {isPromoterTemplate && (
+          <div style={{ margin: '0 12px', padding: '10px 12px', border: '1px solid rgba(196,252,21,.45)', borderRadius: 8, color: '#c4fc15', background: 'rgba(196,252,21,.06)', fontSize: 11 }}>
+            Esta es la plantilla automática. Al registrarse un promotor, el sistema reemplaza nombre, código y liga personal y la envía sin lanzar una campaña manual.
+          </div>
+        )}
 
         {sending && (
           <div style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '12px', borderRadius: 8, textAlign: 'center', fontWeight: 600 }}>
