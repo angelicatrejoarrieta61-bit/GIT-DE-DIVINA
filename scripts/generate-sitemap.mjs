@@ -34,6 +34,7 @@ const urls = [
   ['/', 'daily', '1.0'],
   ['/catalogo', 'daily', '0.9'],
   ['/quienes-somos', 'monthly', '0.6'],
+  ['/programa-promocion', 'monthly', '0.7'],
   ['/contacto', 'monthly', '0.5'],
   ['/blog', 'weekly', '0.7'],
   ...collections.map(({ slug }) => [`/coleccion/${encodeURIComponent(slug)}`, 'weekly', '0.8']),

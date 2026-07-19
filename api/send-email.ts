@@ -3,6 +3,9 @@ import { Resend } from 'resend';
 
 const FROM = 'Divina Store MX <admin@divinastore.com.mx>';
 const TO = 'info@divinastore.com.mx';
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -17,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const { type, firstName, email, message, subscribe, to, subject, htmlBody } = req.body || {};
+  const { type, firstName, email, message, subscribe, to, subject, htmlBody, promoterCode, promoterLink } = req.body || {};
 
   // ── MODO TEST ──
   if (type === 'test') {
@@ -46,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error } = await resend.emails.send({
         from: FROM,
         to: [TO],
-        reply_to: email,
+        replyTo: email,
         subject: `Nuevo contacto - ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -75,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error } = await resend.emails.send({
         from: FROM,
         to: [TO],
-        reply_to: email,
+        replyTo: email,
         subject: `Nuevo suscriptor - ${firstName || email}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -102,6 +105,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         to: [to],
         subject: subject || 'Novedades de Divina Store',
         html: htmlBody,
+      });
+      if (error) throw new Error(error.message);
+    }
+
+    // PROMOTER WELCOME — confirmation, personal code and referral link
+    if (type === 'promoter-welcome') {
+      if (!email || !promoterCode || !promoterLink) {
+        return res.status(400).json({ ok: false, error: 'Faltan datos del promotor' });
+      }
+      if (!/^[A-Z0-9-]{8,40}$/.test(String(promoterCode))) {
+        return res.status(400).json({ ok: false, error: 'Código de promotor no válido' });
+      }
+      const safeName = escapeHtml(firstName || 'Promotor/a DIVINA');
+      const safeEmail = escapeHtml(email);
+      const safeCode = escapeHtml(promoterCode);
+      const safeLink = `https://www.divinastore.com.mx/?ref=${encodeURIComponent(String(promoterCode))}`;
+      const { error } = await resend.emails.send({
+        from: FROM,
+        to: [email],
+        replyTo: TO,
+        subject: `Ya estás dentro: tu código DIVINA es ${promoterCode}`,
+        html: `
+          <div style="margin:0;background:#070707;padding:32px 14px;font-family:Arial,sans-serif;color:#fff;">
+            <div style="max-width:620px;margin:0 auto;background:#111;border:1px solid #2b2b2b;border-radius:20px;overflow:hidden;">
+              <div style="height:8px;background:#c4fc15;"></div>
+              <div style="padding:36px 32px;">
+                <p style="color:#c4fc15;font-size:11px;font-weight:700;letter-spacing:2px;margin:0 0 16px;">PROGRAMA DE PROMOCIÓN DIVINA</p>
+                <h1 style="font-size:32px;line-height:1.1;margin:0 0 18px;">¡Ya estás inscrito/a, ${safeName}!</h1>
+                <p style="color:#b8b8b8;line-height:1.6;">Comparte tu código o liga personal. Cada venta pagada de cualquier producto te genera una comisión del <strong style="color:#fff;">12%</strong>.</p>
+                <p style="font-size:12px;color:#888;margin:26px 0 7px;">TU CÓDIGO</p>
+                <div style="padding:18px;border-radius:10px;background:#050505;border:1px solid #c4fc15;color:#c4fc15;font-size:22px;font-weight:800;letter-spacing:1px;text-align:center;">${safeCode}</div>
+                <p style="font-size:12px;color:#888;margin:22px 0 7px;">TU LIGA PERSONAL</p>
+                <a href="${safeLink}" style="display:block;padding:15px;border-radius:10px;background:#c4fc15;color:#000;font-weight:800;text-align:center;text-decoration:none;word-break:break-all;">${safeLink}</a>
+                <div style="margin-top:28px;padding-top:24px;border-top:1px solid #292929;color:#aaa;font-size:13px;line-height:1.7;">
+                  <strong style="color:#fff;">Recuerda:</strong> la venta debe estar pagada; pedidos cancelados o reembolsados no generan comisión. La atribución de tu liga dura 30 días.
+                </div>
+                <p style="font-size:12px;color:#777;margin-top:26px;">Este mensaje fue enviado a ${safeEmail}. Si necesitas ayuda, responde a este correo.</p>
+              </div>
+            </div>
+          </div>`,
       });
       if (error) throw new Error(error.message);
     }

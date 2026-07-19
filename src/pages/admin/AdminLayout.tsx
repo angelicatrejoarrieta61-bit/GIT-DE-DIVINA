@@ -237,6 +237,13 @@ export const AdminLayout: React.FC = () => {
           </NavLink>
 
           <NavLink
+            to="/admin/promotores"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            💚 Promotores y Comisiones
+          </NavLink>
+
+          <NavLink
             to="/admin/usuarios"
             className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
           >

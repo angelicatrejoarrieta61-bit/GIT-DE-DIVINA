@@ -35,7 +35,7 @@ export const Footer: React.FC = () => {
     footer_col2_l4: 'Grooming : /coleccion/grooming',
     
     footer_col3_title: 'Otras Secciones',
-    footer_col3_l1: 'Programa de promoción : /pages/programa-de-promocion',
+    footer_col3_l1: 'Programa de promoción : /programa-promocion',
     footer_col3_l2: 'Programa testers : /pages/programa-testers',
     footer_col3_l3: 'Legales y Copyright : /pages/legales',
   });
@@ -65,9 +65,14 @@ export const Footer: React.FC = () => {
   const parseLink = (val: string) => {
     if (!val) return { label: '', url: '' };
     const parts = val.split(':');
+    const configuredUrl = parts.slice(1).join(':').trim() || '/';
+    const legacyUrls: Record<string, string> = {
+      '/pages/programa-de-promocion': '/programa-promocion',
+      '/programa-de-promocion': '/programa-promocion',
+    };
     return {
       label: parts[0]?.trim() || '',
-      url: parts.slice(1).join(':').trim() || '/'
+      url: legacyUrls[configuredUrl] || configuredUrl
     };
   };
 

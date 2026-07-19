@@ -28,6 +28,9 @@ import { FloatingContactBubble } from './components/FloatingContactBubble';
 import { CatalogPage } from './pages/CatalogPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { trackPageView } from './lib/analytics';
+import { capturePromoterReferral } from './lib/promoterTracking';
+import { PromotionProgramPage } from './pages/PromotionProgramPage';
+import { AdminPromoters } from './pages/admin/AdminPromoters';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -61,6 +64,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 function AnalyticsRouteTracker() {
   const location = useLocation();
   useEffect(() => {
+    capturePromoterReferral(location.search);
     const timer = window.setTimeout(() => trackPageView(`${location.pathname}${location.search}`), 0);
     return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
@@ -85,6 +89,7 @@ export default function App() {
           <Route path="import"     element={<AdminImport />} />
           <Route path="config"     element={<AdminConfig />} />
           <Route path="reportes"   element={<AdminOrderReports />} />
+          <Route path="promotores" element={<AdminPromoters />} />
           <Route path="mensajes"   element={<AdminMessages />} />
           <Route path="newsletter" element={<AdminNewsletter />} />
           <Route path="blog"       element={<AdminBlog />} />
@@ -96,6 +101,7 @@ export default function App() {
         <Route path="/coleccion/:slug"   element={<PublicLayout><CollectionPage /></PublicLayout>} />
         <Route path="/producto/:slug"    element={<PublicLayout><ProductPage /></PublicLayout>} />
         <Route path="/quienes-somos"     element={<PublicLayout><QuienesSomosPage /></PublicLayout>} />
+        <Route path="/programa-promocion" element={<PublicLayout><PromotionProgramPage /></PublicLayout>} />
         <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
         <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
         <Route path="/checkout"          element={<NoIndex><PublicLayout><CheckoutPage /></PublicLayout></NoIndex>} />

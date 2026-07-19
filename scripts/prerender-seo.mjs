@@ -46,6 +46,7 @@ async function emit(route, meta) {
 const staticRoutes = [
   { path: '/catalogo', title: 'Catálogo de skincare original | Divina Store', description: 'Descubre skincare original de ISDIN, La Roche-Posay, Vichy y más, con envío a todo México.' },
   { path: '/quienes-somos', title: 'Quiénes somos | Divina Store', description: 'Conoce Divina Store, tienda mexicana de skincare original donde la belleza nace del corazón.' },
+  { path: '/programa-promocion', title: 'Programa de promoción: gana 12% | Divina Store', description: 'Recomienda productos Divina Store con tu código o liga personal y gana 12% por cada venta válida. Regístrate gratis.' },
   { path: '/contacto', title: 'Contacto | Divina Store', description: 'Contacta a Divina Store para recibir ayuda con productos, pedidos y cuidado de la piel.' },
   { path: '/blog', title: 'Consejos de skincare | Blog Divina Store', description: 'Guías, rutinas e ingredientes para cuidar tu piel y elegir mejor tus productos de skincare.' },
 ];

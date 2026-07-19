@@ -5,6 +5,7 @@ import { createOrder, updateOrderStatus, getStoreConfig } from '../lib/queries';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
+import { getPromoterCode, normalizePromoterCode, savePromoterCode } from '../lib/promoterTracking';
 
 declare const ClipSDK: new (apiKey: string) => {
   element: {
@@ -81,6 +82,7 @@ export const CheckoutPage: React.FC = () => {
 
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+  const [promoterCode, setPromoterCode] = useState(() => getPromoterCode());
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +238,7 @@ export const CheckoutPage: React.FC = () => {
         total: finalTotal,
         status: 'pending',
         accepts_marketing: form.accepts_marketing,
+        promoter_code: promoterCode || undefined,
       });
 
       if (!order) throw new Error('No se pudo registrar la orden. Intenta de nuevo.');
@@ -558,6 +561,20 @@ export const CheckoutPage: React.FC = () => {
                     {couponError && <p style={{ color: '#ff4444', fontSize: 11, marginTop: 4, marginLeft: 4, fontWeight: 'bold' }}>{couponError}</p>}
                   </div>
                 )}
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16, marginBottom: 16 }}>
+                <label htmlFor="checkout-promoter-code" style={{ display: 'block', fontSize: 11, color: '#aaa', marginBottom: 6, fontWeight: 700 }}>CÓDIGO DE PROMOTOR/A (OPCIONAL)</label>
+                <input
+                  id="checkout-promoter-code"
+                  type="text"
+                  placeholder="Ej. DIVINA-LUIS-A1B2C3"
+                  value={promoterCode}
+                  onChange={event => setPromoterCode(normalizePromoterCode(event.target.value))}
+                  onBlur={() => { if (promoterCode) savePromoterCode(promoterCode); }}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', textTransform: 'uppercase' }}
+                />
+                <small style={{ display: 'block', color: '#777', marginTop: 5 }}>Si llegaste con una liga personal, el código aparece automáticamente.</small>
               </div>
 
               {couponCode ? (

@@ -58,4 +58,24 @@ export interface Order {
   customer_reference?: string;
   payment_info?: any;
   accepts_marketing?: boolean;
+  promoter_id?: string;
+  promoter_code?: string;
+  commission_rate?: number;
+  commission_amount?: number;
+  commission_status?: 'not_applicable' | 'pending' | 'paid' | 'cancelled';
+  commission_paid_at?: string;
+}
+
+export interface Promoter {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  social_handle?: string;
+  code: string;
+  status: 'active' | 'paused';
+  commission_rate: number;
+  terms_accepted: boolean;
+  created_at?: string;
+  updated_at?: string;
 }

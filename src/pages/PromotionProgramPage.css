@@ -1,0 +1,63 @@
+.promo-page { padding-top: var(--nav-h); overflow: hidden; background: #000; }
+.promo-hero { min-height: 650px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); align-items: center; gap: 64px; position: relative; }
+.promo-hero::before { content: ''; position: absolute; width: 540px; height: 540px; right: -120px; top: 30px; border-radius: 50%; background: radial-gradient(circle, rgba(196,252,21,.18), transparent 68%); filter: blur(20px); }
+.promo-kicker, .promo-section-heading span { display: block; color: var(--c-lime); font: 700 11px/1.4 var(--f-accent); letter-spacing: .18em; margin-bottom: 18px; }
+.promo-hero h1 { font-size: clamp(58px, 8vw, 112px); line-height: .88; letter-spacing: -.035em; max-width: 800px; }
+.promo-hero h1 span { color: var(--c-lime); }
+.promo-hero__copy > p { max-width: 650px; color: rgba(255,255,255,.7); font-size: 20px; line-height: 1.6; margin: 32px 0; }
+.promo-hero__rate { aspect-ratio: 1; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: var(--c-lime); color: #000; position: relative; z-index: 1; box-shadow: 0 0 100px rgba(196,252,21,.2); }
+.promo-hero__rate strong { font: 900 clamp(86px, 12vw, 150px)/.8 var(--f-heading); letter-spacing: -.06em; }
+.promo-hero__rate span { max-width: 210px; margin-top: 24px; font: 700 14px/1.25 var(--f-accent); text-transform: uppercase; }
+.promo-how, .promo-rules { padding-top: 110px; padding-bottom: 120px; }
+.promo-section-heading { max-width: 660px; margin-bottom: 50px; }
+.promo-section-heading h2, .promo-register h2 { font-size: clamp(40px, 6vw, 72px); }
+.promo-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.promo-steps article { min-height: 300px; padding: 34px; background: #0b0b0b; border: 1px solid rgba(255,255,255,.1); border-radius: 28px; display: flex; flex-direction: column; }
+.promo-steps b { color: var(--c-lime); font: 700 13px var(--f-accent); }
+.promo-steps h3 { font-size: 32px; margin-top: auto; margin-bottom: 16px; }
+.promo-steps p { color: rgba(255,255,255,.58); line-height: 1.6; }
+.promo-register { background: #0a0a0a; border-block: 1px solid rgba(255,255,255,.08); padding: 100px 0; }
+.promo-register__grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 80px; align-items: start; }
+.promo-register__grid > div:first-child > p { color: rgba(255,255,255,.65); font-size: 18px; margin: 25px 0; }
+.promo-benefits { display: grid; gap: 14px; }
+.promo-benefits li { border-bottom: 1px solid rgba(255,255,255,.1); padding: 0 0 14px 28px; position: relative; }
+.promo-benefits li::before { content: '✓'; color: var(--c-lime); position: absolute; left: 0; font-weight: 900; }
+.promo-form-card { background: #111; border: 1px solid rgba(196,252,21,.22); border-radius: 30px; padding: clamp(24px, 5vw, 48px); box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+.promo-form-card h2 { font-size: 42px; margin-bottom: 8px; }
+.promo-form-card form > p, .promo-success > p { color: rgba(255,255,255,.58); margin-bottom: 28px; }
+.promo-form-card label:not(.promo-check), .promo-success label { display: block; color: rgba(255,255,255,.75); font: 700 12px var(--f-sub); margin: 18px 0 7px; text-transform: uppercase; letter-spacing: .07em; }
+.promo-form-card input:not([type='checkbox']) { width: 100%; height: 52px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.035); color: #fff; padding: 0 15px; outline: none; }
+.promo-form-card input:focus { border-color: var(--c-lime); box-shadow: 0 0 0 3px rgba(196,252,21,.08); }
+.promo-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.promo-check { display: flex; align-items: flex-start; gap: 10px; color: rgba(255,255,255,.7); line-height: 1.4; margin: 24px 0; cursor: pointer; }
+.promo-check input { margin-top: 3px; flex: 0 0 auto; }
+.promo-submit { width: 100%; justify-content: center; }
+.promo-submit:disabled { opacity: .65; cursor: wait; }
+.promo-form-card small { display: block; text-align: center; color: rgba(255,255,255,.4); margin-top: 12px; }
+.promo-honeypot { position: absolute !important; opacity: 0 !important; pointer-events: none !important; height: 1px !important; width: 1px !important; }
+.promo-error { color: #ff8a8a !important; background: rgba(255,70,70,.08); border: 1px solid rgba(255,70,70,.25); padding: 11px 14px; border-radius: 8px; margin: 0 0 16px !important; }
+.promo-success__eyebrow { color: var(--c-lime); font: 700 11px var(--f-accent); letter-spacing: .12em; }
+.promo-share-value { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #050505; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; min-height: 56px; padding: 10px 10px 10px 16px; }
+.promo-share-value strong { color: var(--c-lime); letter-spacing: .08em; }
+.promo-share-value span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.promo-share-value button { background: rgba(196,252,21,.12); color: var(--c-lime); padding: 8px 11px; border-radius: 7px; font-weight: 800; }
+.promo-success .btn { width: 100%; justify-content: center; margin-top: 28px; }
+.promo-rules ol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; counter-reset: rules; }
+.promo-rules li { background: #0a0a0a; border: 1px solid rgba(255,255,255,.09); border-radius: 18px; padding: 24px; color: rgba(255,255,255,.65); line-height: 1.6; }
+.promo-rules li strong { color: #fff; }
+.promo-rules > p { margin-top: 28px; color: rgba(255,255,255,.6); }
+.promo-rules a { color: var(--c-lime); text-decoration: underline; }
+@media (max-width: 850px) {
+  .promo-hero { grid-template-columns: 1fr; padding-top: 90px; padding-bottom: 90px; min-height: auto; gap: 54px; }
+  .promo-hero__rate { width: min(78vw, 410px); justify-self: center; }
+  .promo-steps, .promo-register__grid { grid-template-columns: 1fr; }
+  .promo-register__grid { gap: 48px; }
+}
+@media (max-width: 560px) {
+  .promo-hero h1 { font-size: 54px; }
+  .promo-hero__copy > p { font-size: 17px; }
+  .promo-steps, .promo-rules ol, .promo-form-row { grid-template-columns: 1fr; }
+  .promo-how, .promo-rules { padding-top: 80px; padding-bottom: 80px; }
+  .promo-form-card { border-radius: 20px; }
+  .promo-share-value--link { align-items: stretch; flex-direction: column; }
+}

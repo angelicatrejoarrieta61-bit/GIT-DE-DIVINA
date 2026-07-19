@@ -1,0 +1,40 @@
+.promoters-admin { padding: 38px; max-width: 1500px; margin: 0 auto; color: #fff; }
+.promoters-admin__header { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 30px; }
+.promoters-admin__kicker { color: var(--c-lime); font: 700 10px var(--f-accent); letter-spacing: .16em; }
+.promoters-admin__header h1 { font-size: 42px; margin: 9px 0; }
+.promoters-admin__header p { color: rgba(255,255,255,.52); }
+.promoters-admin__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+.promoters-admin__stats article { border: 1px solid rgba(255,255,255,.09); background: #0a0a0a; border-radius: 16px; padding: 22px; display: grid; gap: 8px; }
+.promoters-admin__stats span, .promoter-row__metric span { color: rgba(255,255,255,.45); font-size: 12px; }
+.promoters-admin__stats strong { font-size: 28px; }
+.promoters-admin__stats .is-lime { background: var(--c-lime); color: #000; }
+.promoters-admin__stats .is-lime span { color: rgba(0,0,0,.6); }
+.promoters-admin__toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+.promoters-admin__toolbar input { flex: 1; min-width: 0; height: 44px; background: #0b0b0b; border: 1px solid rgba(255,255,255,.1); color: #fff; border-radius: 10px; padding: 0 14px; }
+.promoters-admin__toolbar button { border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #fff; padding: 0 18px; }
+.promoters-admin__list { display: grid; gap: 8px; }
+.promoter-row { background: #090909; border: 1px solid rgba(255,255,255,.08); border-radius: 15px; overflow: hidden; }
+.promoter-row__main { display: grid; grid-template-columns: minmax(250px, 1.5fr) repeat(3, minmax(110px, .65fr)) minmax(200px, auto); align-items: center; gap: 14px; padding: 14px; }
+.promoter-row__identity { display: flex; align-items: center; text-align: left; gap: 12px; color: #fff; min-width: 0; }
+.promoter-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%; background: rgba(196,252,21,.13); color: var(--c-lime); font-weight: 900; }
+.promoter-row__identity > span:last-child { min-width: 0; }
+.promoter-row__identity strong, .promoter-row__identity small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.promoter-row__identity small { color: rgba(255,255,255,.42); margin-top: 3px; }
+.promoter-row__metric { display: grid; gap: 3px; }
+.promoter-row__metric strong small { color: rgba(255,255,255,.42); font-weight: 400; }
+.promoter-row__metric--lime strong { color: var(--c-lime); }
+.promoter-row__actions { display: flex; justify-content: flex-end; gap: 7px; }
+.promoter-row__actions button { padding: 9px 11px; border-radius: 8px; font-weight: 700; font-size: 11px; }
+.status-active { color: #78e08f; background: rgba(60,180,90,.12); }
+.status-paused { color: #ffb85c; background: rgba(255,180,70,.12); }
+.pay-button { color: #000; background: var(--c-lime); }
+.promoter-row__actions button:disabled { opacity: .35; cursor: not-allowed; }
+.promoter-row__details { border-top: 1px solid rgba(255,255,255,.08); padding: 16px 22px 22px 68px; background: rgba(255,255,255,.015); }
+.promoter-row__contact { display: flex; flex-wrap: wrap; gap: 8px 24px; color: rgba(255,255,255,.5); font-size: 12px; margin-bottom: 14px; }
+.promoter-sale { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid rgba(255,255,255,.06); padding: 12px 0; }
+.promoter-sale > span:last-child { text-align: right; }
+.promoter-sale small { display: block; color: rgba(255,255,255,.43); }
+.promoters-admin__empty, .promoters-admin__error { padding: 40px; text-align: center; background: #090909; border: 1px solid rgba(255,255,255,.08); border-radius: 15px; color: rgba(255,255,255,.55); }
+.promoters-admin__error { color: #ff9a9a; border-color: rgba(255,80,80,.2); margin-bottom: 14px; }
+@media (max-width: 1100px) { .promoters-admin__stats { grid-template-columns: 1fr 1fr; } .promoter-row__main { grid-template-columns: 1fr 1fr; } .promoter-row__identity, .promoter-row__actions { grid-column: 1 / -1; } .promoter-row__actions { justify-content: flex-start; } }
+@media (max-width: 650px) { .promoters-admin { padding: 22px 14px; } .promoters-admin__header { align-items: flex-start; flex-direction: column; } .promoters-admin__header h1 { font-size: 34px; } .promoters-admin__stats { grid-template-columns: 1fr; } .promoter-row__main { grid-template-columns: 1fr 1fr; } .promoter-row__details { padding-left: 18px; } .promoter-sale { flex-direction: column; } .promoter-sale > span:last-child { text-align: left; } }
