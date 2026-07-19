@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getStoreConfig } from '../lib/queries';
 import { supabase, getImageUrl } from '../lib/supabase';
+import { Seo } from '../components/Seo';
 import './ContactPage.css';
 import './CollectionPage.css';
 
@@ -109,6 +110,11 @@ export const ContactPage: React.FC = () => {
 
   return (
     <div className="contact-page collection-page" style={{ paddingTop: 'var(--nav-h)' }}>
+      <Seo
+        title="Contacto y atención al cliente — Divina Store MX"
+        description="¿Necesitas ayuda con un producto o pedido? Contacta a Divina Store MX por formulario, correo o WhatsApp."
+        path="/contacto"
+      />
       {/* Banner Hero */}
       <div 
         className="collection-page__banner"

@@ -15,6 +15,16 @@ export interface Product {
   image_status?: string;
   sku?: string;
   collection?: Collection | null;
+  routine_step?: string;
+  concentration?: string;
+  concerns?: string[];
+  skin_types?: string[];
+  how_to_use?: string;
+  ingredients?: string[];
+  benefits?: string[];
+  meta_keywords?: string[];
+  faq?: Array<{ q: string; a: string }>;
+  ingredients_info?: Array<{ name: string; benefit: string; pct?: string }>;
 }
 
 export interface Collection {

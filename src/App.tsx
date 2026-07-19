@@ -25,6 +25,7 @@ import { StoreThemeProvider } from './components/StoreThemeProvider';
 import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
 import { CatalogPage } from './pages/CatalogPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -88,6 +89,7 @@ export default function App() {
         {/* ── Blog ── */}
         <Route path="/blog"       element={<PublicLayout><BlogPage /></PublicLayout>} />
         <Route path="/blog/:slug" element={<PublicLayout><BlogPostPage /></PublicLayout>} />
+        <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
       </Routes>
     </BrowserRouter>
   );

@@ -142,7 +142,6 @@ export const toggleBlogPostPublished = async (
  * Se usa en BlogPostPage para mostrar productos reales relacionados.
  */
 
-import { supabase } from './supabase';
 import type { Product } from '../types';
 
 export async function getProductsByBrandOrTags(

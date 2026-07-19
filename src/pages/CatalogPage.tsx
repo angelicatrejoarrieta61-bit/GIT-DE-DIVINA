@@ -8,6 +8,8 @@ import type { Product } from '../types';
 import './CatalogPage.css';
 import './CollectionPage.css';
 
+const SITE_URL = 'https://www.divinastore.com.mx';
+
 export const CatalogPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
@@ -51,7 +53,7 @@ export const CatalogPage: React.FC = () => {
     '@type': 'CollectionPage',
     name: 'Catalogo Completo — Divina Store MX',
     description: 'Explora todos los productos de skincare y grooming premium disponibles en Divina Store MX. ISDIN, La Roche-Posay, Vichy y mas.',
-    url: 'https://git-de-divina.vercel.app/catalogo',
+    url: `${SITE_URL}/catalogo`,
     breadcrumb: {
       '@type': 'BreadcrumbList',
       itemListElement: [
@@ -59,13 +61,13 @@ export const CatalogPage: React.FC = () => {
           '@type': 'ListItem',
           position: 1,
           name: 'Inicio',
-          item: 'https://git-de-divina.vercel.app'
+          item: SITE_URL
         },
         {
           '@type': 'ListItem',
           position: 2,
           name: 'Catalogo',
-          item: 'https://git-de-divina.vercel.app/catalogo'
+          item: `${SITE_URL}/catalogo`
         }
       ]
     },
@@ -79,7 +81,7 @@ export const CatalogPage: React.FC = () => {
           item: {
             '@type': 'Product',
             name: p.name,
-            url: `https://git-de-divina.vercel.app/producto/${p.slug}`,
+            url: `${SITE_URL}/producto/${p.slug}`,
             image: p.image_url ? getImageUrl(p.image_url, { width: 600, quality: 80 }) : '',
             brand: { '@type': 'Brand', name: p.brand || 'Divina Store MX' },
             offers: {
@@ -119,18 +121,23 @@ export const CatalogPage: React.FC = () => {
       <Helmet>
         <title>Catalogo Completo | Skincare y Grooming Premium — Divina Store MX</title>
         <meta name="description" content="Explora todos nuestros productos de skincare y grooming premium en Mexico. ISDIN, La Roche-Posay, Vichy y mas. Envio a CDMX y toda la republica." />
-        <link rel="canonical" href="https://git-de-divina.vercel.app/catalogo" />
+        <link rel="canonical" href={`${SITE_URL}/catalogo`} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://git-de-divina.vercel.app/catalogo" />
+        <meta property="og:url" content={`${SITE_URL}/catalogo`} />
         <meta property="og:title" content="Catalogo Completo | Skincare Premium — Divina Store MX" />
         <meta property="og:description" content="ISDIN, La Roche-Posay, Vichy y mas. Skincare premium original con envio a CDMX y toda la republica." />
-        <meta property="og:image" content="https://git-de-divina.vercel.app/og-image.jpg" />
+        <meta property="og:image" content={`${SITE_URL}/og-image.jpg`} />
         <meta property="og:locale" content="es_MX" />
         <meta property="og:site_name" content="Divina Store MX" />
         <script type="application/ld+json">{JSON.stringify(catalogSchema)}</script>
       </Helmet>
 
       <div className="collection-page catalog-page" style={{ paddingTop: 'var(--nav-h)' }}>
+        {!showCard && (
+          <h1 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
+            Catálogo de skincare y grooming premium
+          </h1>
+        )}
         {/* Banner */}
         <div className="collection-page__banner" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
           {bgImg && (

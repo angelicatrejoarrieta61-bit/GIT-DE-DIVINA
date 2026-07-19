@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getBlogPosts, type BlogPost } from '../../lib/blog-queries';
+import { Seo } from '../../components/Seo';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&q=80';
 
@@ -170,6 +171,11 @@ export function BlogPage() {
 
   return (
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+      <Seo
+        title="Blog de skincare y bienestar urbano — Divina Store MX"
+        description="Guías de skincare, rutinas e ingredientes para cuidar tu piel frente a la contaminación y el clima de la Ciudad de México."
+        path="/blog"
+      />
 
       {/* ── Hero ── */}
       <section style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBlock: '60px 48px' }}>

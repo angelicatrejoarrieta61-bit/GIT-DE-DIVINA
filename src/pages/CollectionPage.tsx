@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams, Link } from 'react-router-dom';
 import { getProductsByCollection, getCollectionBySlug, getStoreConfig } from '../lib/queries';
 import { getImageUrl, supabase } from '../lib/supabase';
 import { ProductCard } from '../components/ProductCard';
 import type { Product, Collection } from '../types';
+import { Seo } from '../components/Seo';
+import { buildCollectionSemantic } from '../lib/useSemantic';
 import './CollectionPage.css';
 
 export const CollectionPage: React.FC = () => {
@@ -100,9 +103,27 @@ export const CollectionPage: React.FC = () => {
   const catSub = config[`col_${blockId}_hero_subtitle`] || collection?.description;
 
   const showCard = !(config[`col_${blockId}_hero_title`] === '' && config[`col_${blockId}_hero_subtitle`] === '');
+  const semantic = buildCollectionSemantic({
+    name: collection?.name || catTitle || 'Colección',
+    slug: slug || '',
+    description: collection?.description || catSub,
+    products,
+  });
 
   return (
     <div className="collection-page" style={{ paddingTop: 'var(--nav-h)' }}>
+      <Seo
+        title={semantic.title}
+        description={semantic.description}
+        path={`/coleccion/${slug || ''}`}
+        image={semantic.ogImage}
+      />
+      <Helmet>
+        <meta name="keywords" content={semantic.keywords} />
+        {semantic.schemas.map((schema, index) => (
+          <script key={index} type="application/ld+json">{JSON.stringify(schema)}</script>
+        ))}
+      </Helmet>
       {/* Banner */}
       <div 
         className="collection-page__banner"

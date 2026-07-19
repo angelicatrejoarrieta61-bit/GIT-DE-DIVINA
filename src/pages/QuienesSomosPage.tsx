@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getStoreConfig } from '../lib/queries';
 import { supabase, getImageUrl } from '../lib/supabase';
+import { Seo } from '../components/Seo';
 import './QuienesSomosPage.css';
 
 export const QuienesSomosPage: React.FC = () => {
@@ -45,6 +46,11 @@ export const QuienesSomosPage: React.FC = () => {
 
   return (
     <div className="about-page" style={{ paddingTop: 'var(--nav-h)' }}>
+      <Seo
+        title="Quiénes somos | La historia de Divina Store MX"
+        description="Conoce el origen, propósito y legado familiar de Divina Store MX: belleza, autocuidado e identidad inspirados por Angélica."
+        path="/quienes-somos"
+      />
       {/* Hero */}
       <section className="about-hero">
         {config.about_hero_img && (
