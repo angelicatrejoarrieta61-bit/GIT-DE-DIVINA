@@ -65,14 +65,28 @@ export const Footer: React.FC = () => {
   const parseLink = (val: string) => {
     if (!val) return { label: '', url: '' };
     const parts = val.split(':');
+    const label = parts[0]?.trim() || '';
     const configuredUrl = parts.slice(1).join(':').trim() || '/';
     const legacyUrls: Record<string, string> = {
       '/pages/programa-de-promocion': '/programa-promocion',
       '/programa-de-promocion': '/programa-promocion',
     };
+    const fallbackUrls: Record<string, string> = {
+      'catalogo general': '/catalogo',
+      'catálogo general': '/catalogo',
+      '¿quienes somos?': '/quienes-somos',
+      '¿quiénes somos?': '/quienes-somos',
+      'quienes somos': '/quienes-somos',
+      'quiénes somos': '/quienes-somos',
+      'contáctanos': '/contacto',
+      'contactanos': '/contacto',
+      'programa de promoción': '/programa-promocion',
+      'programa de promocion': '/programa-promocion',
+    };
+    const normalizedLabel = label.toLocaleLowerCase('es-MX');
     return {
-      label: parts[0]?.trim() || '',
-      url: legacyUrls[configuredUrl] || configuredUrl
+      label,
+      url: legacyUrls[configuredUrl] || (configuredUrl === '/' ? fallbackUrls[normalizedLabel] || '/' : configuredUrl)
     };
   };
 
