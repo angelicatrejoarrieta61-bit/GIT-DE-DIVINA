@@ -1,4 +1,5 @@
 {
+  "cleanUrls": true,
   "functions": {
     "api/send-email.ts": {
       "maxDuration": 60

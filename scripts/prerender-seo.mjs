@@ -36,9 +36,11 @@ function head({ title, description, path, image = DEFAULT_IMAGE, type = 'website
 
 async function emit(route, meta) {
   const html = template.replace(/<!-- SEO_PRERENDER_START -->[\s\S]*?<!-- SEO_PRERENDER_END -->/, head(meta));
-  const dir = new URL(`../dist${route}/`, import.meta.url);
+  const segments = route.split('/').filter(Boolean);
+  const fileName = `${segments.pop()}.html`;
+  const dir = new URL(`../dist/${segments.join('/')}/`, import.meta.url);
   await mkdir(dir, { recursive: true });
-  await writeFile(new URL('index.html', dir), html, 'utf8');
+  await writeFile(new URL(fileName, dir), html, 'utf8');
 }
 
 const staticRoutes = [
