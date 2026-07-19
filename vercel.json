@@ -1,5 +1,6 @@
 {
   "cleanUrls": true,
+  "buildCommand": "npm run build",
   "functions": {
     "api/send-email.ts": {
       "maxDuration": 60
