@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, getImageUrl } from '../../lib/supabase';
+import type { Promoter } from '../../types';
 import { AssetUploader } from '../../components/AssetUploader';
 import * as XLSX from 'xlsx';
 
@@ -29,7 +30,9 @@ const DEFAULT_BLOCKS: NewsletterBlock[] = [
 
 export const AdminNewsletter: React.FC = () => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [promoters, setPromoters] = useState<Promoter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [promotersLoading, setPromotersLoading] = useState(true);
   const [searchSub, setSearchSub] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [logoHeight, setLogoHeight] = useState('40');
@@ -67,6 +70,7 @@ export const AdminNewsletter: React.FC = () => {
 
     // Luego fetch asíncrono en paralelo
     fetchSubscribers();
+    fetchPromoters();
 
     supabase
       .from('products')
@@ -97,6 +101,20 @@ export const AdminNewsletter: React.FC = () => {
       if (!error && data) setSubscribers(data);
     } catch { /* tabla no existe aún */ }
     setLoading(false);
+  }, []);
+
+  const fetchPromoters = useCallback(async () => {
+    setPromotersLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('promoters')
+        .select('id, full_name, email, code, status, commission_rate, terms_accepted, created_at')
+        .order('created_at', { ascending: false });
+      if (!error && data) setPromoters(data as Promoter[]);
+    } catch {
+      // La sección queda vacía si la migración todavía no está aplicada.
+    }
+    setPromotersLoading(false);
   }, []);
 
   // ── Bloques ──
@@ -916,8 +934,9 @@ export const AdminNewsletter: React.FC = () => {
         </div>
       </main>
 
-      {/* ── DERECHA: Base de Datos ── */}
-      <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0 }}>
+      {/* ── DERECHA: Base de Datos + Promotores ── */}
+      <aside className="admin-card glass" style={{ width: 340, display: 'flex', flexDirection: 'column', padding: '12px', flexShrink: 0, minHeight: 0 }}>
+        <section style={{ flex: '1 1 50%', minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Base de Datos</h2>
@@ -1015,6 +1034,44 @@ export const AdminNewsletter: React.FC = () => {
             AGREGAR
           </button>
         </div>
+        </section>
+
+        <section style={{ flex: '1 1 50%', minHeight: 0, display: 'flex', flexDirection: 'column', paddingTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div>
+              <h2 style={{ fontSize: 14, color: 'var(--c-lime)', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>Promotores</h2>
+              <span style={{ display: 'block', marginTop: 2, color: '#666', fontSize: 9 }}>Código y correo de cada registro</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void fetchPromoters()}
+              style={{ background: '#161616', border: '1px solid #333', borderRadius: 4, color: '#aaa', cursor: 'pointer', fontSize: 9, padding: '4px 7px' }}
+            >
+              ACTUALIZAR
+            </button>
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 4 }}>
+            {promotersLoading ? (
+              <p style={{ fontSize: 9, color: '#666', textAlign: 'center', padding: 8 }}>Cargando promotores...</p>
+            ) : promoters.length === 0 ? (
+              <p style={{ fontSize: 9, color: '#555', textAlign: 'center', padding: 8 }}>Todavía no hay promotores registrados.</p>
+            ) : promoters.map(promoter => (
+              <div key={promoter.id} className="promoter-newsletter-row" style={{ padding: '7px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <strong style={{ color: '#fff', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{promoter.full_name}</strong>
+                  <span style={{ flexShrink: 0, color: promoter.status === 'active' ? 'var(--c-lime)' : '#888', fontSize: 8, textTransform: 'uppercase' }}>{promoter.status === 'active' ? 'Activo' : 'Pausado'}</span>
+                </div>
+                <div style={{ color: 'var(--c-lime)', fontSize: 9, fontWeight: 800, letterSpacing: 0.5, marginTop: 3 }}>{promoter.code}</div>
+                <div title={promoter.email} style={{ color: '#777', fontSize: 9, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{promoter.email}</div>
+              </div>
+            ))}
+          </div>
+
+          <a href="/admin/promotores" style={{ display: 'block', marginTop: 7, padding: '6px 8px', border: '1px solid rgba(196,252,21,0.3)', borderRadius: 4, color: 'var(--c-lime)', fontSize: 9, fontWeight: 800, textAlign: 'center', textDecoration: 'none' }}>
+            VER VENTAS Y COMISIONES
+          </a>
+        </section>
       </aside>
 
       {/* ── MODAL DE DETALLES/EDICIÓN ── */}
@@ -1090,6 +1147,7 @@ export const AdminNewsletter: React.FC = () => {
         .newsletter-block-actions { opacity: 0; transition: opacity 0.2s; }
         .newsletter-block-wrapper:hover .newsletter-block-actions { opacity: 1; }
         .sub-row:hover { background: rgba(255,255,255,0.05) !important; }
+        .promoter-newsletter-row:hover { background: rgba(196,252,21,0.04); }
         @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
     </div>
