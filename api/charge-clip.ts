@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
 
-        if (!response.ok || data.status === 'declined' || data.status === 'ERROR') {
+           if (!response.ok || data.status !== 'approved') {
             console.error('[charge-clip] Clip declined/error:', response.status, JSON.stringify(data));
             return res.status(400).json({
                 error: data.decline_reason || data.message || data.error_description || data.description || data.error || `Pago declinado por el banco.`,
