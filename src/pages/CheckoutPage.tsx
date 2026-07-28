@@ -16,42 +16,6 @@ declare const ClipSDK: new (apiKey: string) => {
   };
 };
 
-const IconLock = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-
-const IconShield = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
-  </svg>
-);
-
-const PCIBadge = () => (
-  <svg viewBox="0 0 64 32" width="64" height="32" aria-label="PCI DSS Compliant">
-    <rect width="64" height="32" rx="4" fill="#003087" />
-    <text x="4" y="13" fill="white" fontSize="8" fontWeight="bold" fontFamily="Arial">PCI DSS</text>
-    <text x="4" y="24" fill="#FFD700" fontSize="7" fontFamily="Arial">COMPLIANT</text>
-    <path d="M52 8l4 4-7 7-4-4z" fill="none" stroke="#FFD700" strokeWidth="1.5" />
-    <path d="M49 14l-2 8 8-8z" fill="#FFD700" />
-  </svg>
-);
-
-const SSLBadge = () => (
-  <svg viewBox="0 0 64 32" width="64" height="32" aria-label="SSL Secure">
-    <rect width="64" height="32" rx="4" fill="#1a7c1a" />
-    <text x="4" y="14" fill="white" fontSize="9" fontWeight="bold" fontFamily="Arial">SSL</text>
-    <text x="4" y="25" fill="#90EE90" fontSize="7" fontFamily="Arial">256-BIT</text>
-  </svg>
-);
-
-const IconShieldGreen = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
-  </svg>
-);
-
 const MEXICAN_STATES = [
   'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas', 'Chihuahua',
   'CDMX', 'Coahuila', 'Colima', 'Durango', 'Estado de México', 'Guanajuato', 'Guerrero', 'Hidalgo',
@@ -60,119 +24,76 @@ const MEXICAN_STATES = [
   'Veracruz', 'Yucatán', 'Zacatecas',
 ];
 
+type PaymentTab = 'card' | 'applepay' | 'googlepay';
+
+const IconLock = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
 export const CheckoutPage: React.FC = () => {
   const {
-    items,
-    total,
-    clearCart,
-    couponCode,
-    discountPercentage,
-    applyCoupon,
-    removeCoupon,
-    discountAmount,
-    totalAfterDiscount
+    items, total, clearCart,
+    couponCode, discountPercentage, applyCoupon, removeCoupon,
+    discountAmount, totalAfterDiscount,
   } = useCartStore();
 
   const finalTotal = couponCode ? totalAfterDiscount() : total();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [config, setConfig] = useState<Record<string, string>>({});
   const sdkCardRef = useRef<any>(null);
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [, setConfig] = useState<Record<string, string>>({});
+  const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [promoterCode, setPromoterCode] = useState(() => getPromoterCode());
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCouponError('');
-    if (!couponInput.trim()) return;
-    const success = applyCoupon(couponInput);
-    if (success) {
-      setCouponInput('');
-    } else {
-      setCouponError('Código no válido');
-    }
-  };
-
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    neighborhood: '',
-    city: '',
-    state: 'CDMX',
-    zip: '',
-    reference: 'Casa',
-    accepts_marketing: true,
+    name: '', email: '', phone: '',
+    address: '', neighborhood: '', city: '', state: 'CDMX', zip: '',
+    reference: 'Casa', accepts_marketing: true,
   });
 
   const [colonias, setColonias] = useState<string[]>([]);
   const [isFetchingZip, setIsFetchingZip] = useState(false);
   const [clipStatus, setClipStatus] = useState<'loading' | 'ready' | 'error' | 'missing_key'>('loading');
 
-  useEffect(() => {
-    getStoreConfig().then(setConfig);
-  }, []);
+  useEffect(() => { getStoreConfig().then(setConfig); }, []);
 
-  // ── INIT CLIP SDK ──────────────────────────────────────────────────────────
-  // FIX 1: "amount" es la propiedad correcta del SDK — "paymentAmount" no existe
-  // FIX 2: cartTotal en deps evita stale closure si el monto cambia
+  // Init Clip SDK
   useEffect(() => {
     const CLIP_PUBLIC_KEY = import.meta.env.VITE_CLIP_API_KEY as string;
-
-    if (!CLIP_PUBLIC_KEY) {
-      setClipStatus('missing_key');
-      return;
-    }
-
-    // Destruir instancia previa si cartTotal cambia y se reinicializa
+    if (!CLIP_PUBLIC_KEY) { setClipStatus('missing_key'); return; }
     sdkCardRef.current = null;
     setClipStatus('loading');
-
     let attempts = 0;
-
     const initClip = () => {
       const SDK = (window as any).ClipSDK ?? (typeof ClipSDK !== 'undefined' ? ClipSDK : null);
-
       if (!SDK) {
         attempts++;
-        if (attempts < 20) {
-          setTimeout(initClip, 250);
-        } else {
-          setClipStatus('error');
-        }
+        if (attempts < 20) { setTimeout(initClip, 250); } else { setClipStatus('error'); }
         return;
       }
-
       try {
         const clip = new SDK(CLIP_PUBLIC_KEY);
-        const card = clip.element.create('Card', {
-          locale: 'es',
-          theme: 'light',
-          amount: finalTotal, // ← FIX: propiedad correcta
-        });
+        const card = clip.element.create('Card', { locale: 'es', theme: 'light', amount: finalTotal });
         card.mount('clip-card-container');
         sdkCardRef.current = card;
         setClipStatus('ready');
       } catch (e) {
-        console.error('[Clip] Error inicializando SDK:', e);
+        console.error('[Clip]', e);
         setClipStatus('error');
       }
     };
-
     initClip();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalTotal]);
 
-  // ── ZIP AUTOCOMPLETE ───────────────────────────────────────────────────────
+  // ZIP autocomplete
   useEffect(() => {
-    if (form.zip.length !== 5) {
-      setColonias([]);
-      return;
-    }
+    if (form.zip.length !== 5) { setColonias([]); return; }
     setIsFetchingZip(true);
     fetch(`https://api.zippopotam.us/mx/${form.zip}`)
       .then(r => r.json())
@@ -197,7 +118,19 @@ export const CheckoutPage: React.FC = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError('');
+    if (!couponInput.trim()) return;
+    const success = applyCoupon(couponInput);
+    if (success) { setCouponInput(''); } else { setCouponError('Código no válido'); }
+  };
+
   const handlePagar = async () => {
+    if (paymentTab !== 'card') {
+      setError('Este método está próximamente. Usa Tarjeta por ahora.');
+      return;
+    }
     if (!form.name || !form.email || !form.address || !form.city) {
       setError('Por favor completa todos los campos de envío obligatorios.');
       return;
@@ -206,77 +139,56 @@ export const CheckoutPage: React.FC = () => {
       setError('El formulario de tarjeta no está listo. Recarga la página.');
       return;
     }
-
     setLoading(true);
     setError('');
-
     try {
-      // PASO 1: Token de tarjeta desde Clip SDK
       let cardToken: { id: string };
       try {
         cardToken = await sdkCardRef.current.cardToken();
       } catch (sdkErr: any) {
-        console.error('[Clip] cardToken error:', sdkErr);
-        throw new Error('Datos de tarjeta inválidos. Verifica los campos e intenta de nuevo.');
+        console.error('[Clip] cardToken:', sdkErr);
+        throw new Error('Datos de tarjeta inválidos. Verifica los campos.');
       }
-
       const cardTokenId = cardToken?.id;
-      if (!cardTokenId) throw new Error('No se obtuvo token de tarjeta. Intenta de nuevo.');
+      if (!cardTokenId) throw new Error('No se obtuvo token de tarjeta.');
 
-      // PASO 2: Crear orden en Supabase
       const order = await createOrder({
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_phone: form.phone,
+        customer_name: form.name, customer_email: form.email, customer_phone: form.phone,
         customer_address: `${form.address}, ${form.neighborhood}`,
-        customer_neighborhood: form.neighborhood,
-        customer_city: form.city,
-        customer_state: form.state,
-        customer_zip: form.zip,
-        customer_reference: form.reference,
-        items,
-        total: finalTotal,
-        status: 'pending',
+        customer_neighborhood: form.neighborhood, customer_city: form.city,
+        customer_state: form.state, customer_zip: form.zip, customer_reference: form.reference,
+        items, total: finalTotal, status: 'pending',
         accepts_marketing: form.accepts_marketing,
         promoter_code: promoterCode || undefined,
       });
+      if (!order) throw new Error('No se pudo registrar la orden.');
 
-      if (!order) throw new Error('No se pudo registrar la orden. Intenta de nuevo.');
-
-      // PASO 3: Cobro en backend
       const chargeRes = await fetch('/api/charge-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: finalTotal,
-          orderId: order.id,
+          amount: finalTotal, orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
-          cardTokenId,
-          customerEmail: form.email,
-          userAgent: navigator.userAgent,
+          cardTokenId, customerEmail: form.email, userAgent: navigator.userAgent,
         }),
       });
-
       const chargeData = await chargeRes.json();
-
       if (!chargeRes.ok) {
-        throw new Error(chargeData.error ?? chargeData.message ?? chargeData.description ?? 'Error al procesar el cobro.');
+        throw new Error(chargeData.error ?? chargeData.message ?? 'Error al procesar el cobro.');
       }
-
-      // 3DS si el banco lo requiere
       if (chargeData.requires_action && chargeData.redirect_url) {
         window.location.href = chargeData.redirect_url;
         return;
       }
-
-      // PASO 4: Pago exitoso
       await updateOrderStatus(order.id, 'paid');
-      trackEvent('purchase', { transaction_id: order.id, currency: 'MXN', value: finalTotal, coupon: couponCode || undefined, items: analyticsItems(items) });
+      trackEvent('purchase', {
+        transaction_id: order.id, currency: 'MXN', value: finalTotal,
+        coupon: couponCode || undefined, items: analyticsItems(items),
+      });
       clearCart();
       navigate(`/pago-exitoso?order=${order.id}`);
-
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error inesperado al procesar el pago.';
+      const msg = err instanceof Error ? err.message : 'Error inesperado.';
       console.error('[Checkout]', msg);
       setError(msg);
       setLoading(false);
@@ -285,342 +197,302 @@ export const CheckoutPage: React.FC = () => {
 
   if (items.length === 0) {
     return (
-      <div className="checkout-empty" style={{ paddingTop: 'calc(var(--nav-h) + 80px)' }}>
+      <div className="cv2-empty">
         <h2>Tu carrito está vacío</h2>
-        <button onClick={() => navigate('/catalogo')} className="btn btn-lime">Ir al catálogo</button>
+        <button onClick={() => navigate('/catalogo')} className="cv2-empty__btn">Ir al catálogo</button>
       </div>
     );
   }
 
   return (
-    <div className="checkout-page" style={{ paddingTop: 'var(--nav-h)' }}>
+    <div className="cv2" style={{ paddingTop: 'var(--nav-h)' }}>
 
-      <div className="checkout-hero-header" style={{
-        backgroundImage: config.cart_footer_img ? `url(${getImageUrl(config.cart_footer_img)})` : 'none',
-      }}>
-        <div className="checkout-hero-header__overlay" />
-        <div className="page-width checkout-hero-header__content">
-          <div className="checkout-hero-header__left">
-            <h1 className="checkout-page__title">Finalizar <span className="lime-text">Compra</span></h1>
-            <div className="checkout-page__secure-badge-top"><IconLock /><span>PAGO SEGURO</span></div>
-          </div>
-          <div className="checkout-hero-header__right">
-            <div className="checkout-notice"><IconShield /><span>Pago procesado por <strong>Clip México</strong>.</span></div>
-          </div>
-        </div>
+      {/* HERO — IMAGEN 1 */}
+      <div className="cv2__hero">
+        <img src="/checkout/hero-banner.png" alt="Finaliza tu compra" />
       </div>
 
-      <div className="page-width section" style={{ marginTop: 16 }}>
-        <div className="checkout-page__grid">
-          <div className="checkout-page__left">
+      {/* TRUST BAR — IMAGEN 2 */}
+      <div className="cv2__trust-bar">
+        <img src="/checkout/trust-bar.png" alt="Pago seguro" />
+      </div>
 
-            <div className="checkout-pci-bar">
-              <div className="checkout-pci-bar__badges"><PCIBadge /><SSLBadge /></div>
-              <div className="checkout-pci-bar__text">
-                <IconShieldGreen />
-                Datos protegidos con cifrado de 256-bit · Pago seguro por Clip México
-              </div>
-            </div>
+      <div className="cv2__wrapper">
+        <div className="cv2__grid">
 
-            <div className="checkout-msi-banner">
-              <div className="checkout-msi-banner__icon">💳</div>
-              <div className="checkout-msi-banner__text">
-                <strong>Meses sin intereses disponibles</strong>
-                <p>Hasta 12 MSI según tu banco. Visa, Mastercard y Amex participantes.</p>
-              </div>
-            </div>
+          {/* ── COL IZQUIERDA ── */}
+          <div className="cv2__main">
 
-            {/* DATOS DE ENVÍO */}
-            <div className="checkout-card glass compact">
-              <h2 className="checkout-card__title"><span className="lime-text">01</span> DATOS DE ENVÍO</h2>
-              <div className="checkout-compact-grid">
+            {/* CARD 01 */}
+            <section className="cv2__card">
+              <header className="cv2__card-head">
+                <span className="cv2__card-num">01</span>
+                <span className="cv2__card-title">Datos de Envío</span>
+              </header>
+              <div className="cv2__card-body">
 
-                <div className="checkout-field">
-                  <label>NOMBRE</label>
-                  <input type="text" name="name" value={form.name} onChange={handleInputChange} className="input-glass" required />
-                </div>
-                <div className="checkout-field">
-                  <label>E-MAIL</label>
-                  <input type="email" name="email" value={form.email} onChange={handleInputChange} className="input-glass" required />
-                </div>
-                <div className="checkout-field full">
-                  <label>CELULAR</label>
-                  <input type="tel" name="phone" value={form.phone} onChange={handleInputChange} className="input-glass" required />
+                <div className="cv2__grid-2">
+                  <div className="cv2__field">
+                    <label>Nombre</label>
+                    <input type="text" name="name" value={form.name} onChange={handleInputChange} placeholder="Nombre completo" required />
+                  </div>
+                  <div className="cv2__field">
+                    <label>E-mail</label>
+                    <input type="email" name="email" value={form.email} onChange={handleInputChange} placeholder="correo@ejemplo.com" required />
+                  </div>
                 </div>
 
-                <div className="checkout-section-divider">DOMICILIO (MÉXICO)</div>
-
-                <div className="checkout-field">
-                  <label>CÓDIGO POSTAL {isFetchingZip && '...'}</label>
-                  <input type="text" name="zip" value={form.zip} onChange={handleInputChange} className="input-glass" placeholder="00000" maxLength={5} />
-                </div>
-                <div className="checkout-field">
-                  <label>ESTADO</label>
-                  <select name="state" value={form.state} onChange={handleInputChange} className="input-glass">
-                    <option value="">Selecciona...</option>
-                    {MEXICAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                <div className="cv2__field">
+                  <label>Celular</label>
+                  <input type="tel" name="phone" value={form.phone} onChange={handleInputChange} placeholder="(55) 1234 5678" required />
                 </div>
 
-                <div className="checkout-field">
-                  <label>CIUDAD / MUNICIPIO</label>
-                  <input type="text" name="city" value={form.city} onChange={handleInputChange} className="input-glass" required />
-                </div>
-                <div className="checkout-field">
-                  <label>COLONIA</label>
-                  {colonias.length > 0 ? (
-                    <select name="neighborhood" value={form.neighborhood} onChange={handleInputChange} className="input-glass">
-                      {colonias.map(c => <option key={c} value={c}>{c}</option>)}
+                <div className="cv2__divider"><span>Domicilio (México)</span></div>
+
+                <div className="cv2__grid-2">
+                  <div className="cv2__field">
+                    <label>Código Postal{isFetchingZip && ' …'}</label>
+                    <input type="text" name="zip" value={form.zip} onChange={handleInputChange} placeholder="01000" maxLength={5} />
+                  </div>
+                  <div className="cv2__field">
+                    <label>Estado</label>
+                    <select name="state" value={form.state} onChange={handleInputChange}>
+                      {MEXICAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                  ) : (
-                    <input type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} className="input-glass" placeholder="Ingresa colonia" />
+                  </div>
+                </div>
+
+                <div className="cv2__grid-2">
+                  <div className="cv2__field">
+                    <label>Ciudad / Municipio</label>
+                    <input type="text" name="city" value={form.city} onChange={handleInputChange} placeholder="Ciudad de México" required />
+                  </div>
+                  <div className="cv2__field">
+                    <label>Colonia</label>
+                    {colonias.length > 0 ? (
+                      <select name="neighborhood" value={form.neighborhood} onChange={handleInputChange}>
+                        {colonias.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} placeholder="Ingresa colonia" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="cv2__field">
+                  <label>Calle y número</label>
+                  <input type="text" name="address" value={form.address} onChange={handleInputChange} placeholder="Av. Insurgentes Sur 1234" required />
+                </div>
+
+                <div className="cv2__field">
+                  <label>Referencia (opcional)</label>
+                  <input type="text" name="reference" value={form.reference} onChange={handleInputChange} placeholder="Casa color negra con portón" />
+                </div>
+
+                <label className="cv2__checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.accepts_marketing}
+                    onChange={e => setForm(prev => ({ ...prev, accepts_marketing: e.target.checked }))}
+                  />
+                  <span>Quiero recibir ofertas exclusivas, descuentos y novedades de Divina Store MX.</span>
+                </label>
+              </div>
+            </section>
+
+            {/* CARD 02 */}
+            <section className="cv2__card">
+              <header className="cv2__card-head">
+                <span className="cv2__card-num">02</span>
+                <span className="cv2__card-title">Datos del pago</span>
+              </header>
+              <div className="cv2__card-body">
+
+                {/* Tabs */}
+                <div className="cv2__paytabs">
+                  <button
+                    className={`cv2__paytab ${paymentTab === 'card' ? 'is-active' : ''}`}
+                    onClick={() => setPaymentTab('card')} type="button"
+                  >
+                    <span className="cv2__paytab-icon">💳</span>
+                    Tarjeta de crédito / débito
+                  </button>
+                  <button
+                    className={`cv2__paytab ${paymentTab === 'applepay' ? 'is-active' : ''}`}
+                    onClick={() => setPaymentTab('applepay')} type="button"
+                  >
+                    <span className="cv2__paytab-icon"></span>
+                    Apple Pay
+                  </button>
+                  <button
+                    className={`cv2__paytab ${paymentTab === 'googlepay' ? 'is-active' : ''}`}
+                    onClick={() => setPaymentTab('googlepay')} type="button"
+                  >
+                    <span className="cv2__paytab-icon">G</span>
+                    Google Pay
+                  </button>
+                </div>
+
+                {/* Widget */}
+                <div className="cv2__pay-widget">
+                  <div style={{ display: paymentTab === 'card' ? 'block' : 'none', position: 'relative', minHeight: 180 }}>
+                    {clipStatus === 'loading' && (
+                      <div className="cv2__pay-status">
+                        <div className="cv2__spinner" />Conectando con Clip...
+                      </div>
+                    )}
+                    {clipStatus === 'missing_key' && (
+                      <div className="cv2__pay-status cv2__pay-status--error">
+                        Falta configurar la llave de Clip. Contacta a soporte.
+                      </div>
+                    )}
+                    {clipStatus === 'error' && (
+                      <div className="cv2__pay-status cv2__pay-status--error">
+                        Error al cargar el formulario. Recarga la página.
+                      </div>
+                    )}
+                    <div id="clip-card-container" className="cv2__clip-mount" />
+                  </div>
+
+                  {(paymentTab === 'applepay' || paymentTab === 'googlepay') && (
+                    <div className="cv2__coming-soon">
+                      <div className="cv2__coming-soon-icon">🚀</div>
+                      <p><strong>Próximamente disponible</strong></p>
+                      <p className="cv2__coming-soon-sub">
+                        Estamos trabajando en habilitar este método. Por ahora usa Tarjeta.
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                <div className="checkout-field full">
-                  <label>CALLE Y NÚMERO</label>
-                  <input type="text" name="address" value={form.address} onChange={handleInputChange} className="input-glass" required />
-                </div>
+                {error && <div className="cv2__error"><span>⚠</span><span>{error}</span></div>}
 
-                <div className="checkout-field full">
-                  <label>REFERENCIA</label>
-                  <select name="reference" value={form.reference} onChange={handleInputChange} className="input-glass">
-                    <option value="Casa">Casa</option>
-                    <option value="Oficina">Oficina</option>
-                    <option value="Local">Local</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
+                <button
+                  onClick={handlePagar}
+                  className="cv2__pay-btn"
+                  disabled={loading || (paymentTab === 'card' && clipStatus !== 'ready')}
+                >
+                  {loading ? (
+                    <><span className="cv2__spinner cv2__spinner--dark" />Procesando pago...</>
+                  ) : (
+                    <>
+                      <IconLock />
+                      Pagar ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                    </>
+                  )}
+                </button>
 
-                <div className="checkout-field full" style={{ marginTop: 4 }}>
-                  <div 
-                    onClick={() => setForm(prev => ({ ...prev, accepts_marketing: !prev.accepts_marketing }))}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 10,
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
-                    <div 
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '4px',
-                        border: '2px solid var(--c-lime)',
-                        background: form.accepts_marketing ? 'var(--c-lime)' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s ease',
-                        flexShrink: 0,
-                        color: '#000',
-                        fontWeight: 900,
-                        fontSize: '11px',
-                        lineHeight: '1',
-                        marginTop: 2
-                      }}
-                    >
-                      {form.accepts_marketing && '✓'}
-                    </div>
-                    <span style={{ fontSize: 12, color: '#aaa', fontWeight: 400, lineHeight: '1.4' }}>
-                      Quiero recibir ofertas exclusivas, descuentos y novedades de Divina Store MX. Puedo darme de baja en cualquier momento.
-                    </span>
-                  </div>
-                </div>
+                <p className="cv2__terms">
+                  Al hacer clic en pagar, aceptas nuestros{' '}
+                  <a href="/terminos" target="_blank" rel="noreferrer">Términos y Condiciones</a>{' '}
+                  y{' '}
+                  <a href="/privacidad" target="_blank" rel="noreferrer">Aviso de Privacidad</a>.
+                </p>
               </div>
-            </div>
-
-            {/* DATOS DE PAGO — CLIP ELEMENTS */}
-            <div className="checkout-card glass payment-card">
-              <h2 className="checkout-card__title"><span className="lime-text">02</span> DATOS DE PAGO</h2>
-              <p style={{ color: '#aaa', fontSize: 12, marginBottom: 12, marginTop: -8 }}>
-                Tu información es cifrada con SSL 256-bit. Nunca almacenamos tu tarjeta.
-              </p>
-
-              <div style={{ position: 'relative', minHeight: 180 }}>
-                {clipStatus === 'loading' && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 8, zIndex: 5 }}>
-                    <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#FC4C02', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 10 }} />
-                    Conectando con Clip...
-                  </div>
-                )}
-                {clipStatus === 'missing_key' && (
-                  <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
-                    Falta la llave de API de Clip. Contacta a soporte técnico.
-                  </div>
-                )}
-                {clipStatus === 'error' && (
-                  <div style={{ padding: 20, textAlign: 'center', color: '#ff6b6b', fontSize: 13, background: 'rgba(255,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(255,0,0,0.1)' }}>
-                    Error al cargar el formulario de pago. Verifica tu conexión o recarga la página.
-                  </div>
-                )}
-                <div
-                  id="clip-card-container"
-                  className="checkout-clip-mount"
-                  style={{
-                    display: (clipStatus === 'ready' || clipStatus === 'loading') ? 'block' : 'none',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    padding: '12px',
-                  }}
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="checkout-page__error">
-                <span>⚠</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="checkout-actions">
-              <button
-                onClick={handlePagar}
-                className="checkout-pagar-btn-official"
-                disabled={loading || clipStatus !== 'ready'}
-              >
-                {loading ? (
-                  <><span className="checkout-spinner" />Procesando pago...</>
-                ) : (
-                  <>
-                    <IconLock />
-                    Pagar ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="checkout-footer-badges">
-              <div className="checkout-trust-badge">
-                <IconShield />
-                <div className="trust-text"><strong>PAGO SEGURO</strong><span>Encriptación SSL 256 bits</span></div>
-              </div>
-              <div className="trust-divider" />
-              <div className="checkout-trust-badge">
-                <svg viewBox="0 0 48 20" width="48" height="20">
-                  <rect width="48" height="20" rx="4" fill="#FC4C02" />
-                  <text x="6" y="14" fill="white" fontSize="10" fontWeight="bold" fontFamily="Arial">clip</text>
-                </svg>
-                <div className="trust-text"><strong>PARTNER OFICIAL</strong><span>Clip México</span></div>
-              </div>
-            </div>
+            </section>
           </div>
 
-          {/* RESUMEN */}
-          <div className="checkout-page__summary">
-            <div className="checkout-summary-card glass">
-              <h2 className="checkout-summary-card__title">RESUMEN</h2>
-              <div className="checkout-summary-items">
+          {/* ── COL DERECHA ── */}
+          <aside className="cv2__aside">
+            <div className="cv2__summary">
+              <h2 className="cv2__summary-title">Resumen de tu compra</h2>
+
+              <div className="cv2__summary-items">
                 {items.map(item => (
-                  <div key={item.product.id} className="checkout-summary-item">
-                    <div className="item-img-wrapper">
+                  <div key={item.product.id} className="cv2__summary-item">
+                    <div className="cv2__summary-item-img">
                       <img src={getImageUrl(item.product.image_url)} alt={item.product.name} />
-                      <span className="qty-badge">{item.quantity}</span>
+                      <span className="cv2__summary-item-qty">{item.quantity}</span>
                     </div>
-                    <div className="item-info"><p className="item-name">{item.product.name}</p></div>
-                    <p className="item-price">${(item.product.price * item.quantity).toLocaleString('es-MX')}</p>
+                    <div className="cv2__summary-item-info">
+                      <p className="cv2__summary-item-name">{item.product.name}</p>
+                      <p className="cv2__summary-item-qty-label">Cantidad: {item.quantity}</p>
+                    </div>
+                    <p className="cv2__summary-item-price">
+                      ${(item.product.price * item.quantity).toLocaleString('es-MX')}
+                    </p>
                   </div>
                 ))}
               </div>
 
-              {/* Sección de Cupón en Checkout */}
-              <div className="checkout-coupon-section" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16, marginBottom: 16 }}>
+              <div className="cv2__summary-block">
+                <label className="cv2__summary-label">Código de descuento</label>
                 {couponCode ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(196, 252, 21, 0.1)', border: '1px dashed var(--c-lime)', borderRadius: '8px', padding: '10px 12px' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-lime)' }}>🏷️ {couponCode} (-{discountPercentage}%)</span>
-                    <button onClick={removeCoupon} style={{ color: '#ff4444', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', background: 'none', border: 'none' }}>✕</button>
+                  <div className="cv2__coupon-active">
+                    <span>🏷️ {couponCode} (-{discountPercentage}%)</span>
+                    <button onClick={removeCoupon}>✕</button>
                   </div>
                 ) : (
-                  <div>
-                    <form onSubmit={handleApplyCoupon} style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        type="text"
-                        placeholder="Código de descuento"
-                        value={couponInput}
-                        onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
-                        style={{
-                          flex: 1,
-                          background: 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
-                          color: '#fff',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          outline: 'none',
-                          textTransform: 'uppercase',
-                          width: '100%',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                      <button type="submit" className="btn btn-lime" style={{ padding: '10px 16px', borderRadius: '8px', fontSize: 11, letterSpacing: 'normal', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Aplicar</button>
-                    </form>
-                    {couponError && <p style={{ color: '#ff4444', fontSize: 11, marginTop: 4, marginLeft: 4, fontWeight: 'bold' }}>{couponError}</p>}
-                  </div>
+                  <form onSubmit={handleApplyCoupon} className="cv2__coupon-form">
+                    <input
+                      type="text"
+                      placeholder="Ingresa tu código"
+                      value={couponInput}
+                      onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
+                    />
+                    <button type="submit">APLICAR</button>
+                  </form>
                 )}
+                {couponError && <p className="cv2__coupon-error">{couponError}</p>}
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16, marginBottom: 16 }}>
-                <label htmlFor="checkout-promoter-code" style={{ display: 'block', fontSize: 11, color: '#aaa', marginBottom: 6, fontWeight: 700 }}>CÓDIGO DE PROMOTOR/A (OPCIONAL)</label>
+              <div className="cv2__summary-block">
+                <label className="cv2__summary-label">Código de promotora (opcional)</label>
                 <input
-                  id="checkout-promoter-code"
                   type="text"
-                  placeholder="Ej. DIVINA-LUIS-A1B2C3"
+                  placeholder="DIVINA-JOSE-4B2F26"
                   value={promoterCode}
-                  onChange={event => setPromoterCode(normalizePromoterCode(event.target.value))}
+                  onChange={e => setPromoterCode(normalizePromoterCode(e.target.value))}
                   onBlur={() => { if (promoterCode) savePromoterCode(promoterCode); }}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', textTransform: 'uppercase' }}
+                  className="cv2__summary-input"
                 />
-                <small style={{ display: 'block', color: '#777', marginTop: 5 }}>Si llegaste con una liga personal, el código aparece automáticamente.</small>
+                <small>Si llegaste con una liga personal, el código aparece automáticamente.</small>
               </div>
 
-              {couponCode ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14, marginBottom: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#aaa' }}>
-                    <span>Subtotal</span>
-                    <span>${total().toLocaleString('es-MX')} MXN</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--c-lime)' }}>
-                    <span>Descuento (10%)</span>
-                    <span>-${discountAmount().toLocaleString('es-MX')} MXN</span>
-                  </div>
-                  <div className="summary-total-row" style={{ borderTop: 'none', paddingTop: 0, marginTop: 4 }}>
-                    <span>TOTAL</span>
-                    <span className="total-amount">${finalTotal.toLocaleString('es-MX')} <small>MXN</small></span>
-                  </div>
+              <div className="cv2__summary-total">
+                {couponCode && (
+                  <>
+                    <div className="cv2__summary-row"><span>Subtotal</span><span>${total().toLocaleString('es-MX')}</span></div>
+                    <div className="cv2__summary-row cv2__summary-row--discount">
+                      <span>Descuento ({discountPercentage}%)</span>
+                      <span>-${discountAmount().toLocaleString('es-MX')}</span>
+                    </div>
+                  </>
+                )}
+                <div className="cv2__summary-row cv2__summary-row--total">
+                  <span>Total</span>
+                  <span className="cv2__summary-total-price">
+                    ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} <small>MXN</small>
+                  </span>
                 </div>
-              ) : (
-                <div className="summary-total-row">
-                  <span>TOTAL</span>
-                  <span className="total-amount">${total().toLocaleString('es-MX')} <small>MXN</small></span>
-                </div>
-              )}
-
-              <div className="checkout-msi-mini">💳 Hasta 12 MSI según tu banco</div>
-              <div className="summary-clip-secure">
-                <svg viewBox="0 0 32 14" width="32" height="14">
-                  <rect width="32" height="14" rx="3" fill="#FC4C02" />
-                  <text x="4" y="10" fill="white" fontSize="7" fontWeight="bold" fontFamily="Arial">clip</text>
-                </svg>
-                <span>Checkout impulsado por Clip</span>
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                <PCIBadge />
-                <SSLBadge />
+
+              <div className="cv2__msi">💳 Hasta 12 MSI según tu banco</div>
+
+              <ul className="cv2__benefits">
+                <li>🚚 Envío gratis en compras mayores a $999 MXN</li>
+                <li>🔒 Tu información está protegida</li>
+                <li>⚡ Proceso rápido y seguro con Clip México</li>
+              </ul>
+
+              {/* IMAGEN 3 */}
+              <div className="cv2__payment-methods">
+                <p>Métodos de pago aceptados</p>
+                <img src="/checkout/payment-methods.png" alt="Visa Mastercard Amex Carnet SPEI Apple Pay Google Pay Clip" />
               </div>
             </div>
 
-            <div className="checkout-payment-logos-box">
-              <p>MÉTODOS DE PAGO ACEPTADOS:</p>
-              {config.checkout_payment_logos && (
-                <img src={getImageUrl(config.checkout_payment_logos)} alt="Pasarelas" />
-              )}
+            {/* IMAGEN 4 */}
+            <div className="cv2__trust-badges-side">
+              <img src="/checkout/trust-badges.png" alt="Safe & Secure Checkout" />
             </div>
-          </div>
+          </aside>
         </div>
+      </div>
+
+      {/* IMAGEN 5 */}
+      <div className="cv2__footer-badges">
+        <img src="/checkout/footer-badges.png" alt="PCI DSS SSL Verified Visa Mastercard Clip Empresa Mexicana" />
       </div>
     </div>
   );
