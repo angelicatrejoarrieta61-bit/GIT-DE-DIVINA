@@ -9,7 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import {
-  buildSpec, computeMargin, evaluateOffers, isBarcode, money, slugify, timeAgo, detectBrand, round2,
+  buildSpec, computeMargin, evaluateOffers, isBarcode, money, slugify, timeAgo, detectBrand, round2, norm,
   DEFAULT_MARGIN, MATCH_RANK,
   type EvaluatedOffer, type MarginSettings, type MatchLevel, type SourcingMerchant, type SourcingOffer, type Trust,
 } from '../../lib/sourcing';
@@ -65,7 +65,15 @@ export function AdminSourcing() {
 
   // Búsqueda
   const [linked, setLinked] = useState<CatalogProduct | null>(null);
-  const [pickerText, setPickerText] = useState('');
+  const [catalogText, setCatalogText] = useState('');
+  const [changingLink, setChangingLink] = useState(false);
+  const [addMode, setAddMode] = useState<'ask' | 'form' | 'no'>('ask');
+  const [addName, setAddName] = useState('');
+  const [addBrand, setAddBrand] = useState('');
+  const [addEan, setAddEan] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [specOpen, setSpecOpen] = useState(false);
+  const [savingField, setSavingField] = useState<'price' | 'ean' | null>(null);
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [specText, setSpecText] = useState('');
   const [salePrice, setSalePrice] = useState('');
@@ -129,22 +137,57 @@ export function AdminSourcing() {
   // ── Producto vinculado de Divina ───────────────────────────
   const fullName = (p: CatalogProduct) =>
     p.brand && !p.name.toLowerCase().includes(p.brand.toLowerCase()) ? `${p.brand} ${p.name}` : p.name;
-  const pickerLabel = (p: CatalogProduct) => `${p.name}${p.brand ? ` — ${p.brand}` : ''}`;
-
-  /** Vincula un producto del catálogo. `setSearch` reemplaza la búsqueda por su nombre (o EAN). */
+  /** Vincula un producto del catálogo. `setSearch` reemplaza la búsqueda por su nombre. */
   const linkProduct = (p: CatalogProduct, setSearch = false) => {
     setLinked(p);
-    setPickerText(pickerLabel(p));
+    setChangingLink(false);
+    setCatalogText('');
     setSpecText(fullName(p));
-    if (p.price) setSalePrice(String(p.price));
+    // Respeta el precio que ya escribiste; si no hay, usa el del catálogo.
+    if (p.price) setSalePrice((prev) => (toNum(prev) ? prev : String(p.price)));
     if (setSearch) setQuery(fullName(p));
   };
 
-  const onPickerChange = (v: string) => {
-    setPickerText(v);
-    const p = catalog.find((x) => pickerLabel(x) === v);
-    if (p) linkProduct(p, true);
-    else if (!v) setLinked(null);
+  const unlinkProduct = () => {
+    setLinked(null);
+    setChangingLink(false);
+    setSpecText('');
+  };
+
+  /** Coincidencias en mi catálogo: por código de barras exacto o por palabras del nombre/marca. */
+  const catalogMatches = useMemo(() => {
+    const source = (catalogText.trim() || query.trim());
+    if (source.length < 2) return [] as CatalogProduct[];
+    const code = source.replace(/\s/g, '');
+    if (isBarcode(code)) return catalog.filter((p) => p.ean === code || p.sku === code).slice(0, 5);
+    const tokens = norm(source).split(' ').filter((t) => t.length > 1 && !['ml', 'g', 'gr', 'spf', 'de', 'con', 'para'].includes(t));
+    if (!tokens.length) return [];
+    return catalog
+      .map((p) => {
+        const hay = ` ${norm(`${p.brand ?? ''} ${p.name} ${p.sku ?? ''}`)} `;
+        const hits = tokens.filter((t) => hay.includes(` ${t} `) || (t.length > 3 && hay.includes(t))).length;
+        return { p, score: hits / tokens.length, hits };
+      })
+      .filter((x) => x.hits >= Math.min(2, tokens.length) && x.score >= 0.4)
+      .sort((a, b) => b.score - a.score || a.p.name.length - b.p.name.length)
+      .slice(0, 5)
+      .map((x) => x.p);
+  }, [catalog, catalogText, query]);
+
+  /** Guarda un campo del producto vinculado directo en el catálogo. */
+  const saveLinkedField = async (field: 'price' | 'ean') => {
+    if (!linked) return;
+    const value = field === 'price' ? toNum(salePrice) : query.replace(/\s/g, '');
+    if (field === 'price' && (!value || (value as number) <= 0)) { notify({ kind: 'error', text: 'Pon un precio válido.' }); return; }
+    setSavingField(field);
+    const { data, error: err } = await supabase.from('products').update({ [field]: value }).eq('id', linked.id)
+      .select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+    setSavingField(null);
+    if (err || !data) { notify({ kind: 'error', text: `No se guardó: ${err?.message ?? 'sin respuesta'}` }); return; }
+    const updated = data as CatalogProduct;
+    setLinked(updated);
+    setCatalog((c) => c.map((x) => (x.id === updated.id ? updated : x)));
+    notify({ kind: 'ok', text: field === 'price' ? `Precio de "${updated.name}" actualizado a ${money(updated.price)}.` : `Código de barras guardado en "${updated.name}".` });
   };
 
   // ── Buscar ─────────────────────────────────────────────────
@@ -169,6 +212,8 @@ export function AdminSourcing() {
       setMerchants((prev) => (opts.append ? { ...prev, ...data.merchants } : data.merchants));
       setMeta({ searchId: data.searchId, fetchedAt: data.fetchedAt, cached: data.cached, nextStart: data.nextStart, query: clean });
       if (!opts.append) {
+        setAddMode('ask');
+        setChangingLink(false);
         setBrandFilter('');
         setShopFilter('');
         setParams((p) => { const n = new URLSearchParams(p); n.set('q', clean); if (linked) n.set('product', linked.id); else n.delete('product'); return n; }, { replace: true });
@@ -254,6 +299,64 @@ export function AdminSourcing() {
     return pool.sort((a, b) => (a.costTotal as number) - (b.costTotal as number))[0] ?? null;
   }, [evaluated, merchants]);
 
+  // ── Agregar a mi configuración de productos ────────────────
+  const openAddForm = () => {
+    const firstTitle = best?.title ?? evaluated.find((o) => o.match !== 'no_confirmada')?.title ?? evaluated[0]?.title ?? '';
+    const typed = specText.trim() || (isBarcode(query) ? '' : query.trim());
+    setAddName(typed || firstTitle);
+    setAddBrand(effectiveSpec.brand ?? detectBrand(firstTitle) ?? '');
+    setAddEan(isBarcode(query) ? query.replace(/\s/g, '') : '');
+    setAddMode('form');
+  };
+
+  const addToCatalog = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const price = toNum(salePrice);
+    if (!addName.trim()) { notify({ kind: 'error', text: 'Pon el título del producto.' }); return; }
+    if (!price || price <= 0) { notify({ kind: 'error', text: 'Pon el precio de venta.' }); return; }
+    if (addEan && !/^\d{8,14}$/.test(addEan)) { notify({ kind: 'error', text: 'El código de barras debe tener de 8 a 14 dígitos.' }); return; }
+    setAdding(true);
+    try {
+      const base = slugify(addName) || `producto-${Date.now()}`;
+      const { data: taken } = await supabase.from('products').select('slug').like('slug', `${base}%`);
+      const used = new Set((taken ?? []).map((r) => r.slug));
+      let slug = base;
+      for (let i = 2; used.has(slug); i += 1) slug = `${base}-${i}`;
+
+      const { data, error: err } = await supabase.from('products').insert({
+        name: addName.trim(),
+        slug,
+        brand: addBrand.trim() || null,
+        price,
+        cost_price: best?.costTotal ?? null,
+        ean: addEan || null,
+        fulfillment: 'bajo_pedido',
+        in_stock: true,
+        tags: ['bajo-pedido'],
+        image_status: 'pending',
+      }).select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+      if (err || !data) throw err ?? new Error('Sin respuesta');
+      const product = data as CatalogProduct;
+
+      if (best && best.unit_price_mxn !== null) {
+        const m = computeMargin(price, best.unit_price_mxn, settings);
+        await supabase.from('product_sources').insert({
+          product_id: product.id, merchant_id: best.merchant_id, offer_id: best.id, shop: best.shop, offer_title: best.title,
+          link: best.link, unit_cost_mxn: best.unit_price_mxn, shipping_mxn: settings.supplierShipping, sale_price_mxn: price,
+          margin_mxn: m.margin ?? 0, match_level: best.match, is_primary: true,
+        });
+      }
+      setCatalog((c) => [...c, product]);
+      linkProduct(product);
+      setAddMode('ask');
+      notify({ kind: 'ok', text: `"${product.name}" agregado a tus productos (bajo pedido).` });
+    } catch (e2) {
+      notify({ kind: 'error', text: `No se pudo agregar: ${(e2 as { message?: string })?.message ?? 'error'}` });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const counts = useMemo(() => {
     const c: Record<MatchLevel, number> = { exacta: 0, probable: 0, no_confirmada: 0 };
     evaluated.forEach((o) => { c[o.match] += 1; });
@@ -318,14 +421,17 @@ export function AdminSourcing() {
         <>
           {/* ── Barra de búsqueda ─────────────────────────── */}
           <form className="src-card src-search" onSubmit={onSubmit}>
-            <div className="src-field src-field--wide">
-              <label htmlFor="src-q">Producto, marca o código de barras</label>
+            {/* Paso 1 — Producto buscado */}
+            <div className="src-step">
+              <span className="src-step__n" aria-hidden="true">1</span>
+              <div className="src-step__body">
+              <label className="src-step__label" htmlFor="src-q">Buscar producto, marca o código de barras</label>
               <div className="src-input-group">
                 <input
                   id="src-q"
                   ref={queryRef}
                   className="src-input src-input--lg"
-                  placeholder="Ej: ISDIN Fusion Water SPF 50 50 ml · 8429420224939"
+                  placeholder="Ej: ISDIN Fusion Water SPF 50 50 ml"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   autoComplete="off"
@@ -335,46 +441,46 @@ export function AdminSourcing() {
                   ▥ Escanear
                 </button>
                 <button type="submit" className="src-btn src-btn--lime" disabled={loading || query.trim().length < 2}>
-                  {loading ? <><span className="src-spinner src-spinner--dark" /> Buscando</> : 'Buscar fuentes'}
+                  {loading ? <><span className="src-spinner src-spinner--dark" /> Buscando</> : 'Buscar ofertas'}
                 </button>
+              </div>
+              <span className="src-step__hint">Escribe, pega el código o escanéalo. Te muestro las ofertas de tiendas en México y reviso si ya lo tienes en tu catálogo.</span>
               </div>
             </div>
 
-            <div className="src-search__row">
-              <div className="src-field">
-                <label htmlFor="src-link">Producto de Divina (opcional)</label>
-                <input
-                  id="src-link"
-                  className="src-input"
-                  list="src-catalog"
-                  placeholder="Vincular a mi catálogo…"
-                  value={pickerText}
-                  onChange={(e) => onPickerChange(e.target.value)}
-                />
-                <datalist id="src-catalog">
-                  {catalog.map((p) => <option key={p.id} value={`${p.name}${p.brand ? ` — ${p.brand}` : ''}`} />)}
-                </datalist>
-              </div>
-              <div className="src-field">
-                <label htmlFor="src-spec">Lo que busco exactamente</label>
-                <input
-                  id="src-spec"
-                  className="src-input"
-                  placeholder="Marca, línea, tamaño, SPF y variante"
-                  value={specText}
-                  onChange={(e) => setSpecText(e.target.value)}
-                />
-              </div>
-              <div className="src-field src-field--narrow">
-                <label htmlFor="src-sale">Mi precio de venta</label>
-                <div className="src-money">
-                  <span>$</span>
-                  <input id="src-sale" className="src-input" inputMode="decimal" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+            {/* Paso 2 — Mi precio de venta */}
+            <div className="src-step">
+              <span className="src-step__n" aria-hidden="true">2</span>
+              <div className="src-step__body">
+                <label className="src-step__label" htmlFor="src-sale">Mi precio de venta</label>
+                <div className="src-price-row">
+                  <div className="src-money">
+                    <span>$</span>
+                    <input id="src-sale" className="src-input" inputMode="decimal" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                  </div>
+                  <span className="src-step__hint">Opcional. Con él calculo cuánto ganas en cada oferta.</span>
                 </div>
               </div>
             </div>
 
-            <SpecChips spec={effectiveSpec} />
+            <div className="src-spec-row">
+              <SpecChips spec={effectiveSpec} />
+              <button type="button" className="src-link-btn src-link-btn--flat" onClick={() => setSpecOpen((v) => !v)} aria-expanded={specOpen}>
+                {specOpen ? 'Ocultar' : 'Ajustar comparación'}
+              </button>
+            </div>
+            {specOpen && (
+              <div className="src-field">
+                <label htmlFor="src-spec">Producto exacto contra el que comparo las ofertas</label>
+                <input
+                  id="src-spec"
+                  className="src-input"
+                  placeholder="Marca, línea, tamaño, SPF y variante. Ej: ISDIN Fusion Water SPF 50 50 ml"
+                  value={specText}
+                  onChange={(e) => setSpecText(e.target.value)}
+                />
+              </div>
+            )}
           </form>
 
           {error && <div className="src-alert src-alert--error" role="alert">{error}</div>}
@@ -408,6 +514,121 @@ export function AdminSourcing() {
                   Actualizar precios
                 </button>
               </div>
+            </section>
+          )}
+
+          {/* ── Mi catálogo: ¿ya lo tengo? / ¿lo agrego? ───── */}
+          {meta && !loading && offers.length > 0 && (
+            <section className="src-cat" aria-label="Mi configuración de productos">
+              {linked && !changingLink ? (
+                <>
+                  <header className="src-cat__head">
+                    <span className="src-linked__check" aria-hidden="true">✓</span>
+                    <div>
+                      <strong>Ya lo tienes en tu catálogo</strong>
+                      <span>
+                        {linked.name}{linked.brand ? ` · ${linked.brand}` : ''} · Precio actual {money(linked.price)}
+                        {linked.cost_price ? ` · Costo ${money(linked.cost_price)}` : ''}
+                        {linked.ean ? ` · EAN ${linked.ean}` : ' · Sin código de barras'}
+                      </span>
+                    </div>
+                  </header>
+                  <div className="src-cat__actions">
+                    <div className="src-field">
+                      <label htmlFor="cat-price">Precio de venta</label>
+                      <div className="src-money"><span>$</span><input id="cat-price" className="src-input" inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /></div>
+                    </div>
+                    <button type="button" className="src-btn src-btn--lime" disabled={savingField === 'price' || !sale || sale === Number(linked.price)} onClick={() => void saveLinkedField('price')}>
+                      {savingField === 'price' ? 'Guardando…' : sale && sale !== Number(linked.price) ? 'Guardar precio en catálogo' : 'Precio sin cambios'}
+                    </button>
+                    {isBarcode(query) && linked.ean !== query.replace(/\s/g, '') && (
+                      <button type="button" className="src-btn src-btn--ghost" disabled={savingField === 'ean'} onClick={() => void saveLinkedField('ean')}>
+                        {savingField === 'ean' ? 'Guardando…' : 'Guardar este código de barras'}
+                      </button>
+                    )}
+                    <button type="button" className="src-btn src-btn--ghost" onClick={() => { unlinkProduct(); setChangingLink(true); }}>No es este</button>
+                  </div>
+                  <p className="src-step__hint">Para guardar también el proveedor y el costo, usa <b>+ Mi stock</b> en la oferta que elijas.</p>
+                </>
+              ) : catalogMatches.length > 0 && addMode !== 'form' ? (
+                <>
+                  <header className="src-cat__head">
+                    <span className="src-cat__q" aria-hidden="true">?</span>
+                    <div>
+                      <strong>Encontré {catalogMatches.length === 1 ? 'un producto parecido' : `${catalogMatches.length} productos parecidos`} en tu catálogo</strong>
+                      <span>¿Es alguno de estos? Así actualizo su precio en lugar de duplicarlo.</span>
+                    </div>
+                  </header>
+                  <ul className="src-matches">
+                    {catalogMatches.map((p) => (
+                      <li key={p.id}>
+                        <div className="src-matches__txt">
+                          <strong>{p.name}</strong>
+                          <span>{p.brand ? `${p.brand} · ` : ''}{money(p.price)}{p.ean ? ` · EAN ${p.ean}` : ''}</span>
+                        </div>
+                        <button type="button" className="src-btn src-btn--sm src-btn--lime" onClick={() => linkProduct(p)}>Es este</button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="src-cat__actions">
+                    <button type="button" className="src-btn src-btn--ghost" onClick={openAddForm}>Ninguno, agregar como nuevo</button>
+                  </div>
+                </>
+              ) : addMode === 'form' ? (
+                <form onSubmit={addToCatalog} className="src-cat__form">
+                  <header className="src-cat__head">
+                    <span className="src-cat__q" aria-hidden="true">+</span>
+                    <div>
+                      <strong>Agregar a tu configuración de productos</strong>
+                      <span>{best ? `Proveedor: ${best.shop} · costo ${money(best.costTotal)} (mejor oferta exacta)` : 'Sin oferta exacta todavía: se agrega sin proveedor; elígelo después con + Mi stock.'}</span>
+                    </div>
+                  </header>
+                  <div className="src-grid src-grid--4">
+                    <div className="src-field src-field--span2">
+                      <label htmlFor="add-name">Título</label>
+                      <input id="add-name" className="src-input" value={addName} onChange={(e) => setAddName(e.target.value)} required />
+                    </div>
+                    <div className="src-field">
+                      <label htmlFor="add-price">Precio de venta</label>
+                      <div className="src-money"><span>$</span><input id="add-price" className="src-input" inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} required /></div>
+                    </div>
+                    <div className="src-field">
+                      <label htmlFor="add-brand">Marca</label>
+                      <input id="add-brand" className="src-input" value={addBrand} onChange={(e) => setAddBrand(e.target.value)} />
+                    </div>
+                    <div className="src-field">
+                      <label htmlFor="add-ean">Código de barras</label>
+                      <input id="add-ean" className="src-input" inputMode="numeric" placeholder="Opcional" value={addEan} onChange={(e) => setAddEan(e.target.value.replace(/\D/g, ''))} />
+                    </div>
+                  </div>
+                  <div className="src-cat__actions">
+                    <button type="submit" className="src-btn src-btn--lime" disabled={adding}>
+                      {adding ? <><span className="src-spinner src-spinner--dark" /> Agregando</> : 'Agregar a mis productos'}
+                    </button>
+                    <button type="button" className="src-btn src-btn--ghost" disabled={adding} onClick={() => setAddMode('ask')}>Cancelar</button>
+                    {best && best.margin !== null && sale ? <span className={`src-step__hint ${best.margin < 0 ? 'is-neg' : ''}`}>Margen con este precio: <b>{money(computeMargin(sale, best.unit_price_mxn, settings).margin)}</b></span> : null}
+                  </div>
+                </form>
+              ) : addMode === 'no' ? (
+                <div className="src-cat__row">
+                  <span className="src-step__hint">No se agregó a tus productos.</span>
+                  <button type="button" className="src-link-btn src-link-btn--flat" onClick={() => setAddMode('ask')}>Cambiar de opinión</button>
+                </div>
+              ) : (
+                <div className="src-cat__row">
+                  <header className="src-cat__head">
+                    <span className="src-cat__q" aria-hidden="true">?</span>
+                    <div>
+                      <strong>¿Deseas agregar este producto a tu configuración de productos?</strong>
+                      <span>Revisé tu catálogo y no lo tienes.</span>
+                    </div>
+                  </header>
+                  <div className="src-cat__actions">
+                    <button type="button" className="src-btn src-btn--lime" onClick={openAddForm}>Sí, agregar</button>
+                    <button type="button" className="src-btn src-btn--ghost" onClick={() => setAddMode('no')}>No</button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
@@ -520,7 +741,6 @@ export function AdminSourcing() {
             setStockOffer(null);
             setCatalog((c) => (created ? [...c, product] : c.map((x) => (x.id === product.id ? product : x))));
             setLinked(product);
-            setPickerText(`${product.name}${product.brand ? ` — ${product.brand}` : ''}`);
             notify({ kind: 'ok', text: created ? `"${product.name}" agregado a tu stock bajo pedido.` : `"${product.name}" actualizado con el nuevo proveedor.` });
           }}
         />

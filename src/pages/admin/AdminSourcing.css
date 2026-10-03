@@ -225,11 +225,86 @@
 .src-input-group { display: flex; gap: 8px; }
 .src-input-group .src-input { flex: 1; }
 .src-input-group .src-btn { height: 44px; }
-.src-search__row {
+.src-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
+.src-step__n {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(130px, 0.5fr);
-  gap: var(--src-gap);
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--src-ok);
+  color: #000;
+  font-family: var(--f-sub);
+  font-weight: 800;
+  font-size: 12px;
 }
+.src-step__body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.src-step__label {
+  font-family: var(--f-sub);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-white);
+  line-height: 26px;
+}
+.src-step__hint { font-size: 12.5px; color: var(--c-text-muted); line-height: 1.4; margin: 0; }
+.src-step__hint b { color: var(--src-ok); }
+
+.src-linked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border-lime, rgba(185, 231, 3, 0.3));
+  background: rgba(196, 252, 21, 0.05);
+  border-radius: var(--src-radius-sm);
+}
+.src-linked__check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--src-ok);
+  color: #000;
+  font-size: 12px;
+  font-weight: 800;
+}
+.src-linked__txt { display: flex; flex-direction: column; gap: 1px; flex: 1 1 220px; min-width: 0; }
+.src-linked__txt span { font-size: 12.5px; color: var(--c-text-muted); }
+
+.src-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--src-line);
+  border-radius: var(--src-radius-sm);
+  overflow: hidden;
+}
+.src-matches li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--src-line);
+}
+.src-matches li:first-child { border-top: none; }
+.src-matches li:hover { background: rgba(255, 255, 255, 0.03); }
+.src-matches__txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.src-matches__txt strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.src-matches__txt span { font-size: 12px; color: var(--c-text-muted); }
+
+.src-price-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.src-price-row .src-money { width: 160px; }
+.src-price-row .src-btn { height: 38px; }
+
+.src-spec-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-left: 34px; }
+.src-link-btn--flat { margin-left: 0; font-size: 12.5px; align-self: flex-start; }
 
 .src-spec { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .src-spec__k { font-size: 12px; color: var(--c-text-muted); margin-right: 2px; }
@@ -267,6 +342,47 @@
 .src-stat--ok .src-stat__v { color: var(--src-ok); }
 .src-stat--bad .src-stat__v { color: var(--src-bad); }
 .src-summary__meta { grid-column: 1 / -1; font-size: 12px; color: var(--c-text-muted); }
+
+/* ─── Panel "Mi configuración de productos" ───────────────── */
+.src-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: #1c1c1e;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 3px solid var(--src-ok);
+  border-radius: var(--src-radius);
+  animation: src-pop 0.25s var(--src-ease);
+}
+.src-cat__head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.src-cat__head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.src-cat__head strong { font-size: 15px; line-height: 1.25; }
+.src-cat__head span:not(.src-linked__check):not(.src-cat__q) { font-size: 12.5px; color: var(--c-text-muted); line-height: 1.35; }
+.src-cat__q {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--src-ok);
+  color: var(--src-ok);
+  font-size: 12px;
+  font-weight: 800;
+}
+.src-cat__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.src-cat__actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.src-cat__actions .src-field { width: 150px; }
+.src-cat__actions .src-btn { height: 38px; }
+.src-cat__actions .src-step__hint { align-self: center; }
+.src-cat__form { display: flex; flex-direction: column; gap: 10px; }
+.src-cat .src-matches { background: rgba(0, 0, 0, 0.25); }
+.src-grid.src-grid--4 { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
+.src-grid--4 .src-field--span2 { grid-column: auto; }
+.src-step__hint.is-neg b { color: var(--src-bad); }
 
 /* ─── Filtros ─────────────────────────────────────────────── */
 .src-filters {
@@ -568,8 +684,6 @@
 }
 
 @media (max-width: 860px) {
-  .src-search__row { grid-template-columns: 1fr 1fr; }
-  .src-search__row .src-field:nth-child(2) { grid-column: 1 / -1; order: 3; }
   .src-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .src-table--merchants .src-row,
   .src-table--history .src-row { grid-template-columns: 1fr 1fr; }
@@ -583,8 +697,9 @@
   .src-input-group { flex-wrap: wrap; }
   .src-input-group .src-input { flex-basis: 100%; }
   .src-input-group .src-btn { flex: 1; }
-  .src-search__row { grid-template-columns: 1fr; }
-  .src-search__row .src-field:nth-child(2) { order: 0; }
+  .src-spec-row { padding-left: 0; }
+  .src-price-row .src-money { width: 100%; }
+  .src-price-row .src-btn { width: 100%; }
 
   .src-row--head { display: none; }
   .src-row {
@@ -599,7 +714,10 @@
   .src-row > .src-actions .src-btn--lime { margin-left: auto; }
 
   .src-grid,
+  .src-grid.src-grid--4,
   .src-calc { grid-template-columns: 1fr 1fr; }
+  .src-cat__actions .src-field,
+  .src-cat__actions .src-btn { width: 100%; }
   .src-field--span2 { grid-column: 1 / -1; }
   .src-filters .src-select { flex: 1 1 140px; }
   .src-toast { left: 16px; right: 16px; bottom: 16px; }
