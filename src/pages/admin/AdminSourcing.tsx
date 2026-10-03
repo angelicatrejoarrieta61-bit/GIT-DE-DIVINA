@@ -6,10 +6,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadProductImage } from '../../lib/supabase';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import {
-  buildSpec, computeMargin, evaluateOffers, isBarcode, money, slugify, timeAgo, detectBrand, round2, norm,
+  buildSpec, computeMargin, evaluateOffers, isBarcode, money, slugify, timeAgo, detectBrand, round2, norm, verifyUrl, domainOf,
   DEFAULT_MARGIN, MATCH_RANK,
   type EvaluatedOffer, type MarginSettings, type MatchLevel, type SourcingMerchant, type SourcingOffer, type Trust,
 } from '../../lib/sourcing';
@@ -23,7 +23,6 @@ interface CatalogProduct {
   brand: string | null;
   price: number | null;
   ean: string | null;
-  sku: string | null;
   cost_price: number | null;
   fulfillment: string | null;
   in_stock: boolean | null;
@@ -72,10 +71,9 @@ export function AdminSourcing() {
   const [addBrand, setAddBrand] = useState('');
   const [addEan, setAddEan] = useState('');
   const [adding, setAdding] = useState(false);
-  const [specOpen, setSpecOpen] = useState(false);
+  const [addPhotos, setAddPhotos] = useState<boolean[]>([true, true]);
   const [savingField, setSavingField] = useState<'price' | 'ean' | null>(null);
   const [query, setQuery] = useState(params.get('q') ?? '');
-  const [specText, setSpecText] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [offers, setOffers] = useState<SourcingOffer[]>([]);
   const [merchants, setMerchants] = useState<Record<string, SourcingMerchant>>({});
@@ -107,11 +105,12 @@ export function AdminSourcing() {
   // ── Carga inicial ──────────────────────────────────────────
   useEffect(() => {
     void (async () => {
-      const [{ data: prods }, { data: cols }, { data: cfg }] = await Promise.all([
-        supabase.from('products').select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').order('name').limit(1000),
+      const [{ data: prods, error: prodErr }, { data: cols }, { data: cfg }] = await Promise.all([
+        supabase.from('products').select('id,name,slug,brand,price,ean,cost_price,fulfillment,in_stock').order('name').limit(1000),
         supabase.from('collections').select('id,name').order('name'),
         supabase.from('store_config').select('key,value').in('key', Object.values(SETTINGS_KEYS)),
       ]);
+      if (prodErr) setError(`No pude leer tu catálogo: ${prodErr.message}`);
       const list = (prods ?? []) as CatalogProduct[];
       setCatalog(list);
       setCollections((cols ?? []) as CollectionLite[]);
@@ -142,7 +141,6 @@ export function AdminSourcing() {
     setLinked(p);
     setChangingLink(false);
     setCatalogText('');
-    setSpecText(fullName(p));
     // Respeta el precio que ya escribiste; si no hay, usa el del catálogo.
     if (p.price) setSalePrice((prev) => (toNum(prev) ? prev : String(p.price)));
     if (setSearch) setQuery(fullName(p));
@@ -151,7 +149,6 @@ export function AdminSourcing() {
   const unlinkProduct = () => {
     setLinked(null);
     setChangingLink(false);
-    setSpecText('');
   };
 
   /** Coincidencias en mi catálogo: por código de barras exacto o por palabras del nombre/marca. */
@@ -159,12 +156,12 @@ export function AdminSourcing() {
     const source = (catalogText.trim() || query.trim());
     if (source.length < 2) return [] as CatalogProduct[];
     const code = source.replace(/\s/g, '');
-    if (isBarcode(code)) return catalog.filter((p) => p.ean === code || p.sku === code).slice(0, 5);
+    if (isBarcode(code)) return catalog.filter((p) => p.ean === code).slice(0, 5);
     const tokens = norm(source).split(' ').filter((t) => t.length > 1 && !['ml', 'g', 'gr', 'spf', 'de', 'con', 'para'].includes(t));
     if (!tokens.length) return [];
     return catalog
       .map((p) => {
-        const hay = ` ${norm(`${p.brand ?? ''} ${p.name} ${p.sku ?? ''}`)} `;
+        const hay = ` ${norm(`${p.brand ?? ''} ${p.name}`)} `;
         const hits = tokens.filter((t) => hay.includes(` ${t} `) || (t.length > 3 && hay.includes(t))).length;
         return { p, score: hits / tokens.length, hits };
       })
@@ -181,7 +178,7 @@ export function AdminSourcing() {
     if (field === 'price' && (!value || (value as number) <= 0)) { notify({ kind: 'error', text: 'Pon un precio válido.' }); return; }
     setSavingField(field);
     const { data, error: err } = await supabase.from('products').update({ [field]: value }).eq('id', linked.id)
-      .select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+      .select('id,name,slug,brand,price,ean,cost_price,fulfillment,in_stock').single();
     setSavingField(null);
     if (err || !data) { notify({ kind: 'error', text: `No se guardó: ${err?.message ?? 'sin respuesta'}` }); return; }
     const updated = data as CatalogProduct;
@@ -248,15 +245,16 @@ export function AdminSourcing() {
   const closeScanner = useCallback(() => setScanOpen(false), []);
 
   // ── Evaluación (instantánea al cambiar precio, filtros o ficha) ──
-  const effectiveSpec = useMemo(() => {
-    const text = specText.trim() || (isBarcode(query) ? '' : query);
-    return buildSpec(text, linked?.brand ?? null);
-  }, [specText, query, linked]);
+  /** Producto contra el que se comparan las ofertas: lo que buscaste; si fue un código, el nombre del catálogo o de la primera oferta. */
+  const specSource = isBarcode(query)
+    ? (linked ? fullName(linked) : offers[0]?.title ?? '')
+    : query;
+  const effectiveSpec = useMemo(() => buildSpec(specSource, linked?.brand ?? null), [specSource, linked]);
 
   const sale = toNum(salePrice);
   const evaluated = useMemo(
-    () => evaluateOffers(offers, effectiveSpec, sale, settings),
-    [offers, effectiveSpec, sale, settings],
+    () => evaluateOffers(offers, effectiveSpec, sale, settings, merchants),
+    [offers, effectiveSpec, sale, settings, merchants],
   );
 
   const brands = useMemo(() => {
@@ -300,12 +298,24 @@ export function AdminSourcing() {
   }, [evaluated, merchants]);
 
   // ── Agregar a mi configuración de productos ────────────────
+  /** Hasta 2 fotos distintas tomadas de las ofertas que sí coinciden con el producto. */
+  const photoChoices = useMemo(() => {
+    const seen = new Set<string>();
+    return [...evaluated]
+      .filter((o) => o.match !== 'no_confirmada' && o.thumbnail)
+      .sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match] || a.position - b.position)
+      .filter((o) => (seen.has(o.thumbnail as string) ? false : (seen.add(o.thumbnail as string), true)))
+      .slice(0, 2)
+      .map((o) => ({ src: o.thumbnail as string, shop: o.shop }));
+  }, [evaluated]);
+
   const openAddForm = () => {
     const firstTitle = best?.title ?? evaluated.find((o) => o.match !== 'no_confirmada')?.title ?? evaluated[0]?.title ?? '';
-    const typed = specText.trim() || (isBarcode(query) ? '' : query.trim());
+    const typed = isBarcode(query) ? '' : query.trim();
     setAddName(typed || firstTitle);
     setAddBrand(effectiveSpec.brand ?? detectBrand(firstTitle) ?? '');
     setAddEan(isBarcode(query) ? query.replace(/\s/g, '') : '');
+    setAddPhotos([true, true]);
     setAddMode('form');
   };
 
@@ -323,6 +333,19 @@ export function AdminSourcing() {
       let slug = base;
       for (let i = 2; used.has(slug); i += 1) slug = `${base}-${i}`;
 
+      // Sube las fotos elegidas a tu almacenamiento y guarda su dirección en el producto
+      const stamp = Date.now();
+      const paths: string[] = [];
+      for (const [i, ph] of photoChoices.entries()) {
+        if (!addPhotos[i]) continue;
+        try {
+          const blob = await (await fetch(ph.src)).blob();
+          const ext = (blob.type.split('/')[1] || 'webp').replace('jpeg', 'jpg');
+          const path = await uploadProductImage(new File([blob], `foto.${ext}`, { type: blob.type || 'image/webp' }), `${slug}-${i + 1}-${stamp}`);
+          if (path) paths.push(path);
+        } catch { /* si una foto falla, el producto se agrega igual */ }
+      }
+
       const { data, error: err } = await supabase.from('products').insert({
         name: addName.trim(),
         slug,
@@ -333,29 +356,39 @@ export function AdminSourcing() {
         fulfillment: 'bajo_pedido',
         in_stock: true,
         tags: ['bajo-pedido'],
-        image_status: 'pending',
-      }).select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+        image_url: paths[0] ?? null,
+        images: paths,
+        image_status: paths.length ? 'done' : 'pending',
+      }).select('id,name,slug,brand,price,ean,cost_price,fulfillment,in_stock').single();
       if (err || !data) throw err ?? new Error('Sin respuesta');
       const product = data as CatalogProduct;
 
       if (best && best.unit_price_mxn !== null) {
-        const m = computeMargin(price, best.unit_price_mxn, settings);
+        const m = computeMargin(price, best.unit_price_mxn, settings, best.shipping);
         await supabase.from('product_sources').insert({
           product_id: product.id, merchant_id: best.merchant_id, offer_id: best.id, shop: best.shop, offer_title: best.title,
-          link: best.link, unit_cost_mxn: best.unit_price_mxn, shipping_mxn: settings.supplierShipping, sale_price_mxn: price,
+          link: best.link, unit_cost_mxn: best.unit_price_mxn, shipping_mxn: best.shipping, sale_price_mxn: price,
           margin_mxn: m.margin ?? 0, match_level: best.match, is_primary: true,
         });
       }
       setCatalog((c) => [...c, product]);
       linkProduct(product);
       setAddMode('ask');
-      notify({ kind: 'ok', text: `"${product.name}" agregado a tus productos (bajo pedido).` });
+      notify({ kind: 'ok', text: `"${product.name}" agregado a tus productos${paths.length ? ` con ${paths.length} foto${paths.length > 1 ? 's' : ''}` : ' (sin foto)'}.` });
     } catch (e2) {
       notify({ kind: 'error', text: `No se pudo agregar: ${(e2 as { message?: string })?.message ?? 'error'}` });
     } finally {
       setAdding(false);
     }
   };
+
+  const marginNote = best && sale
+    ? (
+      <span className={`src-cat__margin ${best.margin !== null && best.margin < 0 ? 'is-neg' : 'is-pos'}`}>
+        Tu margen: <b>{money(best.margin)}</b>{best.marginPct !== null ? ` (${best.marginPct}%)` : ''} comprando en {best.shop} a {money(best.costTotal)}
+      </span>
+    )
+    : <span className="src-step__hint">{sale ? 'Aún no hay oferta exacta para calcular tu margen; revisa las probables.' : 'Escribe tu precio y verás cuánto ganas en cada oferta.'}</span>;
 
   const counts = useMemo(() => {
     const c: Record<MatchLevel, number> = { exacta: 0, probable: 0, no_confirmada: 0 };
@@ -421,66 +454,27 @@ export function AdminSourcing() {
         <>
           {/* ── Barra de búsqueda ─────────────────────────── */}
           <form className="src-card src-search" onSubmit={onSubmit}>
-            {/* Paso 1 — Producto buscado */}
-            <div className="src-step">
-              <span className="src-step__n" aria-hidden="true">1</span>
-              <div className="src-step__body">
-              <label className="src-step__label" htmlFor="src-q">Buscar producto, marca o código de barras</label>
-              <div className="src-input-group">
-                <input
-                  id="src-q"
-                  ref={queryRef}
-                  className="src-input src-input--lg"
-                  placeholder="Ej: ISDIN Fusion Water SPF 50 50 ml"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  autoComplete="off"
-                  enterKeyHint="search"
-                />
-                <button type="button" className="src-btn src-btn--ghost" onClick={() => setScanOpen(true)} aria-label="Escanear código de barras con la cámara">
-                  ▥ Escanear
-                </button>
-                <button type="submit" className="src-btn src-btn--lime" disabled={loading || query.trim().length < 2}>
-                  {loading ? <><span className="src-spinner src-spinner--dark" /> Buscando</> : 'Buscar ofertas'}
-                </button>
-              </div>
-              <span className="src-step__hint">Escribe, pega el código o escanéalo. Te muestro las ofertas de tiendas en México y reviso si ya lo tienes en tu catálogo.</span>
-              </div>
-            </div>
-
-            {/* Paso 2 — Mi precio de venta */}
-            <div className="src-step">
-              <span className="src-step__n" aria-hidden="true">2</span>
-              <div className="src-step__body">
-                <label className="src-step__label" htmlFor="src-sale">Mi precio de venta</label>
-                <div className="src-price-row">
-                  <div className="src-money">
-                    <span>$</span>
-                    <input id="src-sale" className="src-input" inputMode="decimal" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
-                  </div>
-                  <span className="src-step__hint">Opcional. Con él calculo cuánto ganas en cada oferta.</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="src-spec-row">
-              <SpecChips spec={effectiveSpec} />
-              <button type="button" className="src-link-btn src-link-btn--flat" onClick={() => setSpecOpen((v) => !v)} aria-expanded={specOpen}>
-                {specOpen ? 'Ocultar' : 'Ajustar comparación'}
+            <label className="src-step__label" htmlFor="src-q">Buscar producto, marca o código de barras</label>
+            <div className="src-input-group">
+              <input
+                id="src-q"
+                ref={queryRef}
+                className="src-input src-input--lg"
+                placeholder="Ej: ISDIN Fusion Water SPF 50 50 ml"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="search"
+              />
+              <button type="button" className="src-btn src-btn--ghost" onClick={() => setScanOpen(true)} aria-label="Escanear código de barras con la cámara">
+                ▥ Escanear
+              </button>
+              <button type="submit" className="src-btn src-btn--lime" disabled={loading || query.trim().length < 2}>
+                {loading ? <><span className="src-spinner src-spinner--dark" /> Buscando</> : 'Buscar ofertas'}
               </button>
             </div>
-            {specOpen && (
-              <div className="src-field">
-                <label htmlFor="src-spec">Producto exacto contra el que comparo las ofertas</label>
-                <input
-                  id="src-spec"
-                  className="src-input"
-                  placeholder="Marca, línea, tamaño, SPF y variante. Ej: ISDIN Fusion Water SPF 50 50 ml"
-                  value={specText}
-                  onChange={(e) => setSpecText(e.target.value)}
-                />
-              </div>
-            )}
+            <span className="src-step__hint">Entre más completo el nombre (línea, tamaño, SPF, variante), más exactas las ofertas. Reviso también si ya lo tienes en tu catálogo.</span>
+            <SpecChips spec={effectiveSpec} />
           </form>
 
           {error && <div className="src-alert src-alert--error" role="alert">{error}</div>}
@@ -506,7 +500,7 @@ export function AdminSourcing() {
               <div className={`src-stat ${best?.margin !== null && best?.margin !== undefined ? (best.margin >= 0 ? 'src-stat--ok' : 'src-stat--bad') : ''}`}>
                 <span className="src-stat__k">Tu margen</span>
                 <span className="src-stat__v">{best && best.margin !== null ? money(best.margin) : '—'}</span>
-                <span className="src-stat__s">{best && best.marginPct !== null ? `${best.marginPct}% de la venta` : sale ? '' : 'Pon tu precio de venta'}</span>
+                <span className="src-stat__s">{best && best.marginPct !== null ? `${best.marginPct}% de la venta` : sale ? '' : 'Pon tu precio abajo'}</span>
               </div>
               <div className="src-summary__meta">
                 {meta.cached ? 'Guardado ' : 'Consultado '}{timeAgo(meta.fetchedAt)}
@@ -548,6 +542,7 @@ export function AdminSourcing() {
                     )}
                     <button type="button" className="src-btn src-btn--ghost" onClick={() => { unlinkProduct(); setChangingLink(true); }}>No es este</button>
                   </div>
+                  {marginNote}
                   <p className="src-step__hint">Para guardar también el proveedor y el costo, usa <b>+ Mi stock</b> en la oferta que elijas.</p>
                 </>
               ) : catalogMatches.length > 0 && addMode !== 'form' ? (
@@ -599,14 +594,29 @@ export function AdminSourcing() {
                     <div className="src-field">
                       <label htmlFor="add-ean">Código de barras</label>
                       <input id="add-ean" className="src-input" inputMode="numeric" placeholder="Opcional" value={addEan} onChange={(e) => setAddEan(e.target.value.replace(/\D/g, ''))} />
+                      {!addEan && <span className="src-field__note">Código no encontrado. Puedes agregarlo después.</span>}
                     </div>
                   </div>
+                  {photoChoices.length > 0 ? (
+                    <div className="src-photos">
+                      <span className="src-photos__k">Fotos para tu catálogo</span>
+                      {photoChoices.map((ph, i) => (
+                        <label key={ph.src.slice(-40)} className={`src-photo ${addPhotos[i] ? 'is-on' : ''}`}>
+                          <img src={ph.src} alt={`Foto ${i + 1}, de ${ph.shop}`} width={64} height={64} />
+                          <span className="src-check"><input type="checkbox" checked={!!addPhotos[i]} onChange={(e) => setAddPhotos((v) => v.map((x, j) => (j === i ? e.target.checked : x)))} /> Usar</span>
+                        </label>
+                      ))}
+                      <span className="src-field__note">Son miniaturas de las ofertas (aprox. 300 px): sirven para listar el producto ya; para la ficha grande sube después una foto en alta desde Imágenes de productos.</span>
+                    </div>
+                  ) : (
+                    <span className="src-field__note">Estas ofertas no traen foto. Súbela después desde Imágenes de productos.</span>
+                  )}
                   <div className="src-cat__actions">
                     <button type="submit" className="src-btn src-btn--lime" disabled={adding}>
                       {adding ? <><span className="src-spinner src-spinner--dark" /> Agregando</> : 'Agregar a mis productos'}
                     </button>
                     <button type="button" className="src-btn src-btn--ghost" disabled={adding} onClick={() => setAddMode('ask')}>Cancelar</button>
-                    {best && best.margin !== null && sale ? <span className={`src-step__hint ${best.margin < 0 ? 'is-neg' : ''}`}>Margen con este precio: <b>{money(computeMargin(sale, best.unit_price_mxn, settings).margin)}</b></span> : null}
+                    {marginNote}
                   </div>
                 </form>
               ) : addMode === 'no' ? (
@@ -627,6 +637,15 @@ export function AdminSourcing() {
                     <button type="button" className="src-btn src-btn--lime" onClick={openAddForm}>Sí, agregar</button>
                     <button type="button" className="src-btn src-btn--ghost" onClick={() => setAddMode('no')}>No</button>
                   </div>
+                </div>
+              )}
+              {!(linked && !changingLink) && addMode !== 'form' && (
+                <div className="src-cat__actions src-cat__price">
+                  <div className="src-field">
+                    <label htmlFor="cat-sale">Mi precio de venta</label>
+                    <div className="src-money"><span>$</span><input id="cat-sale" className="src-input" inputMode="decimal" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /></div>
+                  </div>
+                  {marginNote}
                 </div>
               )}
             </section>
@@ -731,7 +750,7 @@ export function AdminSourcing() {
         <StockModal
           offer={stockOffer}
           linked={linked}
-          spec={specText || query}
+          spec={query}
           salePrice={sale}
           barcode={isBarcode(query) ? query.replace(/\s/g, '') : linked?.ean ?? ''}
           collections={collections}
@@ -803,6 +822,7 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
         <span className={`src-dot src-dot--${trust}`} aria-hidden="true" />
         <span className="src-shop__name">{o.shop}</span>
         <span className="src-shop__trust">{TRUST_LABEL[trust]}{o.rating ? ` · ★ ${o.rating}` : ''}</span>
+        <span className={`src-shop__ship ${o.shippingDays ? '' : 'is-missing'}`}>{o.shippingDays ? `Llega en ${o.shippingDays}` : 'Días de envío sin dato'}</span>
       </div>
 
       <div className="src-cell num" role="cell">
@@ -814,6 +834,7 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
 
       <div className="src-cell num" role="cell">
         <span className="src-price">{money(o.costTotal)}</span>
+        <span className={`src-sub ${o.shippingKnown ? '' : 'is-missing'}`}>{o.shippingKnown ? (o.shipping > 0 ? `incluye envío ${money(o.shipping)}` : 'envío gratis') : 'envío sin dato'}</span>
         <span className="src-sub">+ comisión {money(o.fee)}</span>
       </div>
 
@@ -823,9 +844,10 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
       </div>
 
       <div className="src-cell src-actions" role="cell">
-        {o.link
-          ? <a className="src-btn src-btn--sm src-btn--ghost" href={o.link} target="_blank" rel="noopener noreferrer">Ver ↗</a>
-          : <span className="src-btn src-btn--sm src-btn--ghost is-disabled" aria-disabled="true">Sin link</span>}
+        {o.link && <a className="src-btn src-btn--sm src-btn--ghost" href={o.link} target="_blank" rel="noopener noreferrer" title="Ver esta oferta en Google Shopping">Oferta ↗</a>}
+        {verifyUrl(merchant?.website, o.title)
+          ? <a className="src-btn src-btn--sm src-btn--ghost" href={verifyUrl(merchant?.website, o.title) as string} target="_blank" rel="noopener noreferrer" title={`Buscar este producto dentro de ${domainOf(merchant?.website)}`}>Verificar ↗</a>
+          : <span className="src-btn src-btn--sm src-btn--ghost is-disabled" aria-disabled="true" title="Agrega el sitio de esta tienda en la pestaña Tiendas">Sin sitio</span>}
         <button type="button" className={`src-icon-btn ${trust === 'confiable' ? 'is-on' : ''}`} disabled={!o.merchant_id}
           onClick={() => onTrust(o.merchant_id, trust === 'confiable' ? 'nuevo' : 'confiable')}
           aria-pressed={trust === 'confiable'} title={trust === 'confiable' ? 'Quitar de confiables' : 'Marcar tienda como confiable'}>★</button>
@@ -869,7 +891,7 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
   const [compare, setCompare] = useState('');
   const [collection, setCollection] = useState('');
   const [unitCost, setUnitCost] = useState(String(offer.unit_price_mxn ?? ''));
-  const [shipping, setShipping] = useState(String(settings.supplierShipping));
+  const [shipping, setShipping] = useState(String(offer.shipping));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -907,7 +929,7 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
 
       if (mode === 'update' && linked) {
         const { data, error } = await supabase.from('products').update(common).eq('id', linked.id)
-          .select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+          .select('id,name,slug,brand,price,ean,cost_price,fulfillment,in_stock').single();
         if (error) throw error;
         product = data as CatalogProduct;
       } else {
@@ -928,7 +950,7 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
           category: collection || null,
           tags: ['bajo-pedido'],
           image_status: 'pending',
-        }).select('id,name,slug,brand,price,ean,sku,cost_price,fulfillment,in_stock').single();
+        }).select('id,name,slug,brand,price,ean,cost_price,fulfillment,in_stock').single();
         if (error) throw error;
         product = data as CatalogProduct;
         created = true;
@@ -1115,13 +1137,25 @@ function SettingsModal({ value, onClose, onSaved }: { value: MarginSettings; onC
 }
 
 // ─── Pestaña: directorio de tiendas ──────────────────────────
+type MerchantDraft = { website: string; daysMin: string; daysMax: string; cost: string; freeFrom: string; notes: string; invoice: boolean };
+
+const draftOf = (r: SourcingMerchant): MerchantDraft => ({
+  website: r.website ?? '',
+  daysMin: r.shipping_days_min?.toString() ?? '',
+  daysMax: r.shipping_days_max?.toString() ?? '',
+  cost: r.shipping_cost_mxn?.toString() ?? '',
+  freeFrom: r.free_shipping_from_mxn?.toString() ?? '',
+  notes: r.notes ?? '',
+  invoice: !!r.gives_invoice,
+});
+
 function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
   const [rows, setRows] = useState<SourcingMerchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'todas' | Trust>('todas');
+  const [filter, setFilter] = useState<'todas' | Trust | 'sin_datos'>('todas');
   const [text, setText] = useState('');
-  const [dirty, setDirty] = useState<Record<string, Partial<SourcingMerchant>>>({});
+  const [drafts, setDrafts] = useState<Record<string, MerchantDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1132,26 +1166,54 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
     })();
   }, []);
 
-  const shown = rows.filter((r) => (filter === 'todas' || r.trust === filter) && r.name.toLowerCase().includes(text.toLowerCase()));
-  const edit = (id: string, patch: Partial<SourcingMerchant>) => setDirty((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
+  const complete = (r: SourcingMerchant) => !!r.website && r.shipping_days_max != null && r.shipping_cost_mxn != null;
+  const shown = rows.filter((r) =>
+    (filter === 'todas' || (filter === 'sin_datos' ? !complete(r) : r.trust === filter))
+    && r.name.toLowerCase().includes(text.toLowerCase()));
+
+  const edit = (r: SourcingMerchant, patch: Partial<MerchantDraft>) =>
+    setDrafts((d) => ({ ...d, [r.id]: { ...(d[r.id] ?? draftOf(r)), ...patch } }));
+
+  const setTrust = async (r: SourcingMerchant, trust: Trust) => {
+    if (r.trust === trust) return;
+    setRows((list) => list.map((x) => (x.id === r.id ? { ...x, trust } : x)));
+    const { error: err } = await supabase.from('sourcing_merchants').update({ trust }).eq('id', r.id);
+    if (err) {
+      setRows((list) => list.map((x) => (x.id === r.id ? { ...x, trust: r.trust } : x)));
+      notify({ kind: 'error', text: `No se guardó: ${err.message}` });
+    }
+  };
 
   const save = async (r: SourcingMerchant) => {
-    const patch = dirty[r.id];
-    if (!patch) return;
-    if (patch.website && !/^https?:\/\/[^\s]+\.[^\s]+/.test(patch.website)) {
-      notify({ kind: 'error', text: 'El sitio debe empezar con https://' });
-      return;
-    }
+    const d = drafts[r.id];
+    if (!d) return;
+    const site = d.website.trim();
+    if (site && !/^https?:\/\/[^\s]+\.[^\s]+/.test(site)) { notify({ kind: 'error', text: 'El sitio debe empezar con https://' }); return; }
+    const int = (v: string) => (v.trim() === '' ? null : Math.max(0, Math.round(Number(v))));
+    const num = (v: string) => (v.trim() === '' ? null : toNum(v));
+    const dMin = int(d.daysMin); const dMax = int(d.daysMax);
+    if ((dMin !== null && Number.isNaN(dMin)) || (dMax !== null && Number.isNaN(dMax))) { notify({ kind: 'error', text: 'Los días deben ser números.' }); return; }
+    if (dMin !== null && dMax !== null && dMax < dMin) { notify({ kind: 'error', text: 'El máximo de días no puede ser menor que el mínimo.' }); return; }
+    const patch = {
+      website: site || null,
+      shipping_days_min: dMin ?? (dMax !== null ? dMax : null),
+      shipping_days_max: dMax ?? (dMin !== null ? dMin : null),
+      shipping_cost_mxn: num(d.cost),
+      free_shipping_from_mxn: num(d.freeFrom),
+      notes: d.notes.trim() || null,
+      gives_invoice: d.invoice,
+    };
     setSavingId(r.id);
     const { error: err } = await supabase.from('sourcing_merchants').update(patch).eq('id', r.id);
     setSavingId(null);
     if (err) { notify({ kind: 'error', text: err.message }); return; }
     setRows((list) => list.map((x) => (x.id === r.id ? { ...x, ...patch } : x)));
-    setDirty((d) => { const n = { ...d }; delete n[r.id]; return n; });
+    setDrafts((all) => { const n = { ...all }; delete n[r.id]; return n; });
+    notify({ kind: 'ok', text: `Datos de ${r.name} guardados. Ya se usan en las ofertas.` });
   };
 
-  const counts = { todas: rows.length, confiable: 0, nuevo: 0, descartado: 0 } as Record<'todas' | Trust, number>;
-  rows.forEach((r) => { counts[r.trust] += 1; });
+  const counts = { todas: rows.length, confiable: 0, nuevo: 0, descartado: 0, sin_datos: 0 } as Record<'todas' | Trust | 'sin_datos', number>;
+  rows.forEach((r) => { counts[r.trust] += 1; if (!complete(r)) counts.sin_datos += 1; });
 
   if (loading) return <ResultsSkeleton />;
   if (error) return <div className="src-alert src-alert--error">{error}</div>;
@@ -1159,59 +1221,82 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
 
   return (
     <section>
+      <p className="src-note">
+        Google me da el nombre de la tienda y el precio, pero <b>no los días ni el costo de envío</b>. Captúralos una vez por tienda (la primera vez que le compres) y se usarán en todas las ofertas.
+      </p>
       <div className="src-filters">
-        <div className="src-seg" role="radiogroup" aria-label="Confianza">
-          {(['todas', 'confiable', 'nuevo', 'descartado'] as const).map((k) => (
+        <div className="src-seg" role="radiogroup" aria-label="Filtrar tiendas">
+          {(['todas', 'confiable', 'nuevo', 'descartado', 'sin_datos'] as const).map((k) => (
             <button key={k} type="button" role="radio" aria-checked={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
-              {k === 'todas' ? 'Todas' : TRUST_LABEL[k]} {counts[k]}
+              {k === 'todas' ? 'Todas' : k === 'sin_datos' ? 'Faltan datos' : `${TRUST_LABEL[k]}s`} {counts[k]}
             </button>
           ))}
         </div>
-        <input className="src-input src-input--sm" placeholder="Buscar tienda" value={text} onChange={(e) => setText(e.target.value)} aria-label="Buscar tienda" />
+        <input className="src-input src-input--sm src-input--search" placeholder="Buscar tienda" value={text} onChange={(e) => setText(e.target.value)} aria-label="Buscar tienda" />
       </div>
 
-      <div className="src-table src-table--merchants" role="table" aria-label="Directorio de tiendas">
-        <div className="src-row src-row--head" role="row">
-          <span role="columnheader">Tienda</span>
-          <span role="columnheader">Confianza</span>
-          <span role="columnheader">Sitio web</span>
-          <span role="columnheader">Notas</span>
-          <span role="columnheader">Factura</span>
-          <span role="columnheader" />
-        </div>
+      {shown.length === 0 && <div className="src-empty"><strong>Ninguna tienda con este filtro.</strong></div>}
+
+      <div className="src-stores">
         {shown.map((r) => {
-          const d = dirty[r.id] ?? {};
-          const val = { ...r, ...d };
+          const d = drafts[r.id] ?? draftOf(r);
+          const dirty = !!drafts[r.id];
+          const domain = domainOf(r.website);
           return (
-            <div key={r.id} className="src-row" role="row">
-              <div className="src-cell src-shop" role="cell">
-                <span className={`src-dot src-dot--${val.trust}`} aria-hidden="true" />
-                <span className="src-shop__name">{r.name}</span>
-                <span className="src-shop__trust">Vista {r.times_seen}× · {r.last_seen_at ? timeAgo(r.last_seen_at) : ''}{r.last_price ? ` · último ${money(r.last_price)}` : ''}</span>
-              </div>
-              <div className="src-cell" role="cell">
-                <select className="src-select src-select--block" value={val.trust} onChange={(e) => edit(r.id, { trust: e.target.value as Trust })} aria-label={`Confianza de ${r.name}`}>
-                  <option value="nuevo">Nueva</option>
-                  <option value="confiable">Confiable</option>
-                  <option value="descartado">Descartada</option>
-                </select>
-              </div>
-              <div className="src-cell" role="cell">
-                <input className="src-input src-input--sm" placeholder="https://" value={val.website ?? ''} onChange={(e) => edit(r.id, { website: e.target.value || null })} aria-label={`Sitio de ${r.name}`} />
-              </div>
-              <div className="src-cell" role="cell">
-                <input className="src-input src-input--sm" placeholder="Ej: envío 2 días, pide factura" value={val.notes ?? ''} onChange={(e) => edit(r.id, { notes: e.target.value || null })} aria-label={`Notas de ${r.name}`} />
-              </div>
-              <div className="src-cell" role="cell">
-                <label className="src-check"><input type="checkbox" checked={!!val.gives_invoice} onChange={(e) => edit(r.id, { gives_invoice: e.target.checked })} /> Sí</label>
-              </div>
-              <div className="src-cell src-actions" role="cell">
-                {r.website && <a className="src-btn src-btn--sm src-btn--ghost" href={r.website} target="_blank" rel="noopener noreferrer">Abrir ↗</a>}
-                <button type="button" className="src-btn src-btn--sm src-btn--lime" disabled={!dirty[r.id] || savingId === r.id} onClick={() => void save(r)}>
-                  {savingId === r.id ? 'Guardando…' : 'Guardar'}
+            <article key={r.id} className={`src-store src-store--${r.trust}`}>
+              <header className="src-store__head">
+                <div className="src-store__id">
+                  <span className={`src-dot src-dot--${r.trust}`} aria-hidden="true" />
+                  <div>
+                    <strong>{r.name}</strong>
+                    <span>
+                      Vista {r.times_seen}×{r.last_seen_at ? ` · ${timeAgo(r.last_seen_at)}` : ''}{r.last_price ? ` · último precio ${money(r.last_price)}` : ''}
+                    </span>
+                  </div>
+                </div>
+                <div className="src-seg" role="radiogroup" aria-label={`Confianza de ${r.name}`}>
+                  {(['nuevo', 'confiable', 'descartado'] as Trust[]).map((t) => (
+                    <button key={t} type="button" role="radio" aria-checked={r.trust === t} className={r.trust === t ? `is-on is-on--${t}` : ''} onClick={() => void setTrust(r, t)}>
+                      {TRUST_LABEL[t]}
+                    </button>
+                  ))}
+                </div>
+                {domain
+                  ? <a className="src-btn src-btn--sm src-btn--ghost" href={r.website as string} target="_blank" rel="noopener noreferrer">Abrir {domain} ↗</a>
+                  : <span className="src-btn src-btn--sm src-btn--ghost is-disabled" aria-disabled="true">Sin sitio</span>}
+              </header>
+
+              <div className="src-store__grid">
+                <div className="src-field src-store__site">
+                  <label htmlFor={`w-${r.id}`}>Sitio web</label>
+                  <input id={`w-${r.id}`} className="src-input src-input--sm" placeholder="https://" value={d.website} onChange={(e) => edit(r, { website: e.target.value })} />
+                </div>
+                <div className="src-field">
+                  <label htmlFor={`a-${r.id}`}>Envío en días</label>
+                  <div className="src-range">
+                    <input id={`a-${r.id}`} className="src-input src-input--sm" inputMode="numeric" placeholder="mín" value={d.daysMin} onChange={(e) => edit(r, { daysMin: e.target.value.replace(/\D/g, '') })} aria-label="Días mínimos" />
+                    <span aria-hidden="true">a</span>
+                    <input className="src-input src-input--sm" inputMode="numeric" placeholder="máx" value={d.daysMax} onChange={(e) => edit(r, { daysMax: e.target.value.replace(/\D/g, '') })} aria-label="Días máximos" />
+                  </div>
+                </div>
+                <div className="src-field">
+                  <label htmlFor={`c-${r.id}`}>Costo de envío</label>
+                  <div className="src-money"><span>$</span><input id={`c-${r.id}`} className="src-input src-input--sm" inputMode="decimal" placeholder="sin dato" value={d.cost} onChange={(e) => edit(r, { cost: e.target.value })} /></div>
+                </div>
+                <div className="src-field">
+                  <label htmlFor={`f-${r.id}`}>Gratis desde</label>
+                  <div className="src-money"><span>$</span><input id={`f-${r.id}`} className="src-input src-input--sm" inputMode="decimal" placeholder="no aplica" value={d.freeFrom} onChange={(e) => edit(r, { freeFrom: e.target.value })} /></div>
+                </div>
+                <div className="src-field src-store__notes">
+                  <label htmlFor={`n-${r.id}`}>Notas</label>
+                  <input id={`n-${r.id}`} className="src-input src-input--sm" placeholder="Ej: recoger en sucursal, pide factura al comprar" value={d.notes} onChange={(e) => edit(r, { notes: e.target.value })} />
+                </div>
+                <label className="src-check src-store__inv"><input type="checkbox" checked={d.invoice} onChange={(e) => edit(r, { invoice: e.target.checked })} /> Da factura</label>
+                <button type="button" className="src-btn src-btn--sm src-btn--lime src-store__save" disabled={!dirty || savingId === r.id} onClick={() => void save(r)}>
+                  {savingId === r.id ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado'}
                 </button>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

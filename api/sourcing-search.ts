@@ -58,6 +58,39 @@ function adminClient(): SupabaseClient {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+/** Sitios de tiendas conocidas en México. Solo dominios verificables; lo demás lo captura el usuario. */
+const KNOWN_SITES: Record<string, string> = {
+  'mercado libre': 'https://www.mercadolibre.com.mx',
+  'amazon mx': 'https://www.amazon.com.mx',
+  amazon: 'https://www.amazon.com.mx',
+  liverpool: 'https://www.liverpool.com.mx',
+  'farmacias del ahorro': 'https://www.fahorro.com',
+  'san pablo farmacia': 'https://www.farmaciasanpablo.com.mx',
+  'farmacia san pablo': 'https://www.farmaciasanpablo.com.mx',
+  'farmacias benavides': 'https://www.benavides.com.mx',
+  'farmacias guadalajara': 'https://www.farmaciasguadalajara.com',
+  chedraui: 'https://www.chedraui.com.mx',
+  soriana: 'https://www.soriana.com',
+  'el palacio de hierro': 'https://www.elpalaciodehierro.com',
+  sephora: 'https://www.sephora.com.mx',
+  "sam's club": 'https://www.sams.com.mx',
+  'sams club': 'https://www.sams.com.mx',
+  'bodega aurrera': 'https://www.bodegaaurrera.com.mx',
+  walmart: 'https://www.walmart.com.mx',
+  costco: 'https://www.costco.com.mx',
+  sanborns: 'https://www.sanborns.com.mx',
+  coppel: 'https://www.coppel.com',
+  isdin: 'https://www.isdin.com',
+};
+
+/** Sitio sugerido: tienda conocida, o el propio nombre cuando ya es un dominio (ej. "supiel.com.mx"). */
+export function guessWebsite(shopName: string): string | null {
+  const key = normalizeKey(shopName);
+  if (KNOWN_SITES[key]) return KNOWN_SITES[key];
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|mx|com\.mx|net|org|store|shop)$/.test(key)) return `https://${key.startsWith('www.') ? key : `www.${key}`}`;
+  return null;
+}
+
 export function normalizeKey(s: string): string {
   return s
     .normalize('NFD')
@@ -180,8 +213,15 @@ async function upsertMerchants(db: SupabaseClient, items: Array<{ shop: string; 
   const { data: saved, error: upErr } = await db
     .from('sourcing_merchants')
     .upsert(rows, { onConflict: 'name_key' })
-    .select('id, name_key, trust');
+    .select('id, name, name_key, trust, website');
   if (upErr) throw upErr;
+
+  // Sitio sugerido para tiendas que aún no lo tienen
+  await Promise.all((saved ?? [])
+    .filter((m) => !m.website)
+    .map((m) => ({ id: m.id as string, site: guessWebsite(m.name as string) }))
+    .filter((m) => m.site)
+    .map((m) => db.from('sourcing_merchants').update({ website: m.site }).eq('id', m.id).is('website', null)));
   return new Map((saved ?? []).map((m) => [m.name_key as string, { id: m.id as string, trust: m.trust as string }]));
 }
 
@@ -190,7 +230,7 @@ async function merchantsForOffers(db: SupabaseClient, offers: OfferOut[]) {
   if (!ids.length) return {};
   const { data } = await db
     .from('sourcing_merchants')
-    .select('id, name, trust, website, notes, times_seen, gives_invoice')
+    .select('id, name, trust, website, notes, times_seen, gives_invoice, shipping_days_min, shipping_days_max, shipping_cost_mxn, free_shipping_from_mxn')
     .in('id', ids);
   return Object.fromEntries((data ?? []).map((m) => [m.id, m]));
 }

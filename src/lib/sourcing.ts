@@ -33,6 +33,10 @@ export interface SourcingMerchant {
   notes: string | null;
   times_seen: number;
   gives_invoice: boolean | null;
+  shipping_days_min: number | null;
+  shipping_days_max: number | null;
+  shipping_cost_mxn: number | null;
+  free_shipping_from_mxn: number | null;
   last_price?: number | null;
   last_seen_at?: string;
 }
@@ -73,6 +77,9 @@ export interface EvaluatedOffer extends SourcingOffer {
   margin: number | null;
   marginPct: number | null;
   priceFlag: 'sospechoso' | 'caro' | null;
+  shipping: number;          // envío del proveedor por pieza usado en el costo
+  shippingKnown: boolean;    // true si viene de los datos de la tienda
+  shippingDays: string | null;
 }
 
 // ─── Diccionarios ─────────────────────────────────────────────
@@ -333,15 +340,35 @@ function median(nums: number[]): number | null {
 }
 
 // ─── Evaluación completa ──────────────────────────────────────
+/** Envío que cobra una tienda para una oferta, según lo que capturaste en su ficha. */
+export function merchantShipping(
+  m: SourcingMerchant | undefined,
+  offerPrice: number | null,
+  packQty: number,
+  fallback: number,
+): { shipping: number; known: boolean; days: string | null } {
+  const days = m?.shipping_days_min != null || m?.shipping_days_max != null
+    ? (m?.shipping_days_min != null && m?.shipping_days_max != null && m.shipping_days_min !== m.shipping_days_max
+      ? `${m.shipping_days_min}–${m.shipping_days_max} días`
+      : `${m?.shipping_days_max ?? m?.shipping_days_min} día${(m?.shipping_days_max ?? m?.shipping_days_min) === 1 ? '' : 's'}`)
+    : null;
+  if (!m || m.shipping_cost_mxn == null) return { shipping: fallback, known: false, days };
+  const free = m.free_shipping_from_mxn != null && offerPrice !== null && offerPrice >= m.free_shipping_from_mxn;
+  const total = free ? 0 : Number(m.shipping_cost_mxn);
+  return { shipping: round2(total / Math.max(1, packQty)), known: true, days };
+}
+
 export function evaluateOffers(
   offers: SourcingOffer[],
   spec: TargetSpec,
   salePrice: number | null,
   settings: MarginSettings,
+  merchants: Record<string, SourcingMerchant> = {},
 ): EvaluatedOffer[] {
   const base = offers.map((o) => {
     const { match, reasons } = classify(spec, o.title);
-    const m = computeMargin(salePrice, o.unit_price_mxn, settings);
+    const ship = merchantShipping(o.merchant_id ? merchants[o.merchant_id] : undefined, o.price_mxn, o.pack_qty, settings.supplierShipping);
+    const m = computeMargin(salePrice, o.unit_price_mxn, settings, ship.shipping);
     return {
       ...o,
       brand: detectBrand(o.title) ?? 'Otra',
@@ -349,6 +376,9 @@ export function evaluateOffers(
       reasons: o.pack_qty > 1 ? [...reasons, `Paquete de ${o.pack_qty}: precio por pieza`] : reasons,
       ...m,
       priceFlag: null as EvaluatedOffer['priceFlag'],
+      shipping: ship.shipping,
+      shippingKnown: ship.known,
+      shippingDays: ship.days,
     };
   });
 
@@ -388,4 +418,18 @@ export function timeAgo(iso: string): string {
   if (s < 3600) return `hace ${Math.round(s / 60)} min`;
   if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
   return `hace ${Math.round(s / 86400)} d`;
+}
+
+/** Dominio limpio de un sitio ("https://www.tienda.com/x" → "tienda.com"). */
+export function domainOf(website: string | null | undefined): string | null {
+  if (!website) return null;
+  const m = website.trim().toLowerCase().match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})/);
+  return m ? m[1] : null;
+}
+
+/** Enlace para verificar un producto dentro del sitio de la tienda (búsqueda acotada a su dominio). */
+export function verifyUrl(website: string | null | undefined, title: string): string | null {
+  const d = domainOf(website);
+  if (!d) return null;
+  return `https://www.google.com/search?q=${encodeURIComponent(`site:${d} ${title}`)}`;
 }
