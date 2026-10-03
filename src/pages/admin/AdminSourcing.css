@@ -613,6 +613,8 @@
   font-size: 13px;
   line-height: 1.4;
 }
+.src-alert--row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.src-alert--row .src-btn { flex: none; color: inherit; border-color: currentColor; }
 .src-alert--error { background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 100, 100, 0.35); color: #ffb0b0; }
 .src-alert--warn { background: rgba(253, 198, 86, 0.1); border: 1px solid rgba(253, 198, 86, 0.35); color: var(--src-warn); }
 
