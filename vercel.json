@@ -7,6 +7,9 @@
     },
     "api/create-payment.ts": {
       "maxDuration": 30
+    },
+    "api/sourcing-search.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [

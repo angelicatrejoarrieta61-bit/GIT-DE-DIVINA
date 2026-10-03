@@ -230,6 +230,13 @@ export const AdminLayout: React.FC = () => {
           </NavLink>
 
           <NavLink
+            to="/admin/abastecimiento"
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            🔎 Abastecimiento
+          </NavLink>
+
+          <NavLink
             to="/admin/reportes"
             className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
           >

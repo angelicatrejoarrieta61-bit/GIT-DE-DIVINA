@@ -31,6 +31,7 @@ import { trackPageView } from './lib/analytics';
 import { capturePromoterReferral } from './lib/promoterTracking';
 import { PromotionProgramPage } from './pages/PromotionProgramPage';
 import { AdminPromoters } from './pages/admin/AdminPromoters';
+import { AdminSourcing } from './pages/admin/AdminSourcing';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/admin" element={<NoIndex><AdminLayout /></NoIndex>}>
           <Route index element={<Navigate to="/admin/config?section=site-general" replace />} />
           <Route path="productos"  element={<AdminProducts />} />
+          <Route path="abastecimiento" element={<AdminSourcing />} />
           <Route path="import"     element={<AdminImport />} />
           <Route path="config"     element={<AdminConfig />} />
           <Route path="reportes"   element={<AdminOrderReports />} />
