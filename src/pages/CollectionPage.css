@@ -111,27 +111,27 @@
     margin: auto auto 40px auto;
   }
 
-  /* Exclusivo para colecciones (Cremas, Grooming) para imitar 'quienes-somos' */
-  .collection-page:not(.catalog-page) .collection-page__banner {
+  /* Colecciones y Catálogo: en celular la imagen se muestra completa, a su proporción */
+  .collection-page .collection-page__banner {
     height: auto !important;
     min-height: 0 !important;
     display: grid !important;
     place-items: center !important;
     padding-bottom: 0 !important;
   }
-  .collection-page:not(.catalog-page) .collection-page__bg-img {
+  .collection-page .collection-page__bg-img {
     position: relative !important;
     height: auto !important;
     display: block !important;
     grid-area: 1 / 1 !important;
   }
-  .collection-page:not(.catalog-page) .collection-page__banner-overlay {
+  .collection-page .collection-page__banner-overlay {
     grid-area: 1 / 1 !important;
     position: relative !important;
     height: 100% !important;
     width: 100% !important;
   }
-  .collection-page:not(.catalog-page) .collection-page__banner-content {
+  .collection-page .collection-page__banner-content {
     grid-area: 1 / 1 !important;
     position: relative !important;
     margin: 0 !important;

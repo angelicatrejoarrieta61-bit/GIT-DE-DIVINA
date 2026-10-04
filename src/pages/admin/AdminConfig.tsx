@@ -1132,6 +1132,25 @@ export const AdminConfig: React.FC = () => {
                           style={{ width: '100%', accentColor: 'var(--c-lime)' }}
                         />
                       </div>
+                      {(() => {
+                        const moved = ['x', 'y'].some(k => Number(configs[`col_${blockId}_hero_img_${k}`] || 0) !== 0) || Number(configs[`col_${blockId}_hero_img_scale`] || 1) !== 1;
+                        return (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={!moved}
+                            onClick={() => {
+                              updateConfig(`col_${blockId}_hero_img_x`, '0');
+                              updateConfig(`col_${blockId}_hero_img_y`, '0');
+                              updateConfig(`col_${blockId}_hero_img_scale`, '1');
+                            }}
+                            style={{ marginTop: 12, padding: '8px 14px', fontSize: 11, opacity: moved ? 1 : 0.45, cursor: moved ? 'pointer' : 'not-allowed' }}
+                            title="Vuelve a posición 0, 0 y escala 1: la imagen cubre todo el encabezado"
+                          >
+                            ↺ Restablecer imagen (ajuste automático)
+                          </button>
+                        );
+                      })()}
                     </div>
 
                     <div style={box}>

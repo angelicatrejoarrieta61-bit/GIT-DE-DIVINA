@@ -139,49 +139,24 @@ export const CatalogPage: React.FC = () => {
           </h1>
         )}
         {/* Banner */}
-        <div className="collection-page__banner" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+        {/* Mismo encabezado que las colecciones: la imagen cubre de orilla a orilla */}
+        <div className="collection-page__banner">
           {bgImg && (
-            <>
-              {/* Blurred background stretched to fill (infinite edges) */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundImage: `url(${bgImg})`,
-                  backgroundSize: '100% 100%',
-                  backgroundPosition: 'center',
-                  filter: 'blur(30px) brightness(0.6)',
-                  zIndex: 1,
-                  transform: 'scale(1.1)'
-                }}
-              />
-              {/* Sharp centered image, not cut vertically */}
-              <img 
-                src={bgImg} 
-                alt="Hero Background" 
-                style={{ 
-                  position: 'relative',
-                  height: '100%',
-                  width: 'auto',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
-                  zIndex: 2,
-                  display: 'block',
-                  margin: '0 auto',
-                  transform: `translate(${bgX}px, ${bgY}px) scale(${bgScale})`
-                }} 
-              />
-            </>
+            <img
+              src={bgImg}
+              alt=""
+              className="collection-page__bg-img"
+              style={{ transform: `translate(${bgX}px, ${bgY}px) scale(${bgScale})` }}
+            />
           )}
-          <div className="collection-page__banner-overlay" style={{ zIndex: 3 }} />
+          <div className="collection-page__banner-overlay" style={{ zIndex: 2 }} />
           {showCard && (
             <div 
               className="page-width collection-page__banner-content glass"
               style={{
                 '--card-x': `${cardX}px`,
                 '--card-y': `${cardY}px`,
-                '--card-scale': cardScale,
-                zIndex: 4
+                '--card-scale': cardScale
               } as React.CSSProperties}
             >
               <div className="divider" style={{ marginBottom: 16 }} />
