@@ -30,6 +30,10 @@ export const AdminLayout: React.FC = () => {
       if (!session) navigate('/admin/login');
     });
 
+    if (location.pathname === '/admin/config' && new URLSearchParams(location.search).get('section') === 'products-config') {
+      navigate('/admin/productos', { replace: true });
+    }
+
     if (location.pathname === '/admin') {
       navigate('/admin/config?section=site-general', { replace: true });
     }
@@ -269,10 +273,10 @@ export const AdminLayout: React.FC = () => {
           </NavLink>
 
           <NavLink
-            to="/admin/config?section=products-config"
+            to="/admin/productos"
             className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
           >
-            📦 Configuración de Productos
+            📦 Productos
           </NavLink>
 
           <p className="admin-sidebar__label admin-sidebar__label--tight">SECCIONES</p>
