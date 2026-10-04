@@ -231,62 +231,60 @@ export const CheckoutPage: React.FC = () => {
               </header>
               <div className="cv2__card-body">
 
-                <div className="cv2__grid-2">
+                <div className="cv2__grid-3">
                   <div className="cv2__field">
-                    <label>Nombre</label>
-                    <input type="text" name="name" value={form.name} onChange={handleInputChange} placeholder="Nombre completo" required />
+                    <label htmlFor="co-name">Nombre</label>
+                    <input id="co-name" type="text" name="name" value={form.name} onChange={handleInputChange} placeholder="Nombre completo" autoComplete="name" required />
                   </div>
                   <div className="cv2__field">
-                    <label>E-mail</label>
-                    <input type="email" name="email" value={form.email} onChange={handleInputChange} placeholder="correo@ejemplo.com" required />
+                    <label htmlFor="co-email">E-mail</label>
+                    <input id="co-email" type="email" name="email" value={form.email} onChange={handleInputChange} placeholder="correo@ejemplo.com" autoComplete="email" required />
                   </div>
-                </div>
-
-                <div className="cv2__field">
-                  <label>Celular</label>
-                  <input type="tel" name="phone" value={form.phone} onChange={handleInputChange} placeholder="(55) 1234 5678" required />
+                  <div className="cv2__field">
+                    <label htmlFor="co-phone">Celular</label>
+                    <input id="co-phone" type="tel" name="phone" value={form.phone} onChange={handleInputChange} placeholder="(55) 1234 5678" autoComplete="tel" required />
+                  </div>
                 </div>
 
                 <div className="cv2__divider"><span>Domicilio (México)</span></div>
 
-                <div className="cv2__grid-2">
+                <div className="cv2__grid-3">
                   <div className="cv2__field">
-                    <label>Código Postal{isFetchingZip && ' …'}</label>
-                    <input type="text" name="zip" value={form.zip} onChange={handleInputChange} placeholder="01000" maxLength={5} />
+                    <label htmlFor="co-zip">Código Postal{isFetchingZip && ' …'}</label>
+                    <input id="co-zip" type="text" name="zip" value={form.zip} onChange={handleInputChange} placeholder="01000" maxLength={5} inputMode="numeric" autoComplete="postal-code" />
                   </div>
                   <div className="cv2__field">
-                    <label>Estado</label>
-                    <select name="state" value={form.state} onChange={handleInputChange}>
+                    <label htmlFor="co-state">Estado</label>
+                    <select id="co-state" name="state" value={form.state} onChange={handleInputChange} autoComplete="address-level1">
                       {MEXICAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
+                  <div className="cv2__field">
+                    <label htmlFor="co-city">Ciudad / Municipio</label>
+                    <input id="co-city" type="text" name="city" value={form.city} onChange={handleInputChange} placeholder="Ciudad de México" autoComplete="address-level2" required />
+                  </div>
                 </div>
 
                 <div className="cv2__grid-2">
                   <div className="cv2__field">
-                    <label>Ciudad / Municipio</label>
-                    <input type="text" name="city" value={form.city} onChange={handleInputChange} placeholder="Ciudad de México" required />
-                  </div>
-                  <div className="cv2__field">
-                    <label>Colonia</label>
+                    <label htmlFor="co-neighborhood">Colonia</label>
                     {colonias.length > 0 ? (
-                      <select name="neighborhood" value={form.neighborhood} onChange={handleInputChange}>
+                      <select id="co-neighborhood" name="neighborhood" value={form.neighborhood} onChange={handleInputChange}>
                         {colonias.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     ) : (
-                      <input type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} placeholder="Ingresa colonia" />
+                      <input id="co-neighborhood" type="text" name="neighborhood" value={form.neighborhood} onChange={handleInputChange} placeholder="Ingresa colonia" />
                     )}
+                  </div>
+                  <div className="cv2__field">
+                    <label htmlFor="co-address">Calle y número</label>
+                    <input id="co-address" type="text" name="address" value={form.address} onChange={handleInputChange} placeholder="Av. Insurgentes Sur 1234" autoComplete="street-address" required />
                   </div>
                 </div>
 
                 <div className="cv2__field">
-                  <label>Calle y número</label>
-                  <input type="text" name="address" value={form.address} onChange={handleInputChange} placeholder="Av. Insurgentes Sur 1234" required />
-                </div>
-
-                <div className="cv2__field">
-                  <label>Referencia (opcional)</label>
-                  <input type="text" name="reference" value={form.reference} onChange={handleInputChange} placeholder="Casa color negra con portón" />
+                  <label htmlFor="co-reference">Referencia (opcional)</label>
+                  <input id="co-reference" type="text" name="reference" value={form.reference} onChange={handleInputChange} placeholder="Casa color negra con portón" />
                 </div>
 
                 <label className="cv2__checkbox">
@@ -368,6 +366,7 @@ export const CheckoutPage: React.FC = () => {
                 {error && <div className="cv2__error"><span>⚠</span><span>{error}</span></div>}
 
                 <button
+                  type="button"
                   onClick={handlePagar}
                   className="cv2__pay-btn"
                   disabled={loading || (paymentTab === 'card' && clipStatus !== 'ready')}
@@ -406,7 +405,7 @@ export const CheckoutPage: React.FC = () => {
                     </div>
                     <div className="cv2__summary-item-info">
                       <p className="cv2__summary-item-name">{item.product.name}</p>
-                      <p className="cv2__summary-item-qty-label">Cantidad: {item.quantity}</p>
+                      <p className="cv2__summary-item-qty-label">{item.product.brand || 'Divina'} · {item.quantity} pza{item.quantity !== 1 ? 's' : ''}</p>
                     </div>
                     <p className="cv2__summary-item-price">
                       ${(item.product.price * item.quantity).toLocaleString('es-MX')}
@@ -416,15 +415,16 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="cv2__summary-block">
-                <label className="cv2__summary-label">Código de descuento</label>
+                <label className="cv2__summary-label" htmlFor="co-coupon">Código de descuento</label>
                 {couponCode ? (
                   <div className="cv2__coupon-active">
                     <span>🏷️ {couponCode} (-{discountPercentage}%)</span>
-                    <button onClick={removeCoupon}>✕</button>
+                    <button type="button" onClick={removeCoupon} aria-label="Quitar cupón">✕</button>
                   </div>
                 ) : (
                   <form onSubmit={handleApplyCoupon} className="cv2__coupon-form">
                     <input
+                      id="co-coupon"
                       type="text"
                       placeholder="Ingresa tu código"
                       value={couponInput}
@@ -437,8 +437,9 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="cv2__summary-block">
-                <label className="cv2__summary-label">Código de promotora (opcional)</label>
+                <label className="cv2__summary-label" htmlFor="co-promoter">Código de promotora (opcional)</label>
                 <input
+                  id="co-promoter"
                   type="text"
                   placeholder="DIVINA-JOSE-4B2F26"
                   value={promoterCode}
