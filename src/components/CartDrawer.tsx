@@ -3,6 +3,7 @@ import { useCartStore } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl, supabase } from '../lib/supabase';
 import { getStoreConfig } from '../lib/queries';
+import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
 
@@ -82,19 +83,20 @@ export const CartDrawer: React.FC = () => {
       >
         {/* Header */}
         <div className="cart-drawer__header">
-          <div>
-            <h2 className="cart-drawer__title">Tu Carrito</h2>
-            <p className="cart-drawer__subtitle">
-              {items.length} producto{items.length !== 1 ? 's' : ''}
-            </p>
-          </div>
+          <h2 className="cart-drawer__title">
+            Tu carrito
+            <span className="cart-drawer__count" aria-label={`${items.length} producto${items.length !== 1 ? 's' : ''}`}>
+              <strong>{items.length}</strong> producto{items.length !== 1 ? 's' : ''}
+            </span>
+          </h2>
 
           <button
+            type="button"
             className="cart-drawer__close"
             onClick={closeCart}
             aria-label="Cerrar carrito"
           >
-            ✕
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
@@ -102,37 +104,61 @@ export const CartDrawer: React.FC = () => {
         <div className="cart-drawer__items">
           {items.length === 0 ? (
             <div className="cart-drawer__empty">
-              <span style={{ fontSize: 48 }}>🛍️</span>
-              <p style={{ fontWeight: 600, color: '#000' }}>Tu carrito está vacío</p>
-              <Link to="/catalogo" onClick={closeCart} className="btn btn-lime" style={{ background: '#000', color: '#fff' }}>
-                Ver Productos
+              <ShoppingBag size={36} aria-hidden="true" />
+              <p>Tu carrito está vacío</p>
+              <Link to="/catalogo" onClick={closeCart} className="cart-drawer__empty-btn">
+                Ver productos
               </Link>
             </div>
           ) : (
-            items.map(item => (
-              <div key={`${item.product.id}-${item.variant}`} className="cart-item">
+            items.map((item, i) => (
+              <div
+                key={`${item.product.id}-${item.variant}`}
+                className="cart-item"
+                style={{ '--i': Math.min(i, 8) } as React.CSSProperties}
+              >
                 <div className="cart-item__img">
                   {item.product.image_url ? (
-                    <img src={getImageUrl(item.product.image_url)} alt={item.product.name} />
+                    <img src={getImageUrl(item.product.image_url)} alt={item.product.name} loading="lazy" />
                   ) : (
-                    <div className="cart-item__placeholder">📦</div>
+                    <div className="cart-item__placeholder"><ShoppingBag size={18} aria-hidden="true" /></div>
                   )}
                 </div>
 
                 <div className="cart-item__info">
                   <span className="cart-item__brand">{item.product.brand || 'DIVINA'}</span>
-                  <h3 className="cart-item__name">{item.product.name}</h3>
-                  <p className="cart-item__price">{formatCurrency(item.product.price * item.quantity)}</p>
+                  <h3 className="cart-item__name" title={item.product.name}>{item.product.name}</h3>
                 </div>
+
+                <p className="cart-item__price">{formatCurrency(item.product.price * item.quantity)}</p>
 
                 <div className="cart-item__controls">
                   <div className="cart-item__qty-box">
-                    <button onClick={() => updateQty(item.product.id, Math.max(1, item.quantity - 1))}>−</button>
-                    <span className="cart-item__qty-num">{item.quantity}</span>
-                    <button onClick={() => updateQty(item.product.id, item.quantity + 1)}>+</button>
+                    <button
+                      type="button"
+                      onClick={() => updateQty(item.product.id, Math.max(1, item.quantity - 1))}
+                      disabled={item.quantity <= 1}
+                      aria-label={`Quitar una unidad de ${item.product.name}`}
+                    >
+                      <Minus size={12} aria-hidden="true" />
+                    </button>
+                    <span className="cart-item__qty-num" aria-live="polite">{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateQty(item.product.id, item.quantity + 1)}
+                      aria-label={`Agregar una unidad de ${item.product.name}`}
+                    >
+                      <Plus size={12} aria-hidden="true" />
+                    </button>
                   </div>
-                  <button className="cart-item__delete" onClick={() => removeItem(item.product.id)} title="Eliminar">
-                    🗑️
+                  <button
+                    type="button"
+                    className="cart-item__delete"
+                    onClick={() => removeItem(item.product.id)}
+                    aria-label={`Eliminar ${item.product.name}`}
+                    title="Eliminar"
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -148,7 +174,7 @@ export const CartDrawer: React.FC = () => {
               {couponCode ? (
                 <div className="cart-drawer__coupon-applied">
                   <span className="coupon-tag">🏷️ {couponCode} (-{discountPercentage}%)</span>
-                  <button onClick={removeCoupon} className="coupon-remove-btn" title="Eliminar cupón">✕</button>
+                  <button type="button" onClick={removeCoupon} className="coupon-remove-btn" aria-label="Eliminar cupón" title="Eliminar cupón"><X size={11} aria-hidden="true" /></button>
                 </div>
               ) : (
                 <form onSubmit={handleApplyCoupon} className="cart-drawer__coupon-form">
@@ -172,10 +198,10 @@ export const CartDrawer: React.FC = () => {
                   <span>{formatCurrency(cartTotal)}</span>
                 </div>
                 <div className="cart-drawer__row-item discount">
-                  <span>Descuento (10%):</span>
+                  <span>Descuento ({discountPercentage}%):</span>
                   <span>-{formatCurrency(discountAmount())}</span>
                 </div>
-                <div className="cart-drawer__total-row" style={{ marginTop: 4, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10 }}>
+                <div className="cart-drawer__total-row cart-drawer__total-row--split">
                   <span>Total:</span>
                   <span>{formatCurrency(totalAfterDiscount())}</span>
                 </div>
@@ -187,15 +213,16 @@ export const CartDrawer: React.FC = () => {
               </div>
             )}
             
-            <button 
-              onClick={handleCheckout} 
+            <button
+              type="button"
+              onClick={handleCheckout}
               disabled={checkoutState === 'loading'} 
               className="btn-checkout-main"
             >
               {checkoutState === 'loading' ? 'PROCESANDO...' : 'FINALIZAR COMPRA'}
             </button>
             
-            <button onClick={closeCart} className="btn-continue-shopping">
+            <button type="button" onClick={closeCart} className="btn-continue-shopping">
               Seguir comprando
             </button>
           </div>
