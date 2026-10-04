@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
 import './HeroSection.css';
@@ -46,8 +46,65 @@ export const HeroSection: React.FC<Props> = ({
     };
   }, [imageUrl]);
 
+  // ── La tarjeta de cristal nunca se sale de la imagen ─────────────
+  // Los ajustes X/Y/escala del admin se respetan, pero si en esta pantalla
+  // la tarjeta quedaría fuera del hero, se corrige con --hero-fix-x / --hero-fix-y.
+  const heroRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    const card = cardRef.current;
+    if (!hero || !card) return;
+    let frame = 0;
+
+    const clamp = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          hero.style.setProperty('--hero-fix-x', '0px');
+          hero.style.setProperty('--hero-fix-y', '0px');
+          return;
+        }
+        const cs = getComputedStyle(hero);
+        const curX = parseFloat(cs.getPropertyValue('--hero-fix-x')) || 0;
+        const curY = parseFloat(cs.getPropertyValue('--hero-fix-y')) || 0;
+        const h = hero.getBoundingClientRect();
+        const c = card.getBoundingClientRect();
+        const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 62;
+        const margin = 16;
+        // Posición sin corrección
+        const left = c.left - curX, right = c.right - curX, top = c.top - curY, bottom = c.bottom - curY;
+        const minL = h.left + margin, maxR = h.right - margin;
+        const minT = h.top + navH + margin, maxB = h.bottom - margin;
+        let dx = 0, dy = 0;
+        if (left < minL) dx = minL - left; else if (right > maxR) dx = maxR - right;
+        if (top < minT) dy = minT - top; else if (bottom > maxB) dy = maxB - bottom;
+        hero.style.setProperty('--hero-fix-x', `${Math.round(dx)}px`);
+        hero.style.setProperty('--hero-fix-y', `${Math.round(dy)}px`);
+      });
+    };
+
+    clamp();
+    card.addEventListener('animationend', clamp);
+    window.addEventListener('resize', clamp);
+    // Cambios de posición/escala desde el admin (variables en <html>)
+    const mo = new MutationObserver(clamp);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    const ro = new ResizeObserver(clamp);
+    ro.observe(card);
+    return () => {
+      cancelAnimationFrame(frame);
+      card.removeEventListener('animationend', clamp);
+      window.removeEventListener('resize', clamp);
+      mo.disconnect();
+      ro.disconnect();
+    };
+  }, [title, subtitle, btn1, btn2]);
+
   return (
     <section 
+      ref={heroRef}
       className="hero" 
       id="hero" 
       aria-label="Hero principal"
@@ -58,14 +115,23 @@ export const HeroSection: React.FC<Props> = ({
       {/* Background */}
       <div className="hero__media">
         {imageUrl ? (
+          <>
+          {/* Relleno: la misma foto difuminada cubre siempre de orilla a orilla */}
+          <img
+            src={getImageUrl(imageUrl, { width: 400, quality: 60 })}
+            alt=""
+            aria-hidden="true"
+            className="hero__bg-fill"
+          />
           <img
             src={getImageUrl(imageUrl, { width: 1200, quality: 80 })}
-            srcSet={getImageSrcSet(imageUrl, [600, 1200, 1920], { quality: 80 })}
+            srcSet={getImageSrcSet(imageUrl, [480, 768, 1200, 1920, 2560], { quality: 80 })}
             sizes="100vw"
             alt="Banner Hero"
             className="hero__bg-img"
             fetchPriority="high"
           />
+          </>
         ) : (
           <div className="hero__media-placeholder" />
         )}
@@ -81,7 +147,7 @@ export const HeroSection: React.FC<Props> = ({
 
       {/* Content */}
       <div className="hero__container page-width">
-        <div className="hero__content glass">
+        <div ref={cardRef} className="hero__content glass">
           <div className="hero__label">
             <span className="hero__label-line" />
             NUEVA COLECCIÓN 2026

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Product, Collection, Order } from '../types';
+import { writeCachedStoreConfig } from './storeBoot';
 
 // ─── COLLECTIONS ────────────────────────────────────────────────
 export const getCollections = async (): Promise<Collection[]> => {
@@ -219,16 +220,30 @@ export const deleteAllOrders = async (): Promise<boolean> => {
 };
 
 // ─── STORE CONFIG ────────────────────────────────────────────────
-export const getStoreConfig = async (): Promise<Record<string, string>> => {
-  try {
-    const { data, error } = await supabase.from('store_config').select('*');
-    if (error) { console.error(error); return {}; }
-    if (!data) return {};
-    return Object.fromEntries(data.map(r => [r.key, r.value]));
-  } catch (err) {
-    console.error('getStoreConfig error:', err);
-    return {};
-  }
+let storeConfigInFlight: Promise<Record<string, string>> | null = null;
+
+/**
+ * Configuración de la tienda. Las llamadas simultáneas comparten una sola
+ * petición y el resultado se guarda localmente para el siguiente arranque.
+ */
+export const getStoreConfig = (): Promise<Record<string, string>> => {
+  if (storeConfigInFlight) return storeConfigInFlight;
+  storeConfigInFlight = (async () => {
+    try {
+      const { data, error } = await supabase.from('store_config').select('*');
+      if (error) { console.error(error); return {}; }
+      if (!data) return {};
+      const cfg = Object.fromEntries(data.map(r => [r.key, r.value])) as Record<string, string>;
+      writeCachedStoreConfig(cfg);
+      return cfg;
+    } catch (err) {
+      console.error('getStoreConfig error:', err);
+      return {};
+    } finally {
+      storeConfigInFlight = null;
+    }
+  })();
+  return storeConfigInFlight;
 };
 
 export const setStoreConfig = async (key: string, value: string): Promise<void> => {

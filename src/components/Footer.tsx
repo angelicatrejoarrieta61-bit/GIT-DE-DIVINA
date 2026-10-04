@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { readCachedStoreConfig } from '../lib/storeBoot';
 import { Link } from 'react-router-dom';
 import { getStoreConfig } from '../lib/queries';
 import { getImageUrl } from '../lib/supabase';
@@ -13,7 +14,7 @@ export const Footer: React.FC = () => {
   const [showContactModal, setShowContactModal] = useState(false);
   
   // Settings extracted from the Admin configuration
-  const [configs, setConfigs] = useState<Record<string, string>>({
+  const [configs, setConfigs] = useState<Record<string, string>>(() => ({
     footer_tagline: 'La belleza que nace del alma y perdura para siempre.',
     footer_nl_title: 'Suscríbete ahora',
     footer_nl_subtitle: 'Recibe ofertas exclusivas, descuentos y mucho más',
@@ -38,7 +39,8 @@ export const Footer: React.FC = () => {
     footer_col3_l1: 'Programa de promoción : /programa-promocion',
     footer_col3_l2: 'Programa testers : /pages/programa-testers',
     footer_col3_l3: 'Legales y Copyright : /pages/legales',
-  });
+    ...(readCachedStoreConfig() ?? {}),
+  }));
 
   const applyConfig = (cfg: Record<string, string>) => {
     setConfigs(prev => ({ ...prev, ...cfg }));
@@ -125,7 +127,7 @@ export const Footer: React.FC = () => {
               <img
                 src={getImageUrl(configs.logo_url, { width: 400, quality: 90 })}
                 alt="Divina Store"
-                style={{ width: 'auto', height: 75, objectFit: 'contain' }}
+                style={{ width: 'auto', objectFit: 'contain' }}
                 loading="lazy"
                 decoding="async"
               />

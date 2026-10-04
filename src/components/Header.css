@@ -37,6 +37,8 @@
   filter: drop-shadow(0 0 30px var(--c-glow-orange));
 }
 
+.header__logo-placeholder { display: block; width: 140px; height: var(--logo-h, 40px); max-height: 100px; }
+
 .header__logo-text {
   font-family: var(--f-heading);
   font-size: 22px;

@@ -60,7 +60,9 @@ html { scroll-behavior: smooth; font-size: 16px; overflow-x: hidden; }
 
 body {
   font-family: var(--f-body);
-  background: var(--c-bg);
+  background: var(--page-bg, var(--c-bg));
+  background-repeat: no-repeat;
+  background-color: var(--page-bg-end, var(--c-bg));
   color: var(--c-text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -114,8 +116,8 @@ h4, h5, h6 { font-family: var(--f-sub); }
 
 /* ─── Animations ─────────────────────────────────────────── */
 @keyframes heroEntrance {
-  from { opacity: 0; transform: translate(var(--hero-x, -20px), calc(var(--hero-y, 40px) + 60px)) scale(calc(var(--hero-scale, 1) * 0.95)); filter: blur(12px); }
-  to   { opacity: 1; transform: translate(var(--hero-x, -20px), var(--hero-y, 40px)) scale(var(--hero-scale, 1));    filter: blur(0); }
+  from { opacity: 0; transform: translate(calc(var(--hero-x, -20px) + var(--hero-fix-x, 0px)), calc(var(--hero-y, 40px) + var(--hero-fix-y, 0px) + 60px)) scale(calc(var(--hero-scale, 1) * 0.95)); filter: blur(12px); }
+  to   { opacity: 1; transform: translate(calc(var(--hero-x, -20px) + var(--hero-fix-x, 0px)), calc(var(--hero-y, 40px) + var(--hero-fix-y, 0px))) scale(var(--hero-scale, 1)); filter: blur(0); }
 }
 
 @keyframes glowShift {

@@ -7,20 +7,36 @@ import { getBestSellers, getCollections, getStoreConfig } from '../lib/queries';
 import { supabase } from '../lib/supabase';
 import type { Product, Collection } from '../types';
 import { Seo } from '../components/Seo';
+import { readCachedStoreConfig } from '../lib/storeBoot';
 
 // Orden por defecto si no hay nada guardado en Supabase
 const DEFAULT_ORDER = ['home-hero', 'home-best-sellers', 'home-segmentos'];
+const HOME_SECTIONS = ['home-hero', 'home-best-sellers', 'home-segmentos'];
+
+/** Lee home_layout_order y devuelve el orden normalizado (o null si no hay). */
+function parseOrder(cfg: Record<string, string> | null): string[] | null {
+  if (!cfg?.home_layout_order) return null;
+  const normalized = cfg.home_layout_order.split(',').filter(Boolean).map(p => {
+    if (p === 'hero') return 'home-hero';
+    if (p === 'products') return 'home-best-sellers';
+    if (p === 'categories') return 'home-segmentos';
+    return p;
+  }).filter(p => HOME_SECTIONS.includes(p));
+  return normalized.length > 0 ? normalized : null;
+}
 
 export const HomePage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [config, setConfig] = useState<Record<string, string>>({});
-  const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_ORDER);
+  // Arranca con la copia local para que el hero y el orden no cambien al llegar la red.
+  const [config, setConfig] = useState<Record<string, string>>(() => readCachedStoreConfig() ?? {});
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => parseOrder(readCachedStoreConfig()) ?? DEFAULT_ORDER);
 
   useEffect(() => {
     getBestSellers(20).then(setProducts);
     getCollections().then(setCollections);
     getStoreConfig().then(cfg => {
+      if (!Object.keys(cfg).length) return; // sin red: conserva la copia local
       setConfig(cfg);
       applyOrder(cfg);
     });
@@ -60,19 +76,9 @@ export const HomePage: React.FC = () => {
     };
   }, []);
 
-  // Lee home_layout_order del config y actualiza el orden de secciones
   const applyOrder = (cfg: Record<string, string>) => {
-    if (!cfg.home_layout_order) return;
-    const parts = cfg.home_layout_order.split(',').filter(Boolean);
-    // Normalizar claves que vienen del AdminLayout
-    const normalized = parts.map(p => {
-      if (p === 'hero') return 'home-hero';
-      if (p === 'products') return 'home-best-sellers';
-      if (p === 'categories') return 'home-segmentos';
-      return p;
-    }).filter(p => ['home-hero', 'home-best-sellers', 'home-segmentos'].includes(p));
-
-    if (normalized.length > 0) setSectionOrder(normalized);
+    const order = parseOrder(cfg);
+    if (order) setSectionOrder(order);
   };
 
   const catConfigs: Record<string, string> = {};
@@ -106,7 +112,7 @@ export const HomePage: React.FC = () => {
         featured={true}
         title={
           <div className="product-list-section__header">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <h2 className="product-list-section__title">
                 Nuestros Productos <span className="lime-text">más Vendidos.</span>
               </h2>

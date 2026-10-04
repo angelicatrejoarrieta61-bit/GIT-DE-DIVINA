@@ -1,15 +1,16 @@
-.product-list-section {
-  background: #000000;
-  padding: 80px 0 100px;
+.product-list-section,
+.product-list-section.section {
+  background: transparent;
+  padding: 28px 0 48px;
 }
 
 .product-list-section__header {
-  margin-bottom: 48px;
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   border-bottom: 1px solid rgba(255,255,255,0.05);
-  padding-bottom: 24px;
+  padding-bottom: 14px;
 }
 
 .product-list-section__title {

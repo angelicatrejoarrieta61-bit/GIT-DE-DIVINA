@@ -4,11 +4,11 @@
 .divina-footer {
   --df-bg:          #050a00;
   --df-neon:        var(--c-lime); /* #c4fc15 */
-  --df-neon-dim:    rgba(196, 252, 21, 0.55);
+  --df-neon-dim:    rgba(196, 252, 21, 0.85);
   --df-neon-glow:   rgba(196, 252, 21, 0.15);
   --df-gold:        #c9a96e;
-  --df-text:        rgba(255,255,255,0.82);
-  --df-text-dim:    rgba(255,255,255,0.42);
+  --df-text:        #ffffff;
+  --df-text-dim:    rgba(255,255,255,0.78);
   --df-divider:     rgba(196, 252, 21, 0.18);
   --df-input-bg:    rgba(196, 252, 21, 0.10);
   --df-radius:      10px;
@@ -23,8 +23,8 @@
 .divina-footer__fade {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, #000 0%, transparent 100%);
+  height: 64px;
+  background: linear-gradient(to bottom, var(--page-bg-end, #000) 0%, transparent 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -40,7 +40,7 @@
 .divina-footer__wave {
   position: absolute;
   bottom: 0; left: 0;
-  width: 100%; height: 200px;
+  width: 100%; height: 120px;
   opacity: 0.6;
 }
 
@@ -55,7 +55,7 @@
 
 .divina-footer__glow--tr {
   top: -80px; right: -80px;
-  opacity: 0.22;
+  opacity: 0.14;
 }
 
 .divina-footer__glow--bl {
@@ -70,10 +70,10 @@
   z-index: 2;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 30px 40px 20px;
+  padding: 26px 40px 14px;
   display: grid;
   grid-template-columns: 1.6fr 1fr 1fr 1fr;
-  gap: 32px 24px;
+  gap: 20px 24px;
   align-items: start;
 }
 
@@ -81,16 +81,16 @@
 .divina-footer__logo {
   display: inline-block;
   text-decoration: none;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .divina-footer__logo img {
-  height: 38px; width: auto;
+  height: 48px; width: auto;
   object-fit: contain;
 }
 
 .divina-footer__logo-text {
-  font-size: 3.5rem;
+  font-size: 2.2rem;
   font-weight: 900;
   letter-spacing: 0.06em;
   background: linear-gradient(to right, #e8c98c, #fff4cc, #cba258, #e8c98c);
@@ -103,28 +103,28 @@
 }
 
 .divina-footer__tagline {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: #e8c98c;
-  line-height: 1.55;
-  margin: 0 0 20px;
+  color: #f0d9a8;
+  line-height: 1.4;
+  margin: 0 0 12px;
   max-width: 280px;
 }
 
 /* ── Newsletter ── */
 .divina-footer__nl-title {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--df-text);
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   letter-spacing: 0.01em;
 }
 
 .divina-footer__nl-sub {
   font-size: 0.76rem;
   color: var(--df-text-dim);
-  margin: 0 0 12px;
-  line-height: 1.45;
+  margin: 0 0 8px;
+  line-height: 1.4;
 }
 
 .divina-footer__nl-row {
@@ -141,14 +141,14 @@
   background: var(--df-input-bg);
   border: none;
   outline: none;
-  padding: 10px 14px;
-  font-size: 0.82rem;
+  padding: 8px 12px;
+  font-size: 0.8rem;
   color: #fff;
   min-width: 0;
 }
 
 .divina-footer__nl-input::placeholder {
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.6);
 }
 
 .divina-footer__nl-btn {
@@ -176,12 +176,12 @@
 
 /* ── Nav columns ── */
 .divina-footer__nav-title {
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--df-neon-dim);
-  margin: 0 0 14px;
+  color: var(--df-neon);
+  margin: 0 0 8px;
 }
 
 .divina-footer__nav-list {
@@ -190,14 +190,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .divina-footer__nav-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
+  font-weight: 500;
   color: var(--df-text);
   text-decoration: none;
   transition: color 0.2s, gap 0.2s;
@@ -265,7 +266,7 @@
 }
 
 .divina-footer__copy {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--df-text-dim);
   margin: 0;
   font-style: italic;
@@ -282,7 +283,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px; height: 36px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   border: 1.5px solid var(--df-neon-dim);
   color: var(--df-neon);
@@ -307,7 +308,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px; height: 36px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   border: 1.5px solid var(--df-neon-dim);
   background: transparent;
@@ -345,7 +346,7 @@
 @media (max-width: 1024px) {
   .divina-footer__inner {
     grid-template-columns: 1.4fr 1fr 1fr;
-    padding: 44px 28px 28px;
+    padding: 26px 28px 16px;
   }
 
   /* Brand ocupa toda la primera fila */
@@ -366,8 +367,8 @@
 @media (max-width: 680px) {
   .divina-footer__inner {
     grid-template-columns: 1fr 1fr;
-    padding: 36px 20px 24px;
-    gap: 28px 20px;
+    padding: 24px 20px 14px;
+    gap: 16px 20px;
   }
 
   .divina-footer__brand {
@@ -393,9 +394,9 @@
   }
 
   .divina-footer__bottom {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
   }
 
   .divina-footer__socials,

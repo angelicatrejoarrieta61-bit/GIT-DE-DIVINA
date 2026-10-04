@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { buildPageBackground, hexLuminance, isHexColor, type PageBgMode } from '../../lib/storeBoot';
 // AdminConfig v1.5 - Optimized Master Product Logic
 import { useSearchParams } from 'react-router-dom';
 import { AssetUploader } from '../../components/AssetUploader';
@@ -313,6 +314,16 @@ const Sl = ({ label, cfg, min, max, step, configs, updateConfig }: any) => (
       onChange={e => updateConfig(cfg, e.target.value)} style={{ width: '100%', accentColor: 'var(--c-lime)' }} />
   </div>
 );
+
+/** Fondos listos con la paleta de marca (verde profundo, salvia, carbón). */
+const PAGE_BG_PRESETS: { name: string; mode: PageBgMode; c1: string; c2?: string; c3?: string }[] = [
+  { name: 'Negro original', mode: 'default', c1: '#000000' },
+  { name: 'Verde profundo', mode: 'solid', c1: '#12261f' },
+  { name: 'Carbón', mode: 'solid', c1: '#1c1e20' },
+  { name: 'Verde → negro', mode: 'gradient', c1: '#1c352d', c2: '#000000' },
+  { name: 'Carbón → negro', mode: 'gradient', c1: '#2b2d30', c2: '#000000' },
+  { name: 'Verde · carbón · negro', mode: 'gradient', c1: '#1c352d', c2: '#1c1e20', c3: '#000000' },
+];
 
 export const AdminConfig: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -800,6 +811,96 @@ export const AdminConfig: React.FC = () => {
                       onChange={e => updateConfig('header_menu_size', e.target.value)} style={{ width: '100%', accentColor: 'var(--c-lime)' }} />
                   </div>
                 </div>
+              </section>
+              <section>
+                <h2 style={{ fontSize: 18, marginBottom: 6, color: 'var(--c-lime)' }}>🎨 Fondo de la página</h2>
+                <p className="muted-text" style={{ fontSize: 12, marginBottom: 14 }}>Color liso o degradado de 2 o 3 colores para toda la tienda. Se ve al instante en la vista previa.</p>
+                {(() => {
+                  const mode = (configs.page_bg_mode || 'default') as PageBgMode;
+                  const c1 = isHexColor(configs.page_bg_c1) ? configs.page_bg_c1 : '#000000';
+                  const c2 = isHexColor(configs.page_bg_c2) ? configs.page_bg_c2 : '#12261f';
+                  const c3 = isHexColor(configs.page_bg_c3) ? configs.page_bg_c3 : '';
+                  const angle = configs.page_bg_angle || '180';
+                  const used = mode === 'solid' ? [c1] : mode === 'gradient' ? [c1, c2, ...(c3 ? [c3] : [])] : [];
+                  const tooLight = used.some(c => hexLuminance(c) > 0.3);
+                  const preview = buildPageBackground({ page_bg_mode: mode, page_bg_c1: c1, page_bg_c2: c2, page_bg_c3: c3, page_bg_angle: angle }).css;
+                  const applyPreset = (p: typeof PAGE_BG_PRESETS[number]) => {
+                    updateConfig('page_bg_mode', p.mode);
+                    updateConfig('page_bg_c1', p.c1);
+                    updateConfig('page_bg_c2', p.c2 ?? '');
+                    updateConfig('page_bg_c3', p.c3 ?? '');
+                  };
+                  const colorField = (key: string, label: string, value: string) => (
+                    <div key={key}>
+                      <label style={lbl} htmlFor={`bg-${key}`}>{label}</label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input id={`bg-${key}`} type="color" value={value || '#000000'} onChange={e => updateConfig(key, e.target.value)} style={{ width: 38, height: 34, padding: 0, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, background: 'transparent', cursor: 'pointer' }} />
+                        <input type="text" className="input-dark" value={value} maxLength={7} placeholder="#000000" aria-label={`${label} en hexadecimal`}
+                          onChange={e => { const v = e.target.value.trim(); if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) updateConfig(key, v); }}
+                          style={{ height: 34, padding: '0 8px', fontSize: 12, fontFamily: 'monospace', borderColor: value && !isHexColor(value) ? '#e5484d' : undefined }} />
+                      </div>
+                    </div>
+                  );
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="radiogroup" aria-label="Tipo de fondo">
+                        {([['default', 'Negro original'], ['solid', 'Color liso'], ['gradient', 'Degradado']] as const).map(([v, l]) => (
+                          <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => { updateConfig('page_bg_mode', v); if (v !== 'default' && !isHexColor(configs.page_bg_c1)) updateConfig('page_bg_c1', c1); if (v === 'gradient' && !isHexColor(configs.page_bg_c2)) updateConfig('page_bg_c2', c2); }}
+                            style={{ padding: '7px 14px', borderRadius: 100, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1px solid ${mode === v ? 'var(--c-lime)' : 'rgba(255,255,255,0.15)'}`, background: mode === v ? 'var(--c-lime)' : 'transparent', color: mode === v ? '#000' : '#fff' }}>
+                            {l}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div>
+                        <label style={lbl}>Colores de la marca</label>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {PAGE_BG_PRESETS.map(p => (
+                            <button key={p.name} type="button" onClick={() => applyPreset(p)} title={p.name}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 4px', borderRadius: 100, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                              <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: buildPageBackground({ page_bg_mode: p.mode, page_bg_c1: p.c1, page_bg_c2: p.c2, page_bg_c3: p.c3, page_bg_angle: '135' }).css }} />
+                              {p.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {mode !== 'default' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                          {colorField('page_bg_c1', mode === 'solid' ? 'Color' : 'Color 1 (inicio)', c1)}
+                          {mode === 'gradient' && colorField('page_bg_c2', 'Color 2', c2)}
+                          {mode === 'gradient' && (
+                            <div>
+                              {c3 ? colorField('page_bg_c3', 'Color 3 (final)', c3) : (
+                                <>
+                                  <label style={lbl}>Color 3 (opcional)</label>
+                                  <button type="button" className="btn btn-outline" style={{ height: 34, padding: '0 12px', fontSize: 11 }} onClick={() => updateConfig('page_bg_c3', '#000000')}>+ Añadir tercer color</button>
+                                </>
+                              )}
+                              {c3 && <button type="button" onClick={() => updateConfig('page_bg_c3', '')} style={{ marginTop: 4, fontSize: 11, color: '#ff8a8a', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}>Quitar tercer color</button>}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {mode === 'gradient' && (
+                        <div>
+                          <label style={lbl} htmlFor="bg-angle">Dirección del degradado: {angle}°</label>
+                          <input id="bg-angle" type="range" min={0} max={360} step={5} value={angle} onChange={e => updateConfig('page_bg_angle', e.target.value)} style={{ width: '100%' }} />
+                        </div>
+                      )}
+
+                      <div aria-hidden="true" style={{ height: 44, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: preview, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>
+                        ASÍ SE VE EL TEXTO BLANCO
+                      </div>
+                      {tooLight && (
+                        <p role="alert" style={{ margin: 0, fontSize: 12, color: '#ffb224', lineHeight: 1.4 }}>
+                          ⚠ Ese color es claro y los textos de la tienda son blancos: se leerán mal. Usa tonos oscuros (verde profundo, carbón, negro).
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </section>
               <section>
                 <h2 style={{ fontSize: 18, marginBottom: 20, color: 'var(--c-lime)' }}>🔤 Tipografías</h2>

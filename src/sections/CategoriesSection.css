@@ -1,7 +1,7 @@
 .categories {
   width: 100vw;
   margin-left: calc(-50vw + 50%);
-  padding: 40px 0;
+  padding: 24px 0 0;
   display: flex;
   justify-content: center;
 }
@@ -135,7 +135,7 @@
 
 /* ── Responsive — Mobile ────────────────────────────────── */
 @media (max-width: 768px) {
-  .categories { padding: 24px 0; }
+  .categories { padding: 16px 0 0; }
   .categories__grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 220px);

@@ -62,8 +62,38 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- Fuentes cargadas dinámicamente por StoreThemeProvider -->
+  <style>
+    #boot-loader {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; align-items: center; justify-content: center;
+      background: #000; transition: opacity .3s ease, visibility 0s linear .3s;
+    }
+    #boot-loader.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+    #boot-loader i {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.16); border-top-color: #fff;
+      animation: boot-spin .8s linear infinite;
+    }
+    @keyframes boot-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #boot-loader i { animation-duration: 2.4s; } }
+  </style>
 </head>
 <body>
+  <div id="boot-loader" role="status" aria-label="Cargando"><i aria-hidden="true"></i></div>
+  <script>
+    // Loader inicial: usa el fondo guardado y nunca se queda pegado (máx. 4 s).
+    (function () {
+      var el = document.getElementById('boot-loader');
+      try {
+        var c = JSON.parse(localStorage.getItem('divina_store_config_v1') || 'null');
+        var hex = /^#[0-9a-f]{6}$/i;
+        if (c && c.page_bg_mode && c.page_bg_mode !== 'default' && hex.test(c.page_bg_c1 || '')) {
+          el.style.background = c.page_bg_c1;
+        }
+      } catch (e) {}
+      setTimeout(function () { if (el && el.parentNode) { el.className = 'is-done'; } }, 4000);
+    })();
+  </script>
   <div id="root"></div>
 
   <!-- Fallback para bots/usuarios sin JS: contenido mínimo indexable -->

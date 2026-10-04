@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { getStoreConfig } from '../lib/queries';
 import { supabase } from '../lib/supabase';
+import { applyPageBackground, hideBootLoader, readCachedStoreConfig } from '../lib/storeBoot';
 
 interface Config {
   font_heading?: string;
@@ -42,82 +43,68 @@ async function loadGoogleFont(family: string, weights: string): Promise<void> {
   }
 }
 
+/** Variables que no dependen de la red: se aplican al instante (sin esperar fuentes). */
+function applyInstantVars(cfg: Config): void {
+  const root = document.documentElement;
+  const heading = cfg.font_heading || 'Francois One';
+  const sub     = cfg.font_sub     || 'Barlow Semi Condensed';
+  const body    = cfg.font_body    || 'Catamaran';
+  root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
+  root.style.setProperty('--f-sub',     `"${sub}", sans-serif`);
+  root.style.setProperty('--f-body',    `"${body}", sans-serif`);
+
+  root.style.setProperty('--logo-h', cfg.logo_height
+    ? `${String(cfg.logo_height).replace('px', '')}px`
+    : '40px');
+
+  root.style.setProperty('--header-menu-size', cfg.header_menu_size
+    ? `${String(cfg.header_menu_size).replace('px', '')}px`
+    : '13px');
+
+  root.style.setProperty('--hero-card-display', cfg.hero_card_visible || 'flex');
+
+  if (cfg.hero_card_x) root.style.setProperty('--hero-x', `${String(cfg.hero_card_x).replace('px', '')}px`);
+  if (cfg.hero_card_y) root.style.setProperty('--hero-y', `${String(cfg.hero_card_y).replace('px', '')}px`);
+  if (cfg.hero_card_scale) root.style.setProperty('--hero-scale', String(cfg.hero_card_scale));
+
+  root.style.setProperty('--hero-img-x',     `${String(cfg.hero_image_x || '0').replace('px', '')}px`);
+  root.style.setProperty('--hero-img-y',     `${String(cfg.hero_image_y || '0').replace('px', '')}px`);
+  root.style.setProperty('--hero-img-scale', String(cfg.hero_image_scale || '1'));
+  root.style.setProperty('--hero-img-fit',   String(cfg.hero_image_fit   || 'cover'));
+
+  applyPageBackground(cfg);
+}
+
 export const StoreThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // fontKey se incrementa cada vez que cambia una fuente → fuerza re-render de children
-  const [fontKey, setFontKey] = useState(0);
-  const applyingRef = useRef(false);
+  const hadCacheRef = useRef(false);
 
-  const applyConfig = async (cfg: Config) => {
-    if (applyingRef.current) return;
-    applyingRef.current = true;
-
-    try {
-      const root = document.documentElement;
-
-      // ── Fuentes ─────────────────────────────────────────────────────
-      const heading = cfg.font_heading || 'Francois One';
-      const sub     = cfg.font_sub     || 'Barlow Semi Condensed';
-      const body    = cfg.font_body    || 'Catamaran';
-
-      const prevHeading = root.style.getPropertyValue('--f-heading');
-      const prevSub     = root.style.getPropertyValue('--f-sub');
-      const prevBody    = root.style.getPropertyValue('--f-body');
-
-      // Aplicar CSS vars ANTES de cargar para respuesta inmediata
-      root.style.setProperty('--f-heading', `"${heading}", sans-serif`);
-      root.style.setProperty('--f-sub',     `"${sub}", sans-serif`);
-      root.style.setProperty('--f-body',    `"${body}", sans-serif`);
-
-      // Detectar si cambió alguna fuente
-      const fontsChanged =
-        !prevHeading.includes(heading) ||
-        !prevSub.includes(sub) ||
-        !prevBody.includes(body);
-
-      // Cargar las 3 fuentes en paralelo
-      await Promise.all([
-        loadGoogleFont(heading, '400;600;700;800'),
-        loadGoogleFont(sub,     '300;400;500;600;700'),
-        loadGoogleFont(body,    '300;400;500;600;700;800'),
-      ]);
-
-      // Forzar repaint de todos los elementos de texto
-      document.body.style.display = 'none';
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      document.body.offsetHeight; // layout flush
-      document.body.style.display = '';
-
-      // Si cambió alguna fuente, incrementar fontKey para re-renderizar children
-      if (fontsChanged) setFontKey(k => k + 1);
-
-      // ── Otras variables de tema ──────────────────────────────────────
-      root.style.setProperty('--logo-h', cfg.logo_height
-        ? `${String(cfg.logo_height).replace('px', '')}px`
-        : '40px');
-
-      root.style.setProperty('--header-menu-size', cfg.header_menu_size
-        ? `${String(cfg.header_menu_size).replace('px', '')}px`
-        : '13px');
-
-      root.style.setProperty('--hero-card-display', cfg.hero_card_visible || 'flex');
-
-      if (cfg.hero_card_x) root.style.setProperty('--hero-x', `${String(cfg.hero_card_x).replace('px', '')}px`);
-      if (cfg.hero_card_y) root.style.setProperty('--hero-y', `${String(cfg.hero_card_y).replace('px', '')}px`);
-      if (cfg.hero_card_scale) root.style.setProperty('--hero-scale', String(cfg.hero_card_scale));
-
-      root.style.setProperty('--hero-img-x',     `${String(cfg.hero_image_x || '0').replace('px', '')}px`);
-      root.style.setProperty('--hero-img-y',     `${String(cfg.hero_image_y || '0').replace('px', '')}px`);
-      root.style.setProperty('--hero-img-scale', String(cfg.hero_image_scale || '1'));
-      root.style.setProperty('--hero-img-fit',   String(cfg.hero_image_fit   || 'cover'));
-
-    } finally {
-      applyingRef.current = false;
-    }
+  const applyConfig = (cfg: Config) => {
+    applyInstantVars(cfg);
+    // Las fuentes se descargan en segundo plano; el navegador repinta solo al llegar
+    // (display=swap). Ya no se oculta el body ni se remonta la página: eso causaba el brinco.
+    void Promise.all([
+      loadGoogleFont(cfg.font_heading || 'Francois One',          '400;600;700;800'),
+      loadGoogleFont(cfg.font_sub     || 'Barlow Semi Condensed', '300;400;500;600;700'),
+      loadGoogleFont(cfg.font_body    || 'Catamaran',             '300;400;500;600;700;800'),
+    ]);
   };
 
+  // Antes del primer pintado: aplica la copia local (logo, alturas, fondo, fuentes).
+  useLayoutEffect(() => {
+    const cached = readCachedStoreConfig();
+    if (cached) {
+      hadCacheRef.current = true;
+      applyConfig(cached as Config);
+      hideBootLoader();
+    }
+  }, []);
+
   useEffect(() => {
-    // Carga inicial desde Supabase
-    getStoreConfig().then(cfg => applyConfig(cfg as Config));
+    // Carga fresca desde Supabase
+    getStoreConfig().then(cfg => {
+      if (Object.keys(cfg).length || !hadCacheRef.current) applyConfig(cfg as Config);
+      hideBootLoader();
+    });
 
     // Live preview desde el Admin (postMessage al iframe)
     const handleMessage = (e: MessageEvent) => {
@@ -135,7 +122,7 @@ export const StoreThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         { event: '*', schema: 'public', table: 'store_config' },
         async () => {
           const fresh = await getStoreConfig();
-          applyConfig(fresh as Config);
+          if (Object.keys(fresh).length) applyConfig(fresh as Config);
         }
       )
       .subscribe();
@@ -144,9 +131,7 @@ export const StoreThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       window.removeEventListener('message', handleMessage);
       void supabase.removeChannel(channel);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // fontKey como data-attribute para que React re-renderice children
-  return <div key={fontKey} data-theme-key={fontKey} style={{ display: 'contents' }}>{children}</div>;
+  return <>{children}</>;
 };

@@ -4,6 +4,7 @@ import { useCartStore } from '../store/cartStore';
 import { getCollections, getStoreConfig } from '../lib/queries';
 import { getImageUrl, getImageSrcSet, supabase } from '../lib/supabase';
 import type { Collection } from '../types';
+import { readCachedStoreConfig, readLogoRatio, writeLogoRatio } from '../lib/storeBoot';
 import './Header.css';
 
 interface HeaderLink {
@@ -24,15 +25,30 @@ const DEFAULT_HEADER_LINKS: HeaderLink[] = [
   { label: 'CONTACTO',         path: '/contacto' },
 ];
 
+/** Links guardados en el admin; BLOG siempre presente. */
+function parseHeaderLinks(raw: string | undefined): HeaderLink[] | null {
+  if (!raw) return null;
+  try {
+    const links = JSON.parse(raw);
+    if (!Array.isArray(links)) return null;
+    const hasBlog = links.some((l: HeaderLink) => l.path === '/blog');
+    return hasBlog ? links : [...links, { label: 'BLOG', path: '/blog' }];
+  } catch { return null; }
+}
+
 export const Header: React.FC = () => {
   const [scrolled,    setScrolled]    = useState(false);
   const [visible,     setVisible]     = useState(true);
   const [lastY,       setLastY]       = useState(0);
   const [mobileOpen,  setMobileOpen]  = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [logoUrl,     setLogoUrl]     = useState<string | null>(null);
-  const [homeIconUrl, setHomeIconUrl] = useState<string | null>(null);
-  const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>(DEFAULT_HEADER_LINKS);
+  // Arranque desde la copia local: el logo y el menú correctos desde el primer pintado.
+  const [cached] = useState(() => readCachedStoreConfig());
+  const [configReady, setConfigReady] = useState(() => cached !== null);
+  const [logoUrl,     setLogoUrl]     = useState<string | null>(() => cached?.logo_url || null);
+  const [homeIconUrl, setHomeIconUrl] = useState<string | null>(() => cached?.header_home_icon || null);
+  const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>(() => parseHeaderLinks(cached?.header_links) ?? DEFAULT_HEADER_LINKS);
+  const logoRatio = readLogoRatio(logoUrl);
 
   const { itemCount, openCart } = useCartStore();
   const count = itemCount();
@@ -53,6 +69,8 @@ export const Header: React.FC = () => {
   useEffect(() => {
     getCollections().then(setCollections);
     getStoreConfig().then(cfg => {
+      setConfigReady(true);
+      if (!Object.keys(cfg).length) return; // sin red: conserva lo que ya se muestra
       setLogoUrl(cfg.logo_url || null);
       setHomeIconUrl(cfg.header_home_icon || null);
       if (cfg.header_links) {
@@ -139,8 +157,17 @@ export const Header: React.FC = () => {
                 srcSet={getImageSrcSet(logoUrl, [180, 360], { quality: 90 })}
                 sizes="180px"
                 alt="Divina Store"
-                style={{ height: 'var(--logo-h)', maxHeight: 100, width: 'auto', objectFit: 'contain' }}
+                fetchPriority="high"
+                decoding="async"
+                onLoad={e => {
+                  const img = e.currentTarget;
+                  if (img.naturalHeight > 0) writeLogoRatio(logoUrl, img.naturalWidth / img.naturalHeight);
+                }}
+                style={{ height: 'var(--logo-h)', maxHeight: 100, width: 'auto', objectFit: 'contain', aspectRatio: logoRatio ? String(logoRatio) : undefined }}
               />
+            ) : !configReady ? (
+              /* Aún no se sabe si hay logo: se reserva el espacio, sin texto provisional */
+              <span className="header__logo-placeholder" aria-hidden="true" />
             ) : (
               <>
                 <span className="header__logo-text">DIVINA</span>
