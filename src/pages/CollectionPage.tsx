@@ -85,7 +85,16 @@ export const CollectionPage: React.FC = () => {
     };
   }, [slug]);
 
-  const blockId = slug;
+  // La misma colección se puede abrir con varias direcciones (por su nombre, p. ej.
+  // /coleccion/cremas-faciales, o por su slug real, /coleccion/cremas-serums).
+  // El encabezado configurado en el admin debe ser el mismo en todas: se busca
+  // bajo qué identificador se guardó y se usa ése.
+  const blockId = (() => {
+    const nameSlug = (collection?.name || '').toLowerCase().trim().replace(/\s+/g, '-');
+    const candidates = [nameSlug, slug, collection?.slug, collection?.id].filter(Boolean) as string[];
+    const keys = Object.keys(config);
+    return candidates.find(id => keys.some(k => k.startsWith(`col_${id}_hero_`))) ?? slug;
+  })();
 
   if (!loading && !collection) return <NotFoundPage />;
   
