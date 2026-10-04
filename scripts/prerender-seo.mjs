@@ -68,5 +68,11 @@ for (const p of data.posts) {
   await emit(path, { path, title: `${p.title} | Divina Store`, description, image: p.cover_image || DEFAULT_IMAGE, type: 'article', schema: { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description, image: p.cover_image, datePublished: p.created_at, author: { '@type': 'Person', name: p.author || 'Divina Store' }, mainEntityOfPage: `${SITE}${path}` } });
 }
 
-console.log(`Metadatos iniciales prerenderizados para ${staticRoutes.length + data.collections.length + data.products.length + data.posts.length} rutas.`);
+for (const page of data.pages ?? []) {
+  const path = `/info/${encodeURIComponent(page.slug)}`;
+  const text = String(page.body ?? '').replace(/[#*]/g, ' ');
+  await emit(path, { path, title: `${page.title} | Divina Store MX`, description: summary(text, `${page.title} — Divina Store MX`) });
+}
+
+console.log(`Metadatos iniciales prerenderizados para ${staticRoutes.length + data.collections.length + data.products.length + data.posts.length + (data.pages ?? []).length} rutas.`);
 await unlink(new URL('./.seo-data.json', import.meta.url));

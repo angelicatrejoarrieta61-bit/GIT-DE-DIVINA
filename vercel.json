@@ -24,6 +24,10 @@
     { "source": "/pago-exitoso", "destination": "/" },
     { "source": "/pago-error", "destination": "/" },
     { "source": "/admin", "destination": "/" },
-    { "source": "/admin/:path*", "destination": "/" }
+    { "source": "/admin/:path*", "destination": "/" },
+    { "source": "/info/:slug", "destination": "/" },
+    { "source": "/producto/:slug", "destination": "/" },
+    { "source": "/coleccion/:slug", "destination": "/" },
+    { "source": "/blog/:slug", "destination": "/" }
   ]
 }

@@ -32,6 +32,8 @@ import { capturePromoterReferral } from './lib/promoterTracking';
 import { PromotionProgramPage } from './pages/PromotionProgramPage';
 import { AdminPromoters } from './pages/admin/AdminPromoters';
 import { AdminSourcing } from './pages/admin/AdminSourcing';
+import { AdminHome } from './pages/admin/AdminHome';
+import { InfoPage } from './pages/InfoPage';
 
 // ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
@@ -85,7 +87,7 @@ export default function App() {
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<NoIndex><AdminLogin /></NoIndex>} />
         <Route path="/admin" element={<NoIndex><AdminLayout /></NoIndex>}>
-          <Route index element={<Navigate to="/admin/config?section=site-general" replace />} />
+          <Route index element={<AdminHome />} />
           <Route path="productos"  element={<AdminProducts />} />
           <Route path="abastecimiento" element={<AdminSourcing />} />
           <Route path="import"     element={<AdminImport />} />
@@ -106,6 +108,7 @@ export default function App() {
         <Route path="/programa-promocion" element={<PublicLayout><PromotionProgramPage /></PublicLayout>} />
         <Route path="/catalogo"          element={<PublicLayout><CatalogPage /></PublicLayout>} />
         <Route path="/contacto"          element={<PublicLayout><ContactPage /></PublicLayout>} />
+        <Route path="/info/:slug"        element={<PublicLayout><InfoPage /></PublicLayout>} />
         <Route path="/checkout"          element={<NoIndex><PublicLayout><CheckoutPage /></PublicLayout></NoIndex>} />
         <Route path="/pago-exitoso"      element={<NoIndex><PublicLayout><PaymentSuccessPage /></PublicLayout></NoIndex>} />
         <Route path="/pago-error"        element={<NoIndex><PublicLayout><PaymentErrorPage /></PublicLayout></NoIndex>} />

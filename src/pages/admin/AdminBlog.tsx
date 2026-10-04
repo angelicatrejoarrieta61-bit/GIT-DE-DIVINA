@@ -107,7 +107,7 @@ const INGREDIENTS: Record<string, IngredientDetails> = {
     wikiES:   "Fotoprotector solar",
     wikiEN:   "Sunscreen",
     category: "Cuidado de Piel",
-    keywords: ["spf","solar","fotoprotector","sunscreen","uv","photoprotect","isdin","anthelios","eryfotona"],
+    keywords: ["spf","solar","fotoprotector","sunscreen","photoprotect","anthelios","eryfotona"],
     benefits: [
       "Bloquea radiación UVA (envejecimiento) y UVB (quemaduras)",
       "Previene melanoma y carcinoma basocelular",
@@ -226,12 +226,29 @@ const INGREDIENTS: Record<string, IngredientDetails> = {
 
 const DEFAULT_ING = "vitamina_c";
 
-function detectIngredient(text: string): string {
-  const lower = text.toLowerCase();
+function detectIngredientOrNull(text: string): string | null {
+  const lower = ` ${text.toLowerCase()} `;
   for (const [key, ing] of Object.entries(INGREDIENTS)) {
-    if (ing.keywords.some(kw => lower.includes(kw))) return key;
+    // Las palabras muy cortas (aha, bha, uv…) solo cuentan como palabra completa.
+    if (ing.keywords.some(kw => (kw.length <= 3 ? new RegExp(`[^a-záéíóúñ0-9]${kw}[^a-záéíóúñ0-9]`).test(lower) : lower.includes(kw)))) return key;
   }
-  return DEFAULT_ING;
+  return null;
+}
+
+/** Cuántos artículos existen ya por tema (por etiqueta o por título). */
+function countPostsByTopic(posts: BlogPost[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, ing] of Object.entries(INGREDIENTS)) {
+    const tag = slugify(ing.display);
+    const name = ing.display.split('(')[0].trim().toLowerCase();
+    out[key] = posts.filter(p => (p.tags ?? []).includes(tag) || (p.title ?? '').toLowerCase().includes(name)).length;
+  }
+  return out;
+}
+
+/** El tema con menos artículos, para repartir el contenido. */
+function leastUsedTopic(counts: Record<string, number>): string {
+  return Object.keys(INGREDIENTS).sort((a, b) => (counts[a] ?? 0) - (counts[b] ?? 0))[0] ?? DEFAULT_ING;
 }
 
 function slugify(text: string): string {
@@ -740,6 +757,7 @@ export function AdminBlog() {
   const [posts,          setPosts]          = useState<BlogPost[]>([]);
   const [products,       setProducts]       = useState<Product[]>([]);
   const [selectedProdId, setSelectedProdId] = useState('');
+  const [selectedTopic,  setSelectedTopic]  = useState('auto');
   const [loadingPosts,   setLoadingPosts]   = useState(true);
   const [generating,     setGenerating]     = useState(false);
   const [generateStep,   setGenerateStep]   = useState('');
@@ -804,9 +822,8 @@ export function AdminBlog() {
 
     try {
       // 1. Detectar el ingrediente basado en nombre, marca y descripción
-      const searchText = `${prod.name ?? ""} ${prod.brand ?? ""} ${prod.description ?? ""}`;
-      const ingKey     = detectIngredient(searchText);
-      const ing        = INGREDIENTS[ingKey];
+      const ingKey = resolvedTopic;
+      const ing    = INGREDIENTS[ingKey];
 
       // 2. Consultar Wikipedia en español/inglés desde el navegador sin CORS
       let wikiText = '';
@@ -830,9 +847,23 @@ export function AdminBlog() {
         `${ing.display}: guía completa con evidencia científica`,
         `Beneficios del ${ing.display} según la dermatología moderna`,
       ];
-      const title = titleTemplates[Math.floor(Math.random() * titleTemplates.length)].substring(0, 70);
-      const slug = slugify(title) + "-" + Date.now().toString(36);
-      const excerpt = `Descubre los beneficios del ${ing.display} con evidencia científica real. Guía experta con contexto dermatológico para CDMX y productos auténticos en Divina Store.`.substring(0, 160);
+      // SEO: nunca repetir título ni dirección. Google trata dos títulos iguales como contenido duplicado.
+      const usedTitles = new Set(posts.map(p => (p.title ?? '').trim().toLowerCase()));
+      const usedSlugs  = new Set(posts.map(p => p.slug));
+      const shortName  = ing.display.split('(')[0].trim();
+      const candidates = [
+        ...titleTemplates,
+        `${shortName}: cómo usarlo en tu rutina paso a paso`,
+        `${shortName} en tu skincare: errores comunes y cómo evitarlos`,
+        `${shortName} con ${prod.brand ?? 'Divina Store'}: qué esperar y en cuánto tiempo`,
+        `${prod.name}: para qué sirve y cómo aprovechar su ${shortName.toLowerCase()}`,
+      ].map(t => t.substring(0, 70));
+      const title = candidates.find(t => !usedTitles.has(t.trim().toLowerCase()))
+        ?? `${shortName}: guía ${new Date().getFullYear()} con ${prod.name}`.substring(0, 70);
+      const baseSlug = slugify(title);
+      let slug = baseSlug;
+      for (let i = 2; usedSlugs.has(slug); i += 1) slug = `${baseSlug}-${i}`;
+      const excerpt = `${shortName}: qué es, beneficios y cómo usarlo en tu rutina. Guía práctica con ${prod.name}${prod.brand ? ` de ${prod.brand}` : ''}, original en Divina Store.`.substring(0, 158);
       
       // Asignar una imagen estética premium de Unsplash basada en la categoría
       const coverImage = prod.image_url || getSkincareAestheticImage(ing.category);
@@ -941,6 +972,11 @@ export function AdminBlog() {
   };
 
   const selectedProduct = products.find(p => p.id === selectedProdId);
+  const topicCounts   = countPostsByTopic(posts);
+  // Solo el nombre y la descripción deciden el tema; la marca ya no.
+  const detectedTopic = selectedProduct ? detectIngredientOrNull(`${selectedProduct.name ?? ''} ${selectedProduct.description ?? ''}`) : null;
+  const resolvedTopic = selectedTopic !== 'auto' ? selectedTopic : (detectedTopic ?? leastUsedTopic(topicCounts));
+  const resolvedCount = topicCounts[resolvedTopic] ?? 0;
 
   // ─────────────────────────────────────────────────────────────
   return (
@@ -957,7 +993,7 @@ export function AdminBlog() {
         {/* Header */}
         <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <h2 style={{ fontFamily: 'var(--f-heading)', fontSize: '18px', margin: 0 }}>✍️ Blog con IA</h2>
+            <h2 style={{ fontFamily: 'var(--f-heading)', fontSize: '18px', margin: 0 }}>✍️ Blog</h2>
             <span style={{
               background: 'rgba(196,252,21,0.12)', color: 'var(--c-lime)',
               fontSize: '10px', fontWeight: 700, padding: '3px 9px',
@@ -1024,6 +1060,48 @@ export function AdminBlog() {
                 ${selectedProduct.price} MXN
               </p>
             </div>
+          )}
+
+          <label htmlFor="blog-topic" style={{
+            display: 'block', fontSize: '10px', fontWeight: 700,
+            letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: 'var(--c-text-muted)', marginBottom: '8px', fontFamily: 'var(--f-sub)',
+          }}>
+            Tema del artículo
+          </label>
+          <select
+            id="blog-topic"
+            value={selectedTopic}
+            onChange={e => setSelectedTopic(e.target.value)}
+            style={{
+              width: '100%', padding: '9px 12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '10px', color: 'var(--c-white)',
+              fontSize: '12px', fontFamily: 'var(--f-body)',
+              cursor: 'pointer', marginBottom: '8px', outline: 'none',
+            }}
+          >
+            <option value="auto" style={{ background: '#111' }}>
+              Automático{selectedProduct ? ` → ${INGREDIENTS[resolvedTopic].display.split('(')[0].trim()}` : ''}
+            </option>
+            {Object.entries(INGREDIENTS).map(([key, ing]) => (
+              <option key={key} value={key} style={{ background: '#111' }}>
+                {ing.display.split('(')[0].trim()} · {topicCounts[key] ?? 0} artículo{(topicCounts[key] ?? 0) === 1 ? '' : 's'}
+              </option>
+            ))}
+          </select>
+          {selectedProduct && (
+            <p style={{
+              fontSize: '11px', lineHeight: 1.45, margin: '0 0 10px',
+              color: resolvedCount > 0 ? 'var(--c-gold)' : 'var(--c-text-muted)',
+            }}>
+              {resolvedCount > 0
+                ? `Ya tienes ${resolvedCount} artículo${resolvedCount === 1 ? '' : 's'} de este tema. Repetirlo le resta valor ante Google: elige otro tema de la lista.`
+                : selectedTopic === 'auto' && !detectedTopic
+                  ? 'No reconocí un ingrediente en este producto; uso el tema que menos has publicado.'
+                  : 'Tema nuevo en tu blog: buena elección.'}
+            </p>
           )}
 
           <button
@@ -1178,16 +1256,16 @@ export function AdminBlog() {
           }}>
             <div style={{ fontSize: '56px', marginBottom: '20px', opacity: 0.6 }}>🧬</div>
             <h3 style={{ fontFamily: 'var(--f-heading)', fontSize: '24px', color: 'var(--c-white)', marginBottom: '12px' }}>
-              Contenido editorial con IA
+              Generador de artículos
             </h3>
             <p style={{ fontSize: '14px', maxWidth: '400px', lineHeight: 1.7, marginBottom: '8px' }}>
               Selecciona un producto en el panel izquierdo y haz clic en <strong style={{ color: 'var(--c-lime)' }}>Generar Preview</strong>.
             </p>
             <p style={{ fontSize: '13px', maxWidth: '400px', lineHeight: 1.7, color: 'rgba(255,255,255,0.35)' }}>
-              La IA analiza los ingredientes activos, busca evidencia científica y redacta un artículo editorial premium. Tú revisas y decides si publicar.
+              Arma un borrador con plantillas según el tema elegido y los datos del producto. No es una IA: revisa el texto y las referencias antes de publicar.
             </p>
             <div style={{ display: 'flex', gap: '24px', marginTop: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {['🔬 Ingredientes activos', '📚 Estudios clínicos', '🌆 Contexto CDMX', '✅ Preview antes de publicar'].map(f => (
+              {['🔬 9 temas de ingredientes', '🔁 Títulos sin repetir', '🔎 SEO: título, resumen y URL', '✅ Preview antes de publicar'].map(f => (
                 <div key={f} style={{ fontSize: '12px', color: 'rgba(196,252,21,0.7)', fontFamily: 'var(--f-sub)', fontWeight: 600 }}>
                   {f}
                 </div>

@@ -30,6 +30,19 @@ const collections = await fetchRows('collections', 'slug,name,description,image_
 const products = await fetchRows('products', 'slug,name,brand,price,description,image_url,in_stock', '&in_stock=eq.true');
 const posts = await fetchRows('blog_posts', 'slug,title,excerpt,cover_image,category,author,created_at', '&published=eq.true');
 
+// Páginas de información creadas desde el admin (si falla, el build continúa sin ellas).
+let pages = [];
+try {
+  const cfg = await fetchRows('store_config', 'key,value');
+  const map = Object.fromEntries(cfg.map(r => [r.key, r.value]));
+  const custom = JSON.parse(map.admin_custom_sections || '[]');
+  pages = (Array.isArray(custom) ? custom : [])
+    .filter(s => s?.type === 'page' && s?.key)
+    .map(s => ({ slug: s.key, title: map[`page_${s.key}_title`] || s.label || s.key, body: map[`page_${s.key}_body`] || '' }));
+} catch (err) {
+  console.warn('Páginas de información omitidas del sitemap:', err?.message ?? err);
+}
+
 const urls = [
   ['/', 'daily', '1.0'],
   ['/catalogo', 'daily', '0.9'],
@@ -40,6 +53,7 @@ const urls = [
   ...collections.map(({ slug }) => [`/coleccion/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
   ...products.map(({ slug }) => [`/producto/${encodeURIComponent(slug)}`, 'weekly', '0.8']),
   ...posts.map(({ slug }) => [`/blog/${encodeURIComponent(slug)}`, 'monthly', '0.6']),
+  ...pages.map(({ slug }) => [`/info/${encodeURIComponent(slug)}`, 'monthly', '0.4']),
 ];
 
 const uniqueUrls = [...new Map(urls.map(entry => [entry[0], entry])).values()];
@@ -56,5 +70,5 @@ ${uniqueUrls.map(([path, changefreq, priority]) => `  <url>
 `;
 
 await writeFile(new URL('../public/sitemap.xml', import.meta.url), xml, 'utf8');
-await writeFile(new URL('./.seo-data.json', import.meta.url), JSON.stringify({ collections, products, posts }), 'utf8');
+await writeFile(new URL('./.seo-data.json', import.meta.url), JSON.stringify({ collections, products, posts, pages }), 'utf8');
 console.log(`sitemap.xml generado con ${uniqueUrls.length} URLs de ${SITE_URL}`);

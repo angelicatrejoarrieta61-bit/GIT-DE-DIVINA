@@ -7,6 +7,7 @@ import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProduct
 import { supabase, getImageUrl } from '../../lib/supabase';
 import type { Collection, Product, Order } from '../../types';
 import type { SectionBlock } from '../../sections/DynamicSections';
+import { ADMIN_PATCH_EVENT, type AdminPatchDetail, type CustomSection } from './AdminLayout';
 import './AdminConfig.css';
 
 const DEFAULT_FROST = {
@@ -327,7 +328,7 @@ export const AdminConfig: React.FC = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [frost, setFrost] = useState(DEFAULT_FROST);
   const [homeBlocks, setHomeBlocks] = useState<SectionBlock[]>(DEFAULT_HOME_BLOCKS);
-  const [customSections, setCustomSections] = useState<Array<{ key: string; label: string }>>([]);
+  const [customSections, setCustomSections] = useState<CustomSection[]>([]);
   const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>(DEFAULT_HEADER_LINKS);
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
   const [showPreview, setShowPreview] = useState(false);
@@ -405,9 +406,26 @@ export const AdminConfig: React.FC = () => {
     return () => window.removeEventListener('admin-manual-save', handleManualSave);
   }, []);
 
+  // Cambios hechos fuera de esta pantalla (menú lateral): se integran al estado
+  // para que el guardado automático no los sobrescriba con datos viejos.
   useEffect(() => {
-    // Tab effect is no longer needed since we use searchParams directly
-  }, [searchParams]);
+    const onPatch = (e: Event) => {
+      const d = (e as CustomEvent<AdminPatchDetail>).detail;
+      if (!d) return;
+      if (d.configs || d.removeKeys) {
+        setConfigs((prev) => {
+          const next = { ...prev, ...(d.configs ?? {}) };
+          (d.removeKeys ?? []).forEach((k) => { delete next[k]; });
+          return next;
+        });
+      }
+      if (d.headerLinks) setHeaderLinks(d.headerLinks);
+      if (d.customSections) setCustomSections(d.customSections);
+      if (d.reloadCollections) void getCollections().then(setCollections);
+    };
+    window.addEventListener(ADMIN_PATCH_EVENT, onPatch);
+    return () => window.removeEventListener(ADMIN_PATCH_EVENT, onPatch);
+  }, []);
 
   const loadData = async () => {
     try {
@@ -657,6 +675,7 @@ export const AdminConfig: React.FC = () => {
               if (sec === 'catalogo') return `/?preview=1&admin_path=/catalogo&r=${previewRefreshKey}`;
               if (sec === 'quienes-somos') return `/?preview=1&admin_path=/quienes-somos&r=${previewRefreshKey}`;
               if (sec === 'contacto') return `/?preview=1&admin_path=/contacto&r=${previewRefreshKey}`;
+              if (customSections.some(s => s.type === 'page' && s.key === sec)) return `/?preview=1&admin_path=/info/${sec}&r=${previewRefreshKey}`;
               return `/?preview=1&admin_path=/coleccion/${sec}&r=${previewRefreshKey}`;
             })()}
             style={{ width: '100%', height: '100%', border: 0, background: '#000' }}
@@ -983,7 +1002,7 @@ export const AdminConfig: React.FC = () => {
           )}
 
           {/* ── ESPECIFICO COLECCION (HERO Y RELACIONADOS) ── */}
-          {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', ...customSections.map(s => s.key)].includes(section) && (() => {
+          {['cremas-faciales', 'limpiadores', 'fotoprotectores', 'grooming', 'catalogo', ...customSections.filter(s => s.type !== 'page').map(s => s.key)].includes(section || '') && (() => {
             const col = collections.find(c => c.slug === section);
             const blockId = section; // Use slug (section) instead of col.id to match Storefront's CollectionPage.tsx logic
             const blockName = col?.name || section.replace(/-/g, ' ');
@@ -1062,6 +1081,38 @@ export const AdminConfig: React.FC = () => {
                         })}
                       </div>
                     </div>
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
+
+          {/* ── PÁGINA DE INFORMACIÓN ── */}
+          {customSections.some(s => s.type === 'page' && s.key === section) && (() => {
+            const key = section as string;
+            const titleKey = `page_${key}_title`;
+            const bodyKey = `page_${key}_body`;
+            const body = configs[bodyKey] || '';
+            return (
+              <section>
+                <h2 style={{ fontSize: 18, marginBottom: 6, color: 'var(--c-lime)' }}>📄 {configs[titleKey] || key}</h2>
+                <p style={{ fontSize: 12, color: '#aaa', margin: '0 0 16px' }}>
+                  Dirección pública: <a href={`/info/${key}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-lime)' }}>divinastore.com.mx/info/{key}</a>
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={box}>
+                    <label style={lbl} htmlFor="info-title">Título de la página</label>
+                    <input id="info-title" className="input-dark" type="text" maxLength={90} value={configs[titleKey] || ''} onChange={e => updateConfig(titleKey, e.target.value)} />
+                  </div>
+                  <div style={box}>
+                    <label style={lbl} htmlFor="info-body">Contenido</label>
+                    <textarea id="info-body" className="input-dark" rows={16} value={body} onChange={e => updateConfig(bodyKey, e.target.value)}
+                      placeholder={'## Envíos\nEnviamos a todo México en 3 a 5 días hábiles.\n\n- Envío gratis desde $999\n- Seguimiento por correo\n\n## Devoluciones\nTienes **7 días** para reportar un defecto.'}
+                      style={{ lineHeight: 1.5, fontFamily: 'var(--f-body)', resize: 'vertical' }} />
+                    <p style={{ fontSize: 11, color: '#aaa', margin: '8px 0 0', lineHeight: 1.5 }}>
+                      Deja una línea en blanco entre párrafos. <b>## Texto</b> crea un subtítulo, <b>- texto</b> una lista y <b>**texto**</b> negritas.
+                      Se guarda solo; la vista de la derecha se actualiza al escribir. {body.trim().split(/\s+/).filter(Boolean).length} palabras.
+                    </p>
                   </div>
                 </div>
               </section>
