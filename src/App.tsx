@@ -55,11 +55,13 @@ function RouteRedirector() {
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <StoreThemeProvider>
-      <Header />
-      <main>{children}</main>
-      <Footer />
-      <CartDrawer />
-      <FloatingContactBubble />
+      <div className="store">
+        <Header />
+        <main>{children}</main>
+        <Footer />
+        <CartDrawer />
+        <FloatingContactBubble />
+      </div>
     </StoreThemeProvider>
   );
 }

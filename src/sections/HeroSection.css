@@ -68,7 +68,7 @@
 .hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 60%);
+  background: linear-gradient(0deg, rgba(8,19,15,0.72) 0%, rgba(8,19,15,0) 55%);
   z-index: 3;
   pointer-events: none;
 }
@@ -78,7 +78,7 @@
   position: absolute;
   top: -10%; right: -5%;
   width: 50%; height: 60%;
-  background: radial-gradient(circle, rgba(48,98,223,0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(156,175,136,0.16) 0%, transparent 70%);
   filter: blur(120px);
   z-index: 4;
   pointer-events: none;
@@ -123,29 +123,29 @@
   padding-top: var(--nav-h);
 }
 
-/* Content card */
-.hero__content {
-  max-width: 650px;
+/* Tarjeta de cristal — dos esquinas opuestas muy redondas y dos casi rectas */
+.hero__content,
+.hero__content.glass {
+  --r-big: 96px;
+  --r-small: 10px;
+  position: relative;
+  max-width: 620px;
   width: 100%;
-  padding: 40px;
+  padding: 38px 52px 38px 44px;
   transform: translate3d(calc(var(--hero-x, -20px) + var(--hero-fix-x, 0px)), calc(var(--hero-y, 40px) + var(--hero-fix-y, 0px)), 0) scale(var(--hero-scale, 1));
   animation: heroEntrance 1.8s var(--ease-out) forwards;
-  box-shadow: 0 50px 120px -20px rgba(0,0,0,0.9),
-              inset 0 0 100px rgba(255,255,255,0.03);
   will-change: transform;
+  border-radius: var(--r-small) var(--r-big) var(--r-small) var(--r-big);
+  border: 1px solid rgba(239, 236, 230, 0.34);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  overflow: hidden;
 
-  /* Override glass vars for hero */
-  --glass-bg: rgba(0,0,0,0.2);
-  --glass-blur: 30px;
-  --glass-radius: 40px;
-}
-
-.hero__content::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent);
-  border-radius: 40px 40px 0 0;
+  /* Cristal */
+  --glass-bg: rgba(12, 26, 21, 0.36);
+  --glass-blur: 26px;
+  background:
+    linear-gradient(135deg, rgba(239, 236, 230, 0.18) 0%, rgba(239, 236, 230, 0) 45%),
+    var(--glass-bg);
 }
 
 /* Label */
@@ -178,15 +178,15 @@
   font-size: 48px;
   color: var(--c-white);
   line-height: 0.95;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
-  font-style: italic;
+  font-style: normal;
   margin-bottom: 20px;
 }
 
 .hero__heading-accent {
-  background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(48,98,223,1) 100%);
+  background: linear-gradient(90deg, var(--b-cream) 0%, var(--b-sage) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -212,6 +212,20 @@
 }
 .hero__ctas .btn {
   white-space: nowrap;
+}
+
+/* Corte diagonal al pie del hero (escritorio y tablet) */
+@media (min-width: 769px) {
+  /* Si el ajuste del admin mueve la foto, sus orillas se funden con el relleno
+     difuminado en lugar de dejar una línea recta. */
+  .hero__bg-img {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%), linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%), linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .hero { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - clamp(28px, 4vw, 64px))); }
+  .hero + .categories { margin-top: calc(clamp(28px, 4vw, 64px) * -0.35); }
 }
 
 /* ── Responsive — Tablet ─────────────────────────────────── */
@@ -280,12 +294,12 @@
     margin: 0 auto;
     padding: 20px 18px;
     max-width: 520px;
-    border-radius: 24px;
+    --r-big: 56px;
+    --r-small: 8px;
+    padding: 24px 22px;
     text-align: center;
-    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.8), inset 0 0 60px rgba(255,255,255,0.03);
-    --glass-bg: rgba(0,0,0,0.45);
+    --glass-bg: rgba(12, 26, 21, 0.62);
   }
-  .hero__content::before { border-radius: 24px 24px 0 0; }
   .hero__label { justify-content: center; margin-bottom: 12px; }
   .hero__label-line { width: 28px; flex: 0 0 28px; }
   .hero__heading { font-size: 30px; margin-bottom: 12px; }

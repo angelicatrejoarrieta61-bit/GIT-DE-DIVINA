@@ -27,6 +27,22 @@
   --c-glow-orange: #ff9b10;
   --c-overlay:     rgba(0,0,0,0.6);
 
+  /* Marca (logo 2026): verde profundo, salvia, carbón, grafito, blanco cálido */
+  --b-green-950:  #08130f;
+  --b-green-900:  #0c1a15;
+  --b-green-800:  #12261f;
+  --b-green-700:  #1c352d;
+  --b-sage:       #9caf88;
+  --b-sage-light: #c3d1b3;
+  --b-sage-dark:  #7d916b;
+  --b-charcoal:   #2b2d30;
+  --b-graphite:   #a7a8aa;
+  --b-cream:      #efece6;
+  --b-line:       rgba(239, 236, 230, 0.12);
+  /* Forma "hoja" del logo: dos esquinas amplias y dos casi rectas */
+  --b-leaf:       26px 6px 26px 6px;
+  --b-leaf-alt:   6px 26px 6px 26px;
+
   /* Glassmorphism */
   --glass-bg:      rgba(0,0,0,0.2);
   --glass-blur:    30px;
@@ -258,3 +274,20 @@ h4, h5, h6 { font-family: var(--f-sub); }
   .section { padding-block: 52px; }
   .section-sm { padding-block: 32px; }
 }
+/* ─── Tienda pública: paleta de marca ─────────────────────
+   El acento (antes lima) pasa a salvia en toda la tienda. El admin no cambia. */
+.store {
+  display: contents;
+  --c-lime:        var(--b-sage-light);
+  --c-lime-alt:    var(--b-sage);
+  --c-lime-dark:   var(--b-sage-dark);
+  --c-gold:        var(--b-cream);
+  --c-white:       var(--b-cream);
+  --c-text:        var(--b-cream);
+  --c-text-muted:  rgba(239, 236, 230, 0.62);
+  --c-border:      var(--b-line);
+  --c-border-lime: rgba(156, 175, 136, 0.35);
+  --c-glow-blue:   var(--b-sage);
+  --c-glow-orange: transparent;
+}
+.store ::selection { background: var(--b-sage); color: var(--b-green-950); }

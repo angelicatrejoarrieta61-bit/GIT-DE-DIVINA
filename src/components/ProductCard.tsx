@@ -26,8 +26,9 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
     : null;
 
   return (
-    <Link to={`/producto/${product.slug}`} className={`product-card ${featured ? 'is-featured' : ''}`} aria-label={product.name}>
+    <Link to={`/producto/${product.slug}`} className={`product-card ${featured ? 'is-featured' : ''} ${product.in_stock ? '' : 'is-out'}`} aria-label={product.name}>
       {/* Image */}
+      <div className="product-card__frame">
       <div className="product-card__media">
         {product.image_url ? (
           <img
@@ -43,7 +44,7 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
 
         {/* Badges */}
         <div className="product-card__badges">
-          {discount && <span className="badge badge-lime">-{discount}%</span>}
+          {discount && <span className="badge badge-lime badge-discount">-{discount}%</span>}
           {!product.in_stock && <span className="badge badge-dark">Agotado</span>}
           {product.tags?.find(t => t && typeof t === 'string' && t.startsWith('BADGE:')) && (
             <span className="badge badge-lime">
@@ -52,16 +53,21 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
           )}
         </div>
 
-        {/* Quick add overlay */}
-        <div className="product-card__overlay">
-          <button
-            onClick={handleAdd}
-            className="product-card__add-btn"
-            disabled={!product.in_stock}
-          >
-            {product.in_stock ? 'Agregar al carrito' : 'Sin stock'}
-          </button>
-        </div>
+      </div>
+
+        {/* Agregar: en la esquina cortada, siempre visible (también en celular) */}
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="product-card__add-btn"
+          disabled={!product.in_stock}
+          aria-label={product.in_stock ? `Agregar ${product.name} al carrito` : `${product.name} sin stock`}
+          title={product.in_stock ? 'Agregar al carrito' : 'Sin stock'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            {product.in_stock ? <path d="M12 5v14M5 12h14" /> : <path d="M6 6l12 12M18 6L6 18" />}
+          </svg>
+        </button>
       </div>
 
       {/* Info */}
@@ -71,14 +77,17 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
         )}
         <h3 className="product-card__name">{product.name}</h3>
         <div className="product-card__price-row">
-          <span className="product-card__price">
-            ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
-          </span>
-          {product.compare_price && product.compare_price > product.price && (
-            <span className="product-card__compare">
-              ${product.compare_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          <div className="product-card__prices">
+            <span className="product-card__price">
+              ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
             </span>
-          )}
+            {product.compare_price && product.compare_price > product.price && (
+              <span className="product-card__compare">
+                ${product.compare_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
+
         </div>
       </div>
     </Link>

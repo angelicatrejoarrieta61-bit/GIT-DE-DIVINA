@@ -248,6 +248,15 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Los textos de la tienda son blancos.** Un fondo claro los vuelve ilegibles; el admin avisa.
 - **Probar en navegador real** a 1440, ~1180 y 390 px antes de publicar.
 
+## 17 bis. Diseño de la tienda (octubre 2026)
+
+- **Paleta de marca** en `src/styles/index.css`: `--b-green-*` (verde profundo), `--b-sage*` (salvia), `--b-charcoal`, `--b-graphite`, `--b-cream`.
+- Toda la tienda pública va dentro de `<div class="store">` (en `App.tsx`). Ahí el acento antiguo `--c-lime` se redefine a salvia, así que cualquier estilo viejo que use `var(--c-lime)` toma el color nuevo. **El admin queda fuera** y conserva el lima.
+- **Forma "hoja"** (`--b-leaf`, `--b-leaf-alt`): dos esquinas amplias y dos casi rectas, tomada del logo. La usan las tarjetas de producto, las de categoría y la tarjeta del hero.
+- **Encabezado:** transparente sobre la foto; al bajar se vuelve barra sólida (`.header--scrolled`).
+- **Footer en tres pisos:** newsletter, marca + enlaces, barra legal. El newsletter guarda en `subscribers` con `source: 'footer'`.
+- El checkout (`.cv2`) todavía usa su propio lima; no se ha pasado a la paleta nueva.
+
 ## 18. Pendientes conocidos
 
 - Rotar la llave de Bright Data (se compartió por chat) y actualizarla en Vercel.

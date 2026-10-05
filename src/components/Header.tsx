@@ -133,6 +133,31 @@ export const Header: React.FC = () => {
     };
   }, []);
 
+  // Menú en dos grupos: tienda (izquierda del logo) e información (derecha, junto al carrito)
+  const servicePaths = ['/quienes-somos', '/contacto', '/blog'];
+  // "Inicio" no va en el menú: el logo ya lleva al inicio.
+  const menuLinks = headerLinks.filter(l => l.path !== '/');
+  const shopLinks = menuLinks.filter(l => !servicePaths.includes(l.path));
+  const infoLinks = menuLinks.filter(l => servicePaths.includes(l.path));
+  const renderNavLink = (link: HeaderLink, idx: number, isService: boolean) => (
+    <NavLink
+      key={`${link.path}-${idx}`}
+      to={link.path}
+      className={({ isActive }) => `header__nav-link ${isService ? 'header__nav-link--service' : ''} ${isActive ? 'active' : ''}`}
+      end={link.path === '/'}
+    >
+      {link.path === '/' && homeIconUrl ? (
+        <img
+          src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
+          alt="Inicio"
+          style={{ height: '2.8em', maxHeight: '36px', width: 'auto', objectFit: 'contain', display: 'block' }}
+        />
+      ) : (
+        link.label
+      )}
+    </NavLink>
+  );
+
   return (
     <>
       <header
@@ -177,47 +202,19 @@ export const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="header__nav" aria-label="Navegación principal">
-            {(() => {
-              const servicePaths = ['/quienes-somos', '/contacto', '/blog'];
-              const firstServiceIdx = headerLinks.findIndex(l => servicePaths.includes(l.path));
-              return headerLinks.map((link, idx) => {
-                const isService = servicePaths.includes(link.path);
-                return (
-                  <React.Fragment key={idx}>
-                    {idx === firstServiceIdx && (
-                      <span className="header__nav-separator" />
-                    )}
-                    <NavLink
-                      to={link.path}
-                      className={({ isActive }) => `header__nav-link ${isService ? 'header__nav-link--service' : ''} ${isActive ? 'active' : ''}`}
-                      end={link.path === '/'}
-                    >
-                      {link.path === '/' && homeIconUrl ? (
-                        <img
-                          src={getImageUrl(homeIconUrl, { width: 100, quality: 90 })}
-                          alt="Inicio"
-                          style={{
-                            height: '2.8em',
-                            maxHeight: '36px',
-                            width: 'auto',
-                            objectFit: 'contain',
-                            display: 'block',
-                            filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.2))',
-                          }}
-                        />
-                      ) : (
-                        link.label
-                      )}
-                    </NavLink>
-                  </React.Fragment>
-                );
-              });
-            })()}
+          <nav className="header__nav" aria-label="Colecciones">
+            <div className="header__nav-group header__nav-group--shop">
+              {shopLinks.map((l, i) => renderNavLink(l, i, false))}
+            </div>
           </nav>
 
           {/* Actions */}
           <div className="header__actions">
+            {infoLinks.length > 0 && (
+              <nav className="header__nav-group header__nav-group--info" aria-label="Información">
+                {infoLinks.map((l, i) => renderNavLink(l, i, true))}
+              </nav>
+            )}
             <button
               className="header__cart-btn"
               onClick={openCart}
@@ -235,7 +232,7 @@ export const Header: React.FC = () => {
 
         {/* Mobile Menu */}
         <div className={`header__mobile-menu ${mobileOpen ? 'open' : ''}`}>
-          {headerLinks.map((link, idx) => (
+          {menuLinks.map((link, idx) => (
             <NavLink
               key={idx}
               to={link.path}

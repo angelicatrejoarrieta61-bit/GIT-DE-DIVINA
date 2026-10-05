@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { readCachedStoreConfig } from '../lib/storeBoot';
 import { Link } from 'react-router-dom';
 import { getStoreConfig } from '../lib/queries';
-import { getImageUrl } from '../lib/supabase';
+import { getImageUrl, supabase } from '../lib/supabase';
 import { LegalModal } from './LegalModal';
 import { ContactModal } from './ContactModal';
 import './Footer.css';
@@ -59,9 +59,24 @@ export const Footer: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const [subState, setSubState] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  // Guarda el correo en la lista de suscriptores (antes solo mostraba "gracias" sin guardar).
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) { setSubscribed(true); setEmail(''); }
+    const clean = email.trim().toLowerCase();
+    if (!clean || subState === 'loading') return;
+    setSubState('loading');
+    const { error } = await supabase.from('subscribers').insert([{ email: clean, source: 'footer' }]);
+    // 23505 = ese correo ya estaba suscrito: para la persona es un éxito.
+    if (error && error.code !== '23505') {
+      console.error('[Footer] subscribe:', error);
+      setSubState('error');
+      return;
+    }
+    setSubState('idle');
+    setSubscribed(true);
+    setEmail('');
   };
 
   const parseLink = (val: string) => {
@@ -107,20 +122,52 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="divina-footer" role="contentinfo" aria-label="Pie de página Divina Store">
-      <div className="divina-footer__fade" aria-hidden="true"></div>
+      {/* ── Piso 1: Newsletter ── */}
+      <section className="divina-footer__band" aria-labelledby="footer-nl-title">
+        <div className="divina-footer__band-inner">
+          <div className="divina-footer__band-copy">
+            <p className="divina-footer__eyebrow">Newsletter</p>
+            <h2 id="footer-nl-title" className="divina-footer__nl-title">{configs.footer_nl_title}</h2>
+            <p className="divina-footer__nl-sub">{configs.footer_nl_subtitle}</p>
+          </div>
 
-      <div className="divina-footer__bg" aria-hidden="true">
-        <svg className="divina-footer__wave" viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,160 C180,240 360,80 540,160 C720,240 900,80 1080,160 C1260,240 1380,120 1440,160 L1440,320 L0,320 Z" fill="none" stroke="rgba(196, 252, 21, 0.12)" strokeWidth="1.5"/>
-          <path d="M0,200 C200,120 400,280 600,200 C800,120 1000,280 1200,200 C1320,160 1400,220 1440,200 L1440,320 L0,320 Z" fill="none" stroke="rgba(196, 252, 21, 0.07)" strokeWidth="1"/>
-        </svg>
-        <div className="divina-footer__glow divina-footer__glow--tr" aria-hidden="true"></div>
-        <div className="divina-footer__glow divina-footer__glow--bl" aria-hidden="true"></div>
-      </div>
+          <div className="divina-footer__newsletter">
+            {subscribed ? (
+              <p className="divina-footer__nl-ok" role="status">¡Gracias por suscribirte! Te escribiremos pronto.</p>
+            ) : (
+              <form onSubmit={handleSubscribe} className="divina-footer__nl-form" aria-label="Formulario de suscripción">
+                <div className="divina-footer__nl-row">
+                  <label htmlFor="footer-email-input" className="visually-hidden">Tu correo electrónico</label>
+                  <input
+                    type="email"
+                    id="footer-email-input"
+                    className="divina-footer__nl-input"
+                    placeholder="tu@email.com"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); if (subState === 'error') setSubState('idle'); }}
+                    disabled={subState === 'loading'}
+                    required
+                    aria-required="true"
+                  />
+                  <button type="submit" className="divina-footer__nl-btn" aria-label="Suscribirse" disabled={subState === 'loading'}>
+                    <span>{subState === 'loading' ? 'Enviando…' : 'Suscribirme'}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </button>
+                </div>
+                {subState === 'error' && <p className="divina-footer__nl-error" role="alert">No se pudo registrar tu correo. Intenta de nuevo.</p>}
+                <p className="divina-footer__nl-note">Gestionado por: info@divinastore.com.mx</p>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
 
       <div className="divina-footer__inner">
 
-        {/* ── Columna 1: Logo + tagline + newsletter ── */}
+        {/* ── Piso 2: marca + enlaces ── */}
         <div className="divina-footer__brand">
           <Link to="/" className="divina-footer__logo" aria-label="Inicio Divina Store">
             {configs.logo_url ? (
@@ -132,42 +179,12 @@ export const Footer: React.FC = () => {
                 decoding="async"
               />
             ) : (
-              <span className="divina-footer__logo-text">DIVIИ⋀</span>
+              <span className="divina-footer__logo-text">DIVINA</span>
             )}
           </Link>
 
           <p className="divina-footer__tagline">{configs.footer_tagline}</p>
 
-          <div className="divina-footer__newsletter">
-            <p className="divina-footer__nl-title">{configs.footer_nl_title}</p>
-            <p className="divina-footer__nl-sub">{configs.footer_nl_subtitle}</p>
-            
-            {subscribed ? (
-              <p style={{ color: 'var(--c-lime)', fontSize: '0.85rem' }}>✅ ¡Gracias por suscribirte!</p>
-            ) : (
-              <form onSubmit={handleSubscribe} className="divina-footer__nl-form" aria-label="Formulario de suscripción">
-                <div className="divina-footer__nl-row">
-                  <label htmlFor="footer-email-input" className="visually-hidden">Tu correo electrónico</label>
-                  <input
-                    type="email"
-                    id="footer-email-input"
-                    className="divina-footer__nl-input"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                    aria-required="true"
-                  />
-                  <button type="submit" className="divina-footer__nl-btn" aria-label="Suscribirse">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </button>
-                </div>
-                <p style={{ fontSize: '10px', color: '#666', marginTop: '8px' }}>Gestionado por: info@divinastore.com.mx</p>
-              </form>
-            )}
-          </div>
         </div>
 
         {/* ── Columna 2: Nuestras Secciones ── */}
