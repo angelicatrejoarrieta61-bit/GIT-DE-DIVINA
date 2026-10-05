@@ -7,14 +7,8 @@ import { LegalModal } from './LegalModal';
 import { ContactModal } from './ContactModal';
 import './Footer.css';
 
-export const Footer: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-  const [showLegalModal, setShowLegalModal] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
-  
-  // Settings extracted from the Admin configuration
-  const [configs, setConfigs] = useState<Record<string, string>>(() => ({
+/** Textos y enlaces por defecto del footer. El admin los muestra tal cual para poder editarlos. */
+export const FOOTER_DEFAULTS: Record<string, string> = {
     footer_tagline: 'La belleza que nace del alma y perdura para siempre.',
     footer_nl_title: 'Suscríbete ahora',
     footer_nl_subtitle: 'Recibe ofertas exclusivas, descuentos y mucho más',
@@ -39,6 +33,17 @@ export const Footer: React.FC = () => {
     footer_col3_l1: 'Programa de promoción : /programa-promocion',
     footer_col3_l2: 'Programa testers : /pages/programa-testers',
     footer_col3_l3: 'Legales y Copyright : /pages/legales',
+};
+
+export const Footer: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  
+  // Lo guardado en el admin se monta sobre los textos por defecto
+  const [configs, setConfigs] = useState<Record<string, string>>(() => ({
+    ...FOOTER_DEFAULTS,
     ...(readCachedStoreConfig() ?? {}),
   }));
 
