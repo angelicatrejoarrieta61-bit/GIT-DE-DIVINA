@@ -21,6 +21,7 @@ export const ContactPage: React.FC = () => {
   const [bgImg, setBgImg] = useState<string | null>(null);
   const [bgX, setBgX] = useState('0');
   const [bgY, setBgY] = useState('0');
+  const [bgScale, setBgScale] = useState('1');
   const [cardX, setCardX] = useState('0');
   const [cardY, setCardY] = useState('0');
   const [cardScale, setCardScale] = useState('1');
@@ -35,6 +36,7 @@ export const ContactPage: React.FC = () => {
       if (cfg.contact_hero_img) setBgImg(cfg.contact_hero_img);
       if (cfg.contact_hero_bg_x) setBgX(cfg.contact_hero_bg_x);
       if (cfg.contact_hero_bg_y) setBgY(cfg.contact_hero_bg_y);
+      if (cfg.contact_hero_bg_scale) setBgScale(cfg.contact_hero_bg_scale);
       if (cfg.contact_hero_card_x) setCardX(cfg.contact_hero_card_x);
       if (cfg.contact_hero_card_y) setCardY(cfg.contact_hero_card_y);
       if (cfg.contact_hero_card_scale) setCardScale(String(parseInt(cfg.contact_hero_card_scale) / 100));
@@ -51,6 +53,7 @@ export const ContactPage: React.FC = () => {
         if (payload.contact_hero_img !== undefined) setBgImg(payload.contact_hero_img);
         if (payload.contact_hero_bg_x !== undefined) setBgX(payload.contact_hero_bg_x);
         if (payload.contact_hero_bg_y !== undefined) setBgY(payload.contact_hero_bg_y);
+        if (payload.contact_hero_bg_scale !== undefined) setBgScale(payload.contact_hero_bg_scale || '1');
         if (payload.contact_hero_card_x !== undefined) setCardX(payload.contact_hero_card_x);
         if (payload.contact_hero_card_y !== undefined) setCardY(payload.contact_hero_card_y);
         if (payload.contact_hero_card_scale !== undefined) setCardScale(String(parseInt(payload.contact_hero_card_scale) / 100));
@@ -115,20 +118,14 @@ export const ContactPage: React.FC = () => {
         description="¿Necesitas ayuda con un producto o pedido? Contacta a Divina Store MX por formulario, correo o WhatsApp."
         path="/contacto"
       />
-      {/* Banner Hero */}
-      <div 
-        className="collection-page__banner"
-        style={{ height: bgImg ? '60vh' : '40vh' }}
-      >
+      {/* Encabezado: mismo alto y comportamiento que las colecciones */}
+      <div className="collection-page__banner">
         {bgImg && (
           <img 
             src={getImageUrl(bgImg, { width: 1920, quality: 80 }) || ''} 
-            alt="Contact Hero" 
+            alt="" 
             className="collection-page__bg-img"
-            style={{ 
-              '--bg-x': `${bgX}px`, 
-              '--bg-y': `${bgY}px`
-            } as React.CSSProperties} 
+            style={{ transform: `translate(${bgX}px, ${bgY}px) scale(${bgScale})` }} 
           />
         )}
         <div className="collection-page__banner-overlay" style={{ zIndex: 2 }} />

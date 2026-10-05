@@ -349,52 +349,23 @@ export const AdminConfig: React.FC = () => {
 
   useEffect(() => { loadData(); }, []);
 
-  // ── Guardado seguro ───────────────────────────────────────────────
-  // baselineRef = lo que hay en la base según esta pantalla. Solo se guardan
-  // las llaves que el usuario cambió AQUÍ. Antes se reescribía toda la
-  // configuración, y una pestaña vieja del admin (o un guardado antes de terminar
-  // de cargar) regresaba imágenes y textos a valores anteriores.
-  const baselineRef = useRef<Record<string, string> | null>(null);
-  const JSON_KEYS = ['frost_cards_data', 'home_sections', 'header_links'];
-
-  const buildUpdates = (cfg: Record<string, string>, frst: any, hBlocks: any, hLinks: any) => {
-    const base = baselineRef.current;
-    if (!base) return []; // aún no termina de cargar: no se guarda nada
-    const updates = Object.entries(cfg)
-      .filter(([k, v]) =>
-        v !== undefined &&
-        v !== null &&
-        String(v) !== 'undefined' &&
-        !JSON_KEYS.includes(k) &&
-        !String(v).startsWith('data:') &&
-        String(v) !== base[k]
-      )
-      .map(([key, value]) => ({ key, value: String(value) }));
-    const json: Record<string, string> = {
-      frost_cards_data: JSON.stringify(frst),
-      home_sections: JSON.stringify(hBlocks),
-      header_links: JSON.stringify(hLinks),
-    };
-    for (const key of JSON_KEYS) if (json[key] !== base[key]) updates.push({ key, value: json[key] });
-    return updates;
-  };
-
-  // Los guardados van en fila, uno tras otro: así una petición lenta nunca
-  // llega después de una más nueva y la pisa.
-  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-
-  const saveConfigBulk = (cfg: Record<string, string>, frst: any, hBlocks: any, hLinks: any): Promise<string | null> => {
-    const run = async (): Promise<string | null> => {
-      const updates = buildUpdates(cfg, frst, hBlocks, hLinks);
-      if (updates.length === 0) return null;
-      const { error } = await supabase.from('store_config').upsert(updates, { onConflict: 'key' });
-      if (error) { console.error('Save error:', error); return error.message; }
-      if (baselineRef.current) for (const u of updates) baselineRef.current[u.key] = u.value;
-      return null;
-    };
-    const next = saveQueueRef.current.then(run, run);
-    saveQueueRef.current = next;
-    return next;
+  const saveConfigBulk = async (cfg: Record<string, string>, frst: any, hBlocks: any, hLinks: any) => {
+    const updates = [
+      ...Object.entries(cfg)
+        .filter(([k, v]) => 
+          v !== undefined && 
+          v !== null && 
+          String(v) !== 'undefined' &&
+          !['frost_cards_data', 'home_sections', 'header_links'].includes(k) && 
+          !String(v).startsWith('data:')
+        )
+        .map(([key, value]) => ({ key, value: String(value) })),
+      { key: 'frost_cards_data', value: JSON.stringify(frst) },
+      { key: 'home_sections', value: JSON.stringify(hBlocks) },
+      { key: 'header_links', value: JSON.stringify(hLinks) }
+    ];
+    const { error } = await supabase.from('store_config').upsert(updates, { onConflict: 'key' });
+    if (error) console.error('Save error:', error);
   };
 
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -416,15 +387,28 @@ export const AdminConfig: React.FC = () => {
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(() => {
-      void saveConfigBulk(configs, frost, homeBlocks, headerLinks);
+      saveConfigBulk(configs, frost, homeBlocks, headerLinks);
     }, 1000);
   }, [configs, frost, homeBlocks, headerLinks, collections]);
 
   useEffect(() => {
     const handleManualSave = async () => {
       const { configs, frost, homeBlocks, headerLinks } = stateRef.current;
-      const error = await saveConfigBulk(configs, frost, homeBlocks, headerLinks);
-      if (error) alert('No se pudo guardar: ' + error);
+      const updates = [
+        ...Object.entries(configs)
+          .filter(([k]) => !['frost_cards_data', 'home_sections', 'header_links'].includes(k))
+          .map(([key, value]) => ({ key, value: String(value) })),
+        { key: 'frost_cards_data', value: JSON.stringify(frost) },
+        { key: 'home_sections', value: JSON.stringify(homeBlocks) },
+        { key: 'header_links', value: JSON.stringify(headerLinks) }
+      ];
+      const { error } = await supabase.from('store_config').upsert(updates, { onConflict: 'key' });
+      if (error) {
+        console.error('Error saving config:', error);
+        alert('Error saving config: ' + error.message);
+      } else {
+        console.log('Saved successfully');
+      }
       // Reload iframe once saved fully
       setPreviewRefreshKey(k => k + 1);
     };
@@ -433,45 +417,12 @@ export const AdminConfig: React.FC = () => {
     return () => window.removeEventListener('admin-manual-save', handleManualSave);
   }, []);
 
-  // Al volver a esta pestaña: trae lo que se haya guardado desde otra pestaña o
-  // dispositivo. Lo que se esté editando aquí (sin guardar) no se toca.
-  useEffect(() => {
-    const refresh = async () => {
-      if (document.visibilityState !== 'visible' || !baselineRef.current) return;
-      await saveQueueRef.current; // primero termina lo que se esté guardando
-      const fresh = await getStoreConfig();
-      const base = baselineRef.current;
-      if (!base || Object.keys(fresh).length === 0) return;
-      // Se calcula fuera de setConfigs (sin efectos dentro del actualizador).
-      const current = stateRef.current.configs;
-      const adopted: Record<string, string> = {};
-      for (const [k, v] of Object.entries(fresh)) {
-        if (JSON_KEYS.includes(k)) continue;
-        const untouched = current[k] === undefined || String(current[k]) === base[k];
-        if (untouched && String(current[k]) !== v) adopted[k] = v;
-        if (untouched) base[k] = v;
-      }
-      if (Object.keys(adopted).length) setConfigs((prev) => ({ ...prev, ...adopted }));
-    };
-    document.addEventListener('visibilitychange', refresh);
-    window.addEventListener('focus', refresh);
-    return () => {
-      document.removeEventListener('visibilitychange', refresh);
-      window.removeEventListener('focus', refresh);
-    };
-  }, []);
-
   // Cambios hechos fuera de esta pantalla (menú lateral): se integran al estado
   // para que el guardado automático no los sobrescriba con datos viejos.
   useEffect(() => {
     const onPatch = (e: Event) => {
       const d = (e as CustomEvent<AdminPatchDetail>).detail;
       if (!d) return;
-      if (baselineRef.current) {
-        Object.assign(baselineRef.current, d.configs ?? {});
-        (d.removeKeys ?? []).forEach((k) => { delete baselineRef.current![k]; });
-        if (d.headerLinks) baselineRef.current.header_links = JSON.stringify(d.headerLinks);
-      }
       if (d.configs || d.removeKeys) {
         setConfigs((prev) => {
           const next = { ...prev, ...(d.configs ?? {}) };
@@ -515,40 +466,34 @@ export const AdminConfig: React.FC = () => {
       setProducts(prods);
       setOrders(ords);
       setAdminProducts(aProds);
-      // Valores normalizados; también son la línea base del guardado seguro.
-      let nextFrost = stateRef.current.frost;
-      let nextBlocks: SectionBlock[] = DEFAULT_HOME_BLOCKS;
-      let nextLinks: HeaderLink[] = DEFAULT_HEADER_LINKS;
       if (c.frost_cards_data) {
-        try { const p = JSON.parse(c.frost_cards_data); if (p?.cards) nextFrost = { ...DEFAULT_FROST, ...p }; } catch { }
+        try { const p = JSON.parse(c.frost_cards_data); if (p?.cards) setFrost({ ...DEFAULT_FROST, ...p }); } catch { }
       }
       if (c.home_sections) {
         try {
           const parsed = JSON.parse(c.home_sections);
-          if (Array.isArray(parsed)) nextBlocks = parsed;
-        } catch { }
+          if (Array.isArray(parsed)) setHomeBlocks(parsed);
+        } catch {
+          setHomeBlocks(DEFAULT_HOME_BLOCKS);
+        }
+      } else {
+        setHomeBlocks(DEFAULT_HOME_BLOCKS);
       }
-      if (c.header_links) {
-        try {
-          const hl = JSON.parse(c.header_links);
-          if (Array.isArray(hl)) nextLinks = hl;
-        } catch { }
-      }
-      setFrost(nextFrost);
-      setHomeBlocks(nextBlocks);
-      setHeaderLinks(nextLinks);
-      // Si la base no tenía estas llaves, no se crean solas con valores por defecto.
-      baselineRef.current = {
-        ...c,
-        frost_cards_data: JSON.stringify(nextFrost),
-        home_sections: JSON.stringify(nextBlocks),
-        header_links: JSON.stringify(nextLinks),
-      };
       if (c.admin_custom_sections) {
         try {
           const parsed = JSON.parse(c.admin_custom_sections);
           if (Array.isArray(parsed)) setCustomSections(parsed);
         } catch { }
+      }
+      if (c.header_links) {
+        try {
+          const hl = JSON.parse(c.header_links);
+          if (Array.isArray(hl)) setHeaderLinks(hl);
+        } catch {
+          setHeaderLinks(DEFAULT_HEADER_LINKS);
+        }
+      } else {
+        setHeaderLinks(DEFAULT_HEADER_LINKS);
       }
       
       if (aProds.length === 0) {
@@ -1455,11 +1400,62 @@ export const AdminConfig: React.FC = () => {
                           <Sl label="Posición X Imagen" cfg="contact_hero_bg_x" min={-1000} max={1000} />
                           <Sl label="Posición Y Imagen" cfg="contact_hero_bg_y" min={-1000} max={1000} />
                         </div>
+                        <div style={{ marginTop: 12 }}>
+                          <label style={lbl} htmlFor="contact-bg-scale">Escala de la Imagen: {configs.contact_hero_bg_scale || '1'}</label>
+                          <input
+                            id="contact-bg-scale"
+                            type="range"
+                            min={0.5}
+                            max={3.0}
+                            step={0.05}
+                            value={configs.contact_hero_bg_scale || '1'}
+                            onChange={(e) => updateConfig('contact_hero_bg_scale', e.target.value)}
+                            style={{ width: '100%', accentColor: 'var(--c-lime)' }}
+                          />
+                        </div>
+                        {(() => {
+                          const moved = Number(configs.contact_hero_bg_x || 0) !== 0 || Number(configs.contact_hero_bg_y || 0) !== 0 || Number(configs.contact_hero_bg_scale || 1) !== 1;
+                          return (
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              disabled={!moved}
+                              onClick={() => {
+                                updateConfig('contact_hero_bg_x', '0');
+                                updateConfig('contact_hero_bg_y', '0');
+                                updateConfig('contact_hero_bg_scale', '1');
+                              }}
+                              style={{ marginTop: 12, padding: '8px 14px', fontSize: 11, opacity: moved ? 1 : 0.45, cursor: moved ? 'pointer' : 'not-allowed' }}
+                              title="Vuelve a posición 0, 0 y escala 1: la imagen cubre todo el encabezado"
+                            >
+                              ↺ Restablecer imagen (ajuste automático)
+                            </button>
+                          );
+                        })()}
+                        <p className="muted-text" style={{ fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>Medida recomendada: 1920 × 640 px (proporción 3:1), igual que las colecciones.</p>
                       </div>
 
                       <div style={box}>
                         <h3 style={{ fontSize: 14, marginBottom: 16 }}>Texto de la Tarjeta</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={!(configs.contact_hero_title === '' && configs.contact_hero_subtitle === '')}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  updateConfig('contact_hero_title', 'Ponte en <span class="lime-text">Contacto</span>');
+                                  updateConfig('contact_hero_subtitle', '¿Tienes alguna duda sobre nuestros productos o necesitas ayuda con tu pedido? Escríbenos.');
+                                } else {
+                                  updateConfig('contact_hero_title', '');
+                                  updateConfig('contact_hero_subtitle', '');
+                                }
+                              }}
+                              style={{ width: 16, height: 16, accentColor: 'var(--c-lime)' }}
+                            />
+                            Mostrar tarjeta de texto sobre la imagen
+                          </label>
+                          <p className="muted-text" style={{ fontSize: 11, margin: '-6px 0 0', lineHeight: 1.4 }}>Apágala si tu imagen ya trae el texto. No hace falta moverla fuera con X/Y.</p>
                           <div>
                             <label style={lbl}>Título</label>
                             <input className="input-dark" type="text" value={configs.contact_hero_title ?? 'Ponte en <span class="lime-text">Contacto</span>'} onChange={e => updateConfig('contact_hero_title', e.target.value)} />
