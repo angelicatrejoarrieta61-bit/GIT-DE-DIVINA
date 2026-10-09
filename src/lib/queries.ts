@@ -213,6 +213,21 @@ export const updateOrderStatus = async (id: string, status: Order['status']): Pr
   await supabase.from('orders').update({ status }).eq('id', id);
 };
 
+/** Borra los pedidos indicados. Devuelve cuántos se borraron (o null si hubo error). */
+export const deleteOrders = async (ids: string[]): Promise<number | null> => {
+  if (!ids.length) return 0;
+  const { data, error } = await supabase.from('orders').delete().in('id', ids).select('id');
+  if (error) { console.error('[deleteOrders]', error); return null; }
+  return data?.length ?? 0;
+};
+
+/** Actualiza campos de un pedido (estado, envío, notas). */
+export const updateOrder = async (id: string, patch: Partial<Order>): Promise<string | null> => {
+  const { error } = await supabase.from('orders').update(patch).eq('id', id);
+  if (error) { console.error('[updateOrder]', error); return error.message; }
+  return null;
+};
+
 export const deleteAllOrders = async (): Promise<boolean> => {
   const { error } = await supabase.from('orders').delete().not('id', 'is', null); // Evita error de casteo de UUID
   if (error) { console.error(error); return false; }

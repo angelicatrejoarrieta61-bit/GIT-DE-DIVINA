@@ -64,6 +64,14 @@ export interface Order {
   commission_amount?: number;
   commission_status?: 'not_applicable' | 'pending' | 'paid' | 'cancelled';
   commission_paid_at?: string;
+  shipping_carrier?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  shipped_at?: string | null;
+  internal_note?: string | null;
+  admin_notified_at?: string | null;
+  customer_notified_at?: string | null;
+  shipping_notified_at?: string | null;
 }
 
 export interface Promoter {

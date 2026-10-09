@@ -181,6 +181,8 @@ export const CheckoutPage: React.FC = () => {
         return;
       }
       await updateOrderStatus(order.id, 'paid');
+      // Aviso de pedido nuevo + confirmación al cliente (el servidor evita duplicados)
+      void fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId: order.id }), keepalive: true }).catch(() => {});
       trackEvent('purchase', {
         transaction_id: order.id, currency: 'MXN', value: finalTotal,
         coupon: couponCode || undefined, items: analyticsItems(items),

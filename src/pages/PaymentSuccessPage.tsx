@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 export const PaymentSuccessPage: React.FC = () => {
   const [params] = useSearchParams();
   const orderId = params.get('order');
+
+  // Respaldo del aviso de pedido nuevo (p. ej. pagos que regresan de la verificación del banco).
+  // El servidor solo envía si el pedido está pagado y aún no se avisó.
+  useEffect(() => {
+    if (!orderId) return;
+    void fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'order-paid', orderId }),
+    }).catch(() => {});
+  }, [orderId]);
 
   return (
     <div

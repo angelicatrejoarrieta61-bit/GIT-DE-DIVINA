@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, getImageUrl } from '../../lib/supabase';
 import type { Promoter } from '../../types';
 import { AssetUploader } from '../../components/AssetUploader';
@@ -54,6 +55,14 @@ export const AdminNewsletter: React.FC = () => {
   const [editingSub, setEditingSub] = useState<Subscriber | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ── Destinatarios que llegan desde Pedidos → Clientes (?para=correo1,correo2) ──
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedRef = useRef<string[]>(
+    (searchParams.get('para') || '').split(',').map(e => e.trim().toLowerCase()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  );
+  const [fromOrders, setFromOrders] = useState<{ selected: number; missing: string[] } | null>(null);
+  const [addingMissing, setAddingMissing] = useState(false);
+
   // ── Filtrado de la base de datos ──
   const filteredSubs = subscribers.filter(s =>
     s.email.toLowerCase().includes(searchSub.toLowerCase()) ||
@@ -98,7 +107,17 @@ export const AdminNewsletter: React.FC = () => {
         .from('subscribers')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) setSubscribers(data);
+      if (!error && data) {
+        setSubscribers(data);
+        // Preselecciona a los clientes enviados desde Pedidos
+        const wanted = requestedRef.current;
+        if (wanted.length) {
+          const byEmail = new Map(data.map((sub: Subscriber) => [sub.email.toLowerCase(), sub.id]));
+          const ids = wanted.map(e => byEmail.get(e)).filter(Boolean) as string[];
+          setSelectedIds(new Set(ids));
+          setFromOrders({ selected: ids.length, missing: wanted.filter(e => !byEmail.has(e)) });
+        }
+      }
     } catch { /* tabla no existe aún */ }
     setLoading(false);
   }, []);
@@ -547,8 +566,44 @@ export const AdminNewsletter: React.FC = () => {
   // Bloques de tipo products para el selector del panel derecho
   const productBlocks = blocks.filter(b => b.type === 'products');
 
+  /** Agrega a la lista los clientes que aún no están y los deja seleccionados. */
+  const addMissingFromOrders = async () => {
+    if (!fromOrders?.missing.length) return;
+    setAddingMissing(true);
+    const rows = fromOrders.missing.map(email => ({ email, source: 'cliente_pedido' }));
+    const { data, error } = await supabase.from('subscribers').upsert(rows, { onConflict: 'email' }).select('*');
+    setAddingMissing(false);
+    if (error) { alert('No se pudieron agregar: ' + error.message); return; }
+    const added = (data || []) as Subscriber[];
+    setSubscribers(prev => [...added.filter(a => !prev.some(p => p.id === a.id)), ...prev]);
+    setSelectedIds(prev => new Set([...prev, ...added.map(a => a.id)]));
+    setFromOrders(prev => prev ? { selected: prev.selected + added.length, missing: [] } : prev);
+  };
+
+  const closeFromOrders = () => {
+    setFromOrders(null);
+    requestedRef.current = [];
+    searchParams.delete('para');
+    setSearchParams(searchParams, { replace: true });
+  };
+
   return (
     <div className="admin-newsletter" style={{ display: 'flex', height: 'calc(100vh - 40px)', gap: 20, padding: '10px' }}>
+      {fromOrders && (
+        <div role="status" style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', maxWidth: 'calc(100vw - 32px)', padding: '9px 12px 9px 16px', borderRadius: 10, background: '#141415', border: '1px solid rgba(196,252,21,0.45)', boxShadow: '0 14px 40px rgba(0,0,0,0.55)', fontSize: 13, color: '#fff' }}>
+          <span><strong style={{ color: 'var(--c-lime)' }}>{fromOrders.selected}</strong> cliente{fromOrders.selected === 1 ? '' : 's'} de Pedidos seleccionado{fromOrders.selected === 1 ? '' : 's'}.</span>
+          {fromOrders.missing.length > 0 && (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.65)' }}>{fromOrders.missing.length} no está{fromOrders.missing.length === 1 ? '' : 'n'} en tu lista ({fromOrders.missing.slice(0, 2).join(', ')}{fromOrders.missing.length > 2 ? '…' : ''}).</span>
+              <button type="button" onClick={() => void addMissingFromOrders()} disabled={addingMissing} style={{ height: 28, padding: '0 12px', borderRadius: 7, border: 0, background: 'var(--c-lime)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                {addingMissing ? 'Agregando…' : 'Agregar y seleccionar'}
+              </button>
+            </>
+          )}
+          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>Arma tu correo y presiona Enviar.</span>
+          <button type="button" onClick={closeFromOrders} aria-label="Cerrar aviso" style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>×</button>
+        </div>
+      )}
 
       {/* ── IZQUIERDA: Controles de Bloques ── */}
       <aside className="admin-card glass" style={{ width: 240, padding: 16, flexShrink: 0, overflowY: 'auto' }}>

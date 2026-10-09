@@ -1,316 +1,449 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { getOrders, updateOrderStatus, deleteUnpaidOrders } from '../../lib/queries';
+/**
+ * AdminOrderReports.tsx — Pedidos y clientes (/admin/reportes)
+ * Resumen en fichas, búsqueda, filtros por estado y periodo, selección múltiple,
+ * borrar, marcar como enviado (paquetería + guía + aviso por correo), etiqueta
+ * imprimible, avisos de pedido nuevo y acceso a campañas desde Clientes.
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Search, RefreshCw, Download, Settings2, Truck, Tag, Trash2, ChevronDown, ChevronRight,
+  Mail, MessageCircle, Copy, Check, X, Send, Package, Users, AlertTriangle,
+} from 'lucide-react';
+import { getOrders, deleteOrders, updateOrder, getStoreConfig } from '../../lib/queries';
+import { supabase, getImageUrl } from '../../lib/supabase';
 import type { Order, CartItem } from '../../types';
+import './AdminOrders.css';
 
-type StatusType = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
-type TabType = 'orders' | 'customers';
+type Status = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+type Tab = 'orders' | 'customers';
+type Period = 'all' | 'today' | '7d' | '30d' | 'month';
 
-const STATUS_LABELS: Record<StatusType, { label: string; color: string; bg: string }> = {
-  pending:   { label: 'Pendiente',   color: '#FFC107', bg: 'rgba(255,193,7,0.12)'  },
-  paid:      { label: 'Pagado',      color: '#4CAF50', bg: 'rgba(76,175,80,0.12)'  },
-  shipped:   { label: 'Enviado',     color: '#2196F3', bg: 'rgba(33,150,243,0.12)' },
-  delivered: { label: 'Entregado',   color: '#9C27B0', bg: 'rgba(156,39,176,0.12)' },
-  cancelled: { label: 'Cancelado',   color: '#ff6b6b', bg: 'rgba(255,107,107,0.12)'},
+const STATUS: Record<Status, { label: string; tone: string }> = {
+  pending:   { label: 'Sin pagar',  tone: 'warn' },
+  paid:      { label: 'Por enviar', tone: 'ok' },
+  shipped:   { label: 'Enviado',    tone: 'info' },
+  delivered: { label: 'Entregado',  tone: 'done' },
+  cancelled: { label: 'Cancelado',  tone: 'bad' },
 };
+const PAID: Status[] = ['paid', 'shipped', 'delivered'];
+const CARRIERS = ['Estafeta', 'DHL', 'FedEx', 'Paquetexpress', 'Redpack', '99 Minutos', 'Correos de México', 'Entrega local', 'Otra'];
+const PERIODS: Record<Period, string> = { all: 'Todo', today: 'Hoy', '7d': '7 días', '30d': '30 días', month: 'Este mes' };
 
-function fmtDate(iso?: string) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const CFG_KEYS = ['orders_notify_email', 'ship_from_name', 'ship_from_phone', 'ship_from_address', 'ship_from_city', 'ship_from_state', 'ship_from_zip'] as const;
+type ShipCfg = Record<(typeof CFG_KEYS)[number], string>;
+const EMPTY_CFG: ShipCfg = { orders_notify_email: 'admin@divinastore.com.mx', ship_from_name: 'Divina Store MX', ship_from_phone: '', ship_from_address: '', ship_from_city: '', ship_from_state: '', ship_from_zip: '' };
+
+const shortId = (id: string) => id.slice(0, 8).toUpperCase();
+const money = (n: number) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtDate = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) + ' ' + new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '—';
+const itemsOf = (o: Order): CartItem[] => (Array.isArray(o.items) ? o.items : []);
+const unitsOf = (o: Order) => itemsOf(o).reduce((s, i) => s + (i.quantity || 0), 0);
+const phoneDigits = (p?: string) => (p || '').replace(/\D/g, '');
+const waLink = (p?: string, text = '') => {
+  const d = phoneDigits(p);
+  if (d.length < 10) return null;
+  const full = d.length === 10 ? `52${d}` : d;
+  return `https://wa.me/${full}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+};
+const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+function inPeriod(iso: string | undefined, p: Period) {
+  if (p === 'all') return true;
+  if (!iso) return false;
+  const d = new Date(iso); const now = new Date();
+  if (p === 'today') return d.toDateString() === now.toDateString();
+  if (p === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  const days = p === '7d' ? 7 : 30;
+  return now.getTime() - d.getTime() <= days * 86_400_000;
 }
-function fmtMXN(n: number) { return n.toLocaleString('es-MX', { minimumFractionDigits: 2 }); }
 
-/* ── CSV Export Helper ── */
 function downloadCSV(filename: string, rows: string[][]) {
-  const bom = '\uFEFF';
   const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
 }
 
-/* ── Unique Customer type ── */
-interface UniqueCustomer {
-  email: string;
-  name: string;
-  phone: string;
-  city: string;
-  state: string;
-  totalOrders: number;
-  totalSpent: number;
-  lastOrder: string;
-  acceptsMarketing: boolean;
+interface Customer {
+  email: string; name: string; phone: string; city: string; state: string;
+  orders: number; spent: number; last: string; marketing: boolean;
 }
+
+/** Etiqueta 4×6" imprimible en una ventana nueva. */
+function printLabel(o: Order, cfg: ShipCfg) {
+  const w = window.open('', '_blank', 'width=520,height=760');
+  if (!w) { alert('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio.'); return; }
+  const from = [cfg.ship_from_address, [cfg.ship_from_city, cfg.ship_from_state].filter(Boolean).join(', '), cfg.ship_from_zip ? `CP ${cfg.ship_from_zip}` : ''].filter(Boolean);
+  const to = [o.customer_address, o.customer_neighborhood, [o.customer_city, o.customer_state].filter(Boolean).join(', '), o.customer_zip ? `CP ${o.customer_zip}` : ''].filter(Boolean);
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiqueta #${shortId(o.id)}</title>
+<style>
+  @page { size: 4in 6in; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #e9e9e9; }
+  .label { width: 4in; height: 6in; margin: 12px auto; background: #fff; padding: 0.22in; display: flex; flex-direction: column; gap: 0.12in; border: 1px solid #bbb; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #000; padding-bottom: 6px; }
+  .brand { font-size: 20px; font-weight: 800; letter-spacing: 4px; }
+  .num { font-size: 11px; text-align: right; } .num b { display: block; font-size: 20px; letter-spacing: 1px; }
+  .k { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #444; margin-bottom: 3px; }
+  .from { font-size: 11px; line-height: 1.35; }
+  .to { border: 2px solid #000; border-radius: 6px; padding: 0.12in; flex: 1; }
+  .to .name { font-size: 20px; font-weight: 800; line-height: 1.15; margin-bottom: 6px; }
+  .to .addr { font-size: 15px; line-height: 1.35; }
+  .to .ref { font-size: 12px; margin-top: 6px; } .to .tel { font-size: 15px; font-weight: 700; margin-top: 8px; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; border-top: 1px dashed #000; padding-top: 6px; }
+  .actions { width: 4in; margin: 0 auto 16px; display: flex; gap: 8px; }
+  .actions button { flex: 1; padding: 10px; font-size: 14px; font-weight: 700; border-radius: 8px; border: 0; cursor: pointer; background: #12261f; color: #fff; }
+  @media print { body { background: #fff; } .label { margin: 0; border: 0; } .actions { display: none; } }
+</style></head><body>
+<div class="label">
+  <div class="top"><div class="brand">DIVINA</div><div class="num">Pedido<b>#${shortId(o.id)}</b></div></div>
+  <div class="from"><div class="k">Remitente</div><strong>${esc(cfg.ship_from_name || 'Divina Store MX')}</strong>${cfg.ship_from_phone ? ' · ' + esc(cfg.ship_from_phone) : ''}<br>${from.map(esc).join('<br>') || '<em>Configura tu dirección de envío en Pedidos → Ajustes</em>'}</div>
+  <div class="to"><div class="k">Destinatario</div>
+    <div class="name">${esc(o.customer_name || '—')}</div>
+    <div class="addr">${to.map(esc).join('<br>')}</div>
+    ${o.customer_reference ? `<div class="ref"><strong>Referencia:</strong> ${esc(o.customer_reference)}</div>` : ''}
+    ${o.customer_phone ? `<div class="tel">Tel. ${esc(o.customer_phone)}</div>` : ''}
+  </div>
+  <div class="meta"><span>${unitsOf(o)} pieza(s)</span><span>${o.shipping_carrier ? esc(o.shipping_carrier) : ''}${o.tracking_number ? ' · ' + esc(o.tracking_number) : ''}</span><span>${new Date(o.created_at || Date.now()).toLocaleDateString('es-MX')}</span></div>
+</div>
+<div class="actions"><button onclick="window.print()">Imprimir</button><button onclick="window.close()" style="background:#777">Cerrar</button></div>
+</body></html>`);
+  w.document.close();
+}
+
+/* ───────────────────────────────────────────────────────────────── */
 
 export const AdminOrderReports: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabType>('orders');
-  const [filterStatus, setFilterStatus] = useState<StatusType | 'all'>('all');
-  const [search, setSearch] = useState('');
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('orders');
+  const [status, setStatus] = useState<Status | 'all'>('all');
+  const [period, setPeriod] = useState<Period>('all');
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState<string | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [custSel, setCustSel] = useState<Set<string>>(new Set());
+  const [confirmDel, setConfirmDel] = useState<string | null>(null); // id o 'bulk'
+  const [busy, setBusy] = useState<string | null>(null);
+  const [shipFor, setShipFor] = useState<Order | null>(null);
+  const [showCfg, setShowCfg] = useState(false);
+  const [cfg, setCfg] = useState<ShipCfg>(EMPTY_CFG);
+  const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => { loadOrders(); }, []);
+  const notify = useCallback((kind: 'ok' | 'err', text: string) => {
+    setToast({ kind, text });
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3800);
+  }, []);
 
-  const loadOrders = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setOrders(await getOrders());
     setLoading(false);
-  };
+  }, []);
 
-  const handleStatusChange = async (id: string, s: StatusType) => {
-    setUpdatingId(id);
-    await updateOrderStatus(id, s);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: s } : o));
-    setUpdatingId(null);
-  };
+  useEffect(() => {
+    void load();
+    getStoreConfig().then(c => setCfg(prev => {
+      const next = { ...prev };
+      CFG_KEYS.forEach(k => { if (c[k] !== undefined && c[k] !== '') next[k] = c[k]; });
+      return next;
+    }));
+  }, [load]);
 
-  const handleDeleteAll = async () => {
-    if (window.confirm('🚨 ¿ESTÁS SEGURO? Esto borrará todos los pedidos de prueba (no pagados) de la base de datos permanentemente. Se conservarán únicamente los pedidos aprobados/pagados.')) {
-      setLoading(true);
-      const success = await deleteUnpaidOrders();
-      if (success) {
-        await loadOrders();
-        alert('Los pedidos de prueba (no pagados) han sido eliminados de forma permanente.');
-      } else {
-        alert('Error al intentar borrar los pedidos de prueba.');
-      }
-      setLoading(false);
-    }
-  };
+  /* ── Datos derivados ── */
+  const inRange = useMemo(() => orders.filter(o => inPeriod(o.created_at, period)), [orders, period]);
 
-  /* ── Filtered orders ── */
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return orders.filter(o => {
-      if (filterStatus !== 'all' && o.status !== filterStatus) return false;
-      if (q && !(o.customer_name || '').toLowerCase().includes(q)
-            && !(o.customer_email || '').toLowerCase().includes(q)
-            && !o.id.toLowerCase().includes(q)) return false;
-      return true;
+    const t = q.trim().toLowerCase();
+    return inRange.filter(o => {
+      if (status !== 'all' && (o.status || 'pending') !== status) return false;
+      if (!t) return true;
+      return [o.customer_name, o.customer_email, o.customer_phone, o.id, o.tracking_number, o.customer_city]
+        .some(v => (v || '').toLowerCase().includes(t))
+        || itemsOf(o).some(i => (i.product?.name || '').toLowerCase().includes(t));
     });
-  }, [orders, filterStatus, search]);
+  }, [inRange, status, q]);
 
-  /* ── Unique customers ── */
-  const customers = useMemo<UniqueCustomer[]>(() => {
-    const map = new Map<string, UniqueCustomer>();
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: inRange.length };
+    (Object.keys(STATUS) as Status[]).forEach(k => { c[k] = inRange.filter(o => (o.status || 'pending') === k).length; });
+    return c;
+  }, [inRange]);
+
+  const kpi = useMemo(() => {
+    const paid = inRange.filter(o => PAID.includes((o.status || 'pending') as Status));
+    const sales = paid.reduce((s, o) => s + (o.total || 0), 0);
+    return {
+      sales, paidCount: paid.length,
+      avg: paid.length ? sales / paid.length : 0,
+      toShip: inRange.filter(o => o.status === 'paid').length,
+      unpaid: inRange.filter(o => (o.status || 'pending') === 'pending').length,
+    };
+  }, [inRange]);
+
+  const customers = useMemo<Customer[]>(() => {
+    const map = new Map<string, Customer>();
     orders.forEach(o => {
       const email = (o.customer_email || '').toLowerCase().trim();
       if (!email) return;
-      const prev = map.get(email);
-      if (prev) {
-        prev.totalOrders++;
-        prev.totalSpent += o.total || 0;
-        if (o.created_at && o.created_at > prev.lastOrder) {
-          prev.lastOrder = o.created_at;
-          prev.name = o.customer_name || prev.name;
-          prev.phone = o.customer_phone || prev.phone;
-          prev.city = o.customer_city || prev.city;
-          prev.state = o.customer_state || prev.state;
-        }
-        if (o.accepts_marketing) prev.acceptsMarketing = true;
-      } else {
-        map.set(email, {
-          email, name: o.customer_name || '', phone: o.customer_phone || '',
-          city: o.customer_city || '', state: o.customer_state || '',
-          totalOrders: 1, totalSpent: o.total || 0,
-          lastOrder: o.created_at || '', acceptsMarketing: !!o.accepts_marketing,
-        });
+      const counted = PAID.includes((o.status || 'pending') as Status);
+      const c = map.get(email) ?? { email, name: '', phone: '', city: '', state: '', orders: 0, spent: 0, last: '', marketing: false };
+      if (counted) { c.orders++; c.spent += o.total || 0; }
+      if (!c.last || (o.created_at || '') > c.last) {
+        c.last = o.created_at || c.last; c.name = o.customer_name || c.name; c.phone = o.customer_phone || c.phone;
+        c.city = o.customer_city || c.city; c.state = o.customer_state || c.state;
       }
+      if (o.accepts_marketing) c.marketing = true;
+      map.set(email, c);
     });
-    return Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+    return [...map.values()].sort((a, b) => b.spent - a.spent || b.last.localeCompare(a.last));
   }, [orders]);
 
-  /* ── Metrics ── */
-  const metrics = useMemo(() => {
-    const paid = orders.filter(o => ['paid','delivered','shipped'].includes(o.status || ''));
-    const totalRevenue = paid.reduce((s, o) => s + (o.total || 0), 0);
-    const totalPending = orders.filter(o => o.status === 'pending').reduce((s, o) => s + (o.total || 0), 0);
-    const avg = orders.length ? orders.reduce((s, o) => s + (o.total || 0), 0) / orders.length : 0;
-    const countByStatus: Record<string, number> = {};
-    Object.keys(STATUS_LABELS).forEach(k => { countByStatus[k] = orders.filter(o => o.status === k).length; });
-    const marketingEmails = customers.filter(c => c.acceptsMarketing).length;
-    return { totalRevenue, totalPending, avg, countByStatus, uniqueCustomers: customers.length, marketingEmails };
-  }, [orders, customers]);
+  // La búsqueda filtra la tabla, no el total de clientes del resumen
+  const shownCustomers = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return t ? customers.filter(c => [c.email, c.name, c.phone, c.city].some(v => v.toLowerCase().includes(t))) : customers;
+  }, [customers, q]);
 
-  /* ── Export functions ── */
-  const exportOrders = () => {
-    const header = ['ID','Fecha','Nombre','Email','Teléfono','Dirección','Colonia','Ciudad','Estado','CP','Referencia','Productos','Qty','Total','Estado','Newsletter'];
-    const rows = [header, ...filtered.map(o => [
-      o.id.slice(0,8).toUpperCase(), fmtDate(o.created_at), o.customer_name||'', o.customer_email||'',
-      o.customer_phone||'', o.customer_address||'', o.customer_neighborhood||'',
-      o.customer_city||'', o.customer_state||'', o.customer_zip||'', o.customer_reference||'',
-      Array.isArray(o.items) ? o.items.map((i:CartItem) => i.product?.name).join(' | ') : '',
-      Array.isArray(o.items) ? String(o.items.reduce((s:number,i:CartItem) => s+i.quantity, 0)) : '',
-      '$'+fmtMXN(o.total), STATUS_LABELS[(o.status as StatusType)||'pending']?.label || o.status || '',
-      o.accepts_marketing ? 'Sí' : 'No',
-    ])];
-    downloadCSV(`divina_pedidos_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  /* ── Acciones ── */
+  const changeStatus = async (o: Order, s: Status) => {
+    setBusy(o.id);
+    const err = await updateOrder(o.id, { status: s });
+    setBusy(null);
+    if (err) return notify('err', `No se pudo cambiar el estado: ${err}`);
+    setOrders(prev => prev.map(x => x.id === o.id ? { ...x, status: s } : x));
   };
 
-  const exportCustomers = () => {
-    const header = ['Email','Nombre','Teléfono','Ciudad','Estado','Pedidos','Total Gastado','Último Pedido','Acepta Marketing'];
-    const rows = [header, ...customers.map(c => [
-      c.email, c.name, c.phone, c.city, c.state,
-      String(c.totalOrders), '$'+fmtMXN(c.totalSpent), fmtDate(c.lastOrder),
-      c.acceptsMarketing ? 'Sí' : 'No',
-    ])];
-    downloadCSV(`divina_clientes_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  const doDelete = async (ids: string[]) => {
+    setBusy('delete');
+    const n = await deleteOrders(ids);
+    setBusy(null); setConfirmDel(null);
+    if (n === null) return notify('err', 'No se pudieron borrar. Revisa que la migración de pedidos v2 esté aplicada.');
+    if (n < ids.length) notify('err', `Se borraron ${n} de ${ids.length}. Revisa los permisos de la tabla orders.`);
+    else notify('ok', n === 1 ? 'Pedido borrado.' : `${n} pedidos borrados.`);
+    setOrders(prev => prev.filter(o => !ids.includes(o.id)));
+    setSel(new Set()); if (open && ids.includes(open)) setOpen(null);
   };
 
-  const exportMarketingEmails = () => {
-    const list = customers.filter(c => c.acceptsMarketing);
-    const rows = [['Email','Nombre'], ...list.map(c => [c.email, c.name])];
-    downloadCSV(`divina_newsletter_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  const resendPaidNotice = async (o: Order) => {
+    setBusy(o.id);
+    await updateOrder(o.id, { admin_notified_at: null } as Partial<Order>);
+    const r = await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId: o.id }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(null);
+    if (!r.ok) return notify('err', d.error || 'No se pudo enviar el aviso.');
+    notify('ok', 'Aviso de pedido reenviado a tu correo.');
+    void load();
   };
 
-  const box: React.CSSProperties = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '20px 24px' };
-  const chip = (active: boolean, color: string, bg: string): React.CSSProperties => ({
-    background: active ? bg : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? color : 'rgba(255,255,255,0.08)'}`,
-    color: active ? color : 'var(--c-text-muted)', borderRadius: 100, padding: '6px 14px',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--f-sub)',
-  });
+  const copy = async (key: string, text: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(key); window.setTimeout(() => setCopied(null), 1500); } catch { notify('err', 'No se pudo copiar.'); }
+  };
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12, color: 'var(--c-text-muted)' }}>
-      <div style={{ width: 20, height: 20, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--c-lime)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-      Cargando reportes...
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+  const toggle = (set: Set<string>, id: string) => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); return n; };
+  const allVisibleSelected = filtered.length > 0 && filtered.every(o => sel.has(o.id));
 
+  const goCampaign = (emails: string[]) => navigate(`/admin/newsletter?para=${encodeURIComponent(emails.join(','))}`);
+
+  const exportOrders = () => downloadCSV(`divina_pedidos_${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['Pedido', 'Fecha', 'Estado', 'Cliente', 'Email', 'Teléfono', 'Dirección', 'Colonia', 'Ciudad', 'Estado (lugar)', 'CP', 'Referencia', 'Productos', 'Piezas', 'Total', 'Paquetería', 'Guía'],
+    ...filtered.map(o => [shortId(o.id), fmtDate(o.created_at), STATUS[(o.status || 'pending') as Status]?.label || o.status || '', o.customer_name || '', o.customer_email || '', o.customer_phone || '',
+      o.customer_address || '', o.customer_neighborhood || '', o.customer_city || '', o.customer_state || '', o.customer_zip || '', o.customer_reference || '',
+      itemsOf(o).map(i => `${i.quantity}x ${i.product?.name}`).join(' | '), String(unitsOf(o)), money(o.total), o.shipping_carrier || '', o.tracking_number || '']),
+  ]);
+  const exportCustomers = () => downloadCSV(`divina_clientes_${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['Email', 'Nombre', 'Teléfono', 'Ciudad', 'Estado', 'Compras pagadas', 'Total', 'Último pedido', 'Acepta marketing'],
+    ...customers.map(c => [c.email, c.name, c.phone, c.city, c.state, String(c.orders), money(c.spent), fmtDate(c.last), c.marketing ? 'Sí' : 'No']),
+  ]);
+
+  /* ── Render ── */
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 1200, margin: '0 auto', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 28 }}>
+    <div className="ord">
+      {/* Encabezado */}
+      <header className="ord-head">
         <div>
-          <h2 style={{ fontSize: 22, color: 'var(--c-lime)', marginBottom: 6 }}>📊 Reportes de Pedidos y Clientes</h2>
-          <p style={{ color: 'var(--c-text-muted)', fontSize: 13, margin: 0 }}>Gestión completa de pedidos, clientes y datos para email marketing.</p>
+          <h1 className="ord-title">Pedidos</h1>
+          <p className="ord-sub">Avisos de pedidos nuevos a <strong>{cfg.orders_notify_email || 'sin configurar'}</strong></p>
         </div>
-        <div style={{ textAlign: 'right' }}>
-           <p style={{ fontSize: '11px', color: '#888', margin: '0 0 4px' }}>Notificaciones de compras: <strong>admin@divinastore.com.mx</strong></p>
-           <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px' }}>Gestión de Info/Newsletter: <strong>info@divinastore.com.mx</strong></p>
-           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-             <button onClick={handleDeleteAll} style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff6b6b', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>🗑️ Empezar de Cero</button>
-             <button onClick={loadOrders} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>🔄 Actualizar</button>
-           </div>
+        <div className="ord-head__actions">
+          <button type="button" className="ord-btn" onClick={() => void load()} disabled={loading} title="Volver a cargar">
+            <RefreshCw size={14} className={loading ? 'ord-spin' : ''} aria-hidden="true" /> Actualizar
+          </button>
+          <button type="button" className="ord-btn" onClick={tab === 'orders' ? exportOrders : exportCustomers}>
+            <Download size={14} aria-hidden="true" /> CSV
+          </button>
+          <button type="button" className={`ord-btn ${showCfg ? 'is-on' : ''}`} onClick={() => setShowCfg(v => !v)} aria-expanded={showCfg}>
+            <Settings2 size={14} aria-hidden="true" /> Ajustes
+          </button>
         </div>
+      </header>
+
+      {showCfg && <ConfigPanel cfg={cfg} onSaved={(c) => { setCfg(c); setShowCfg(false); notify('ok', 'Ajustes guardados.'); }} onError={(m) => notify('err', m)} />}
+
+      {/* Resumen en fichas */}
+      <div className="ord-kpis" role="list">
+        <Kpi label="Ventas" value={money(kpi.sales)} hint={`${kpi.paidCount} pagados`} />
+        <Kpi label="Ticket prom." value={money(kpi.avg)} />
+        <Kpi label="Por enviar" value={String(kpi.toShip)} tone={kpi.toShip ? 'ok' : undefined} onClick={() => { setTab('orders'); setStatus('paid'); }} />
+        <Kpi label="Sin pagar" value={String(kpi.unpaid)} tone={kpi.unpaid ? 'warn' : undefined} onClick={() => { setTab('orders'); setStatus('pending'); }} />
+        <Kpi label="Clientes" value={String(customers.length)} onClick={() => setTab('customers')} />
+        <label className="ord-period">
+          <span className="ord-visually-hidden">Periodo</span>
+          <select value={period} onChange={e => setPeriod(e.target.value as Period)} aria-label="Periodo">
+            {(Object.keys(PERIODS) as Period[]).map(p => <option key={p} value={p}>{PERIODS[p]}</option>)}
+          </select>
+        </label>
       </div>
 
-      {/* ── Metrics ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 28 }}>
-        {[
-          { label: 'Ventas Totales', value: `$${fmtMXN(metrics.totalRevenue)}`, color: 'var(--c-lime)' },
-          { label: 'Pendiente', value: `$${fmtMXN(metrics.totalPending)}`, color: '#FFC107' },
-          { label: 'Pedidos', value: orders.length, color: '#fff' },
-          { label: 'Ticket Promedio', value: `$${fmtMXN(metrics.avg)}`, color: '#aaa' },
-          { label: 'Clientes Únicos', value: metrics.uniqueCustomers, color: '#2196F3' },
-          { label: 'Newsletter', value: `${metrics.marketingEmails} suscriptores`, color: '#9C27B0' },
-        ].map(m => (
-          <div key={m.label} style={box}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-text-muted)', margin: '0 0 4px' }}>{m.label}</p>
-            <p style={{ fontSize: 20, fontWeight: 800, fontFamily: 'var(--f-heading)', color: m.color, margin: 0 }}>{m.value}</p>
+      {/* Pestañas + buscador */}
+      <div className="ord-bar">
+        <div className="ord-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'orders'} className={tab === 'orders' ? 'is-on' : ''} onClick={() => setTab('orders')}>
+            <Package size={13} aria-hidden="true" /> Pedidos <em>{inRange.length}</em>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'customers'} className={tab === 'customers' ? 'is-on' : ''} onClick={() => setTab('customers')}>
+            <Users size={13} aria-hidden="true" /> Clientes <em>{customers.length}</em>
+          </button>
+        </div>
+        <label className="ord-search">
+          <Search size={14} aria-hidden="true" />
+          <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={tab === 'orders' ? 'Buscar cliente, correo, # pedido, guía o producto' : 'Buscar cliente, correo o ciudad'} aria-label="Buscar" />
+          {q && <button type="button" onClick={() => setQ('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
+        </label>
+      </div>
+
+      {tab === 'orders' && (
+        <>
+          <div className="ord-chips" role="group" aria-label="Filtrar por estado">
+            {(['all', ...Object.keys(STATUS)] as (Status | 'all')[]).map(s => (
+              <button key={s} type="button" className={`ord-chip ${status === s ? 'is-on' : ''} ${s !== 'all' ? `t-${STATUS[s as Status].tone}` : ''}`} onClick={() => setStatus(s)} aria-pressed={status === s}>
+                {s === 'all' ? 'Todos' : STATUS[s as Status].label} <em>{counts[s] ?? 0}</em>
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {([['orders', '📦 Pedidos'], ['customers', '👥 Clientes']] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} style={{
-            ...chip(tab === k, 'var(--c-lime)', 'rgba(196,252,21,0.1)'),
-            fontSize: 13, padding: '8px 20px',
-          }}>{label}</button>
-        ))}
-      </div>
+          {sel.size > 0 && (
+            <div className="ord-bulk" role="region" aria-label="Acciones de selección">
+              <span><strong>{sel.size}</strong> seleccionado{sel.size === 1 ? '' : 's'}</span>
+              <button type="button" className="ord-link" onClick={() => setSel(new Set())}>Quitar selección</button>
+              <div className="ord-bulk__right">
+                {confirmDel === 'bulk' ? (
+                  <span className="ord-confirm">
+                    <AlertTriangle size={14} aria-hidden="true" /> ¿Borrar {sel.size} pedido{sel.size === 1 ? '' : 's'} para siempre?
+                    <button type="button" className="ord-btn ord-btn--danger" disabled={busy === 'delete'} onClick={() => void doDelete([...sel])}>{busy === 'delete' ? 'Borrando…' : 'Sí, borrar'}</button>
+                    <button type="button" className="ord-btn" onClick={() => setConfirmDel(null)}>No</button>
+                  </span>
+                ) : (
+                  <button type="button" className="ord-btn ord-btn--danger" onClick={() => setConfirmDel('bulk')}><Trash2 size={14} aria-hidden="true" /> Borrar seleccionados</button>
+                )}
+              </div>
+            </div>
+          )}
 
-      {/* ═══════════════ ORDERS TAB ═══════════════ */}
-      {tab === 'orders' && (<>
-        {/* Filters + export */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {(['all', ...Object.keys(STATUS_LABELS)] as const).map(s => {
-              const info = s === 'all'
-                ? { label: `Todos (${orders.length})`, color: '#fff', bg: 'rgba(255,255,255,0.06)' }
-                : { ...STATUS_LABELS[s as StatusType], label: `${STATUS_LABELS[s as StatusType].label} (${metrics.countByStatus[s]??0})` };
-              return <button key={s} onClick={() => setFilterStatus(s as any)} style={chip(filterStatus === s, info.color, info.bg)}>{info.label}</button>;
-            })}
-          </div>
-          <button onClick={exportOrders} style={{ background: 'var(--c-lime)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Exportar CSV</button>
-        </div>
-
-        <input type="text" className="input-dark" placeholder="🔍 Buscar por nombre, email o ID..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 420, marginBottom: 16 }} />
-
-        {filtered.length === 0 ? (
-          <div style={{ ...box, textAlign: 'center', padding: 48, color: 'var(--c-text-muted)' }}>📭 Sin pedidos con estos filtros.</div>
-        ) : (
-          <div style={{ ...box, padding: 0, overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          {loading ? <div className="ord-empty">Cargando pedidos…</div> : filtered.length === 0 ? (
+            <div className="ord-empty">{orders.length === 0 ? 'Aún no hay pedidos.' : 'Ningún pedido coincide con estos filtros.'}</div>
+          ) : (
+            <div className="ord-table-wrap">
+              <table className="ord-table">
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                    {['#','Fecha','Cliente','Email','Tel','Total','Estado','Cambiar'].map(h => (
-                      <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                  <tr>
+                    <th className="c-check"><input type="checkbox" checked={allVisibleSelected} onChange={() => setSel(allVisibleSelected ? new Set() : new Set(filtered.map(o => o.id)))} aria-label="Seleccionar todos" /></th>
+                    <th>Pedido</th><th>Cliente</th><th className="c-num c-hide-sm">Pzs</th><th className="c-num">Total</th><th>Estado</th><th className="c-hide-sm">Envío</th><th className="c-act">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((o, idx) => {
-                    const si = STATUS_LABELS[(o.status as StatusType) ?? 'pending'] ?? STATUS_LABELS.pending;
-                    const exp = expandedOrder === o.id;
+                  {filtered.map(o => {
+                    const st = (o.status || 'pending') as Status;
+                    const isOpen = open === o.id;
                     return (
                       <React.Fragment key={o.id}>
-                        <tr onClick={() => setExpandedOrder(exp ? null : o.id)} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: exp ? 'rgba(196,252,21,0.03)' : idx%2===0 ? 'transparent' : 'rgba(255,255,255,0.01)', cursor: 'pointer' }}>
-                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 11, color: '#666' }}>{o.id.slice(0,8).toUpperCase()}</td>
-                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{fmtDate(o.created_at)}</td>
-                          <td style={{ padding: '10px 14px', fontWeight: 600 }}>{o.customer_name || '—'}</td>
-                          <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--c-text-muted)' }}>{o.customer_email || '—'}</td>
-                          <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--c-text-muted)' }}>{o.customer_phone || '—'}</td>
-                          <td style={{ padding: '10px 14px', fontFamily: 'var(--f-heading)', color: 'var(--c-lime)', fontWeight: 700 }}>${fmtMXN(o.total)}</td>
-                          <td style={{ padding: '10px 14px' }}>
-                            <span style={{ background: si.bg, color: si.color, border: `1px solid ${si.color}33`, borderRadius: 100, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{si.label}</span>
+                        <tr className={`${isOpen ? 'is-open' : ''} ${sel.has(o.id) ? 'is-sel' : ''}`}>
+                          <td className="c-check"><input type="checkbox" checked={sel.has(o.id)} onChange={() => setSel(s => toggle(s, o.id))} aria-label={`Seleccionar pedido ${shortId(o.id)}`} /></td>
+                          <td>
+                            <button type="button" className="ord-rowbtn" onClick={() => setOpen(isOpen ? null : o.id)} aria-expanded={isOpen}>
+                              {isOpen ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
+                              <span className="ord-id">#{shortId(o.id)}</span>
+                            </button>
+                            <span className="ord-date">{fmtDate(o.created_at)}</span>
                           </td>
-                          <td style={{ padding: '10px 14px' }} onClick={e => e.stopPropagation()}>
-                            <select value={o.status ?? 'pending'} disabled={updatingId === o.id} onChange={e => handleStatusChange(o.id, e.target.value as StatusType)}
-                              style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: 8, padding: '4px 8px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-                              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                          <td className="c-client"><strong>{o.customer_name || '—'}</strong><span>{o.customer_email || ''}</span></td>
+                          <td className="c-num c-hide-sm">{unitsOf(o)}</td>
+                          <td className="c-num ord-money">{money(o.total)}</td>
+                          <td>
+                            <select className={`ord-status t-${STATUS[st]?.tone}`} value={st} disabled={busy === o.id} onChange={e => void changeStatus(o, e.target.value as Status)} aria-label="Estado del pedido">
+                              {(Object.keys(STATUS) as Status[]).map(k => <option key={k} value={k}>{STATUS[k].label}</option>)}
                             </select>
                           </td>
+                          <td className="c-ship c-hide-sm">{o.tracking_number ? <><strong>{o.shipping_carrier || 'Guía'}</strong><span>{o.tracking_number}</span></> : <span className="ord-muted">—</span>}</td>
+                          <td className="c-act">
+                            {confirmDel === o.id ? (
+                              <span className="ord-confirm ord-confirm--row">
+                                ¿Borrar?
+                                <button type="button" className="ord-icon ord-icon--danger" disabled={busy === 'delete'} onClick={() => void doDelete([o.id])} aria-label="Confirmar borrar"><Check size={14} /></button>
+                                <button type="button" className="ord-icon" onClick={() => setConfirmDel(null)} aria-label="Cancelar"><X size={14} /></button>
+                              </span>
+                            ) : (
+                              <>
+                                <button type="button" className="ord-icon ord-icon--primary" onClick={() => setShipFor(o)} disabled={!PAID.includes(st)} title={!PAID.includes(st) ? 'Solo pedidos pagados' : o.tracking_number ? 'Editar envío' : 'Enviar pedido'} aria-label="Enviar pedido"><Truck size={15} /></button>
+                                <button type="button" className="ord-icon" onClick={() => printLabel(o, cfg)} title="Crear etiqueta" aria-label="Crear etiqueta"><Tag size={15} /></button>
+                                <button type="button" className="ord-icon ord-icon--danger" onClick={() => setConfirmDel(o.id)} title="Borrar pedido" aria-label="Borrar pedido"><Trash2 size={15} /></button>
+                              </>
+                            )}
+                          </td>
                         </tr>
-                        {exp && (
-                          <tr><td colSpan={8} style={{ padding: 0 }}>
-                            <div style={{ background: 'rgba(196,252,21,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '16px 20px' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
-                                <div>
-                                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-lime)', marginBottom: 8 }}>📍 Cliente</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Nombre:</strong> {o.customer_name||'—'}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Email:</strong> {o.customer_email||'—'}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Tel:</strong> {o.customer_phone||'—'}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Dirección:</strong> {o.customer_address||'—'}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Colonia:</strong> {o.customer_neighborhood||'—'}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Ciudad:</strong> {o.customer_city||'—'}, {o.customer_state||''} CP {o.customer_zip||''}</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Ref:</strong> {o.customer_reference||'—'}</p>
-                                  <p style={{ fontSize: 12, color: o.accepts_marketing ? '#9C27B0' : '#666', margin: '4px 0 0', fontWeight: 600 }}>
-                                    {o.accepts_marketing ? '✅ Acepta marketing' : '❌ No acepta marketing'}
-                                  </p>
+                        {isOpen && (
+                          <tr className="ord-detail"><td colSpan={8}>
+                            <div className="ord-detail__grid">
+                              <section>
+                                <h4>Productos</h4>
+                                <ul className="ord-items">
+                                  {itemsOf(o).length ? itemsOf(o).map((i, k) => (
+                                    <li key={k}>
+                                      {i.product?.image_url ? <img src={getImageUrl(i.product.image_url, { width: 80, quality: 70 })} alt="" /> : <span className="ord-thumb" />}
+                                      <span className="ord-items__name">{i.quantity}× {i.product?.name || 'Producto'}</span>
+                                      <span className="ord-money">{money((i.product?.price || 0) * (i.quantity || 0))}</span>
+                                    </li>
+                                  )) : <li className="ord-muted">Sin detalle de productos</li>}
+                                </ul>
+                                <p className="ord-total">Total <strong>{money(o.total)} MXN</strong></p>
+                                {o.promoter_code && <p className="ord-muted">Promotora: {o.promoter_code}</p>}
+                              </section>
+                              <section>
+                                <h4>Enviar a</h4>
+                                <p className="ord-addr">
+                                  <strong>{o.customer_name || '—'}</strong><br />
+                                  {[o.customer_address, o.customer_neighborhood, [o.customer_city, o.customer_state].filter(Boolean).join(', '), o.customer_zip && `CP ${o.customer_zip}`].filter(Boolean).join(' · ')}
+                                  {o.customer_reference && <><br /><em>Ref: {o.customer_reference}</em></>}
+                                </p>
+                                <div className="ord-inline">
+                                  <button type="button" className="ord-btn" onClick={() => void copy(`a-${o.id}`, [o.customer_name, o.customer_address, o.customer_neighborhood, o.customer_city, o.customer_state, o.customer_zip && `CP ${o.customer_zip}`, o.customer_phone && `Tel ${o.customer_phone}`].filter(Boolean).join(', '))}>
+                                    {copied === `a-${o.id}` ? <Check size={13} /> : <Copy size={13} />} Copiar dirección
+                                  </button>
+                                  <button type="button" className="ord-btn" onClick={() => printLabel(o, cfg)}><Tag size={13} /> Etiqueta</button>
                                 </div>
-                                <div>
-                                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-lime)', marginBottom: 8 }}>📦 Productos</p>
-                                  {Array.isArray(o.items) && o.items.length > 0 ? o.items.map((item: CartItem, i: number) => (
-                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.quantity}× {item.product?.name || 'Producto'}</span>
-                                      <span style={{ fontSize: 12, color: 'var(--c-lime)', fontWeight: 600 }}>${fmtMXN((item.product?.price||0)*item.quantity)}</span>
-                                    </div>
-                                  )) : <p style={{ fontSize: 12, color: '#666' }}>Sin detalle</p>}
+                              </section>
+                              <section>
+                                <h4>Contacto y avisos</h4>
+                                <div className="ord-inline">
+                                  {o.customer_email && <a className="ord-btn" href={`mailto:${o.customer_email}?subject=${encodeURIComponent(`Tu pedido #${shortId(o.id)} en Divina Store`)}`}><Mail size={13} /> Correo</a>}
+                                  {waLink(o.customer_phone, `Hola ${o.customer_name?.split(' ')[0] || ''}, te escribimos de Divina Store por tu pedido #${shortId(o.id)}.`) && (
+                                    <a className="ord-btn" href={waLink(o.customer_phone, `Hola ${o.customer_name?.split(' ')[0] || ''}, te escribimos de Divina Store por tu pedido #${shortId(o.id)}.`)!} target="_blank" rel="noreferrer"><MessageCircle size={13} /> WhatsApp</a>
+                                  )}
                                 </div>
-                                <div>
-                                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-lime)', marginBottom: 8 }}>💰 Resumen</p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>ID:</strong> <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{o.id}</span></p>
-                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 3px' }}><strong>Fecha:</strong> {fmtDate(o.created_at)}</p>
-                                  <p style={{ fontSize: 22, fontFamily: 'var(--f-heading)', color: 'var(--c-lime)', margin: '8px 0 0' }}>${fmtMXN(o.total)} MXN</p>
-                                </div>
-                              </div>
+                                <ul className="ord-log">
+                                  <li className={o.admin_notified_at ? 'is-ok' : ''}>Aviso a ti: {o.admin_notified_at ? fmtDate(o.admin_notified_at) : 'no enviado'}</li>
+                                  <li className={o.customer_notified_at ? 'is-ok' : ''}>Confirmación al cliente: {o.customer_notified_at ? fmtDate(o.customer_notified_at) : 'no enviada'}</li>
+                                  <li className={o.shipping_notified_at ? 'is-ok' : ''}>Aviso de envío: {o.shipping_notified_at ? fmtDate(o.shipping_notified_at) : 'no enviado'}</li>
+                                </ul>
+                                {PAID.includes(st) && (
+                                  <button type="button" className="ord-link" disabled={busy === o.id} onClick={() => void resendPaidNotice(o)}>Reenviarme el aviso de este pedido</button>
+                                )}
+                                <NoteField order={o} onSaved={(note) => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, internal_note: note } : x))} onError={(m) => notify('err', m)} />
+                              </section>
                             </div>
                           </td></tr>
                         )}
@@ -319,59 +452,209 @@ export const AdminOrderReports: React.FC = () => {
                   })}
                 </tbody>
               </table>
+              <p className="ord-foot">{filtered.length} de {orders.length} pedidos</p>
             </div>
-            <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: 12, color: 'var(--c-text-muted)' }}>
-              Mostrando {filtered.length} de {orders.length} pedidos
+          )}
+        </>
+      )}
+
+      {tab === 'customers' && (
+        <>
+          <div className="ord-bulk ord-bulk--soft">
+            <span>{custSel.size ? <><strong>{custSel.size}</strong> seleccionado{custSel.size === 1 ? '' : 's'}</> : 'Selecciona clientes para enviarles una campaña'}</span>
+            <div className="ord-bulk__right">
+              <button type="button" className="ord-btn" onClick={() => setCustSel(new Set(shownCustomers.filter(c => c.marketing).map(c => c.email)))}>Seleccionar los que aceptan correos</button>
+              <button type="button" className="ord-btn ord-btn--primary" disabled={!custSel.size} onClick={() => goCampaign([...custSel])}><Send size={13} aria-hidden="true" /> Enviar campaña ({custSel.size})</button>
             </div>
           </div>
-        )}
-      </>)}
-
-      {/* ═══════════════ CUSTOMERS TAB ═══════════════ */}
-      {tab === 'customers' && (<>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <p style={{ color: 'var(--c-text-muted)', fontSize: 13, margin: 0 }}>
-            {customers.length} clientes únicos · {metrics.marketingEmails} aceptan marketing
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={exportCustomers} style={{ background: 'var(--c-lime)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Exportar Clientes</button>
-            <button onClick={exportMarketingEmails} style={{ background: '#9C27B0', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📧 Exportar Newsletter</button>
-          </div>
-        </div>
-
-        <div style={{ ...box, padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                  {['Email','Nombre','Teléfono','Ciudad','Estado','Pedidos','Total Gastado','Último Pedido','Newsletter'].map(h => (
-                    <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--c-text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c, i) => (
-                  <tr key={c.email} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: i%2===0?'transparent':'rgba(255,255,255,0.01)' }}>
-                    <td style={{ padding: '10px 14px', color: '#2196F3', fontWeight: 600 }}>{c.email}</td>
-                    <td style={{ padding: '10px 14px' }}>{c.name}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--c-text-muted)' }}>{c.phone || '—'}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--c-text-muted)' }}>{c.city || '—'}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--c-text-muted)' }}>{c.state || '—'}</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700 }}>{c.totalOrders}</td>
-                    <td style={{ padding: '10px 14px', fontFamily: 'var(--f-heading)', color: 'var(--c-lime)', fontWeight: 700 }}>${fmtMXN(c.totalSpent)}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--c-text-muted)', fontSize: 12 }}>{fmtDate(c.lastOrder)}</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                      {c.acceptsMarketing
-                        ? <span style={{ color: '#4CAF50', fontWeight: 700, fontSize: 12 }}>✅ Sí</span>
-                        : <span style={{ color: '#666', fontSize: 12 }}>No</span>}
-                    </td>
+          {shownCustomers.length === 0 ? <div className="ord-empty">Sin clientes todavía.</div> : (
+            <div className="ord-table-wrap">
+              <table className="ord-table">
+                <thead>
+                  <tr>
+                    <th className="c-check"><input type="checkbox" checked={shownCustomers.length > 0 && shownCustomers.every(c => custSel.has(c.email))} onChange={() => setCustSel(shownCustomers.every(c => custSel.has(c.email)) ? new Set() : new Set(shownCustomers.map(c => c.email)))} aria-label="Seleccionar todos los clientes" /></th>
+                    <th>Cliente</th><th className="c-hide-sm">Ubicación</th><th className="c-num c-hide-sm">Compras</th><th className="c-num">Total</th><th className="c-hide-sm">Último</th><th className="c-hide-sm">Correos</th><th className="c-act">Contactar</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </>)}
+                </thead>
+                <tbody>
+                  {shownCustomers.map(c => (
+                    <tr key={c.email} className={custSel.has(c.email) ? 'is-sel' : ''}>
+                      <td className="c-check"><input type="checkbox" checked={custSel.has(c.email)} onChange={() => setCustSel(s => toggle(s, c.email))} aria-label={`Seleccionar ${c.email}`} /></td>
+                      <td className="c-client"><strong>{c.name || '—'}</strong><span>{c.email}</span></td>
+                      <td className="ord-muted c-hide-sm">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</td>
+                      <td className="c-num c-hide-sm">{c.orders}</td>
+                      <td className="c-num ord-money">{money(c.spent)}</td>
+                      <td className="ord-muted c-hide-sm">{fmtDate(c.last)}</td>
+                      <td className="c-hide-sm"><span className={`ord-tag ${c.marketing ? 't-ok' : ''}`}>{c.marketing ? 'Acepta' : 'No'}</span></td>
+                      <td className="c-act">
+                        <button type="button" className="ord-icon ord-icon--primary" onClick={() => goCampaign([c.email])} title="Enviar email (Newsletter y campañas)" aria-label={`Enviar email a ${c.email}`}><Mail size={15} /></button>
+                        {waLink(c.phone) ? <a className="ord-icon" href={waLink(c.phone, `Hola ${c.name.split(' ')[0] || ''}, te escribimos de Divina Store.`)!} target="_blank" rel="noreferrer" title="WhatsApp" aria-label={`WhatsApp a ${c.name || c.email}`}><MessageCircle size={15} /></a> : <span className="ord-icon is-ghost" aria-hidden="true" />}
+                        <button type="button" className="ord-icon" onClick={() => void copy(`e-${c.email}`, c.email)} title="Copiar correo" aria-label={`Copiar ${c.email}`}>{copied === `e-${c.email}` ? <Check size={15} /> : <Copy size={15} />}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="ord-foot">Compras y total cuentan solo pedidos pagados.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {shipFor && (
+        <ShipModal
+          order={shipFor}
+          onClose={() => setShipFor(null)}
+          onDone={(patch, msg) => { setOrders(prev => prev.map(x => x.id === shipFor.id ? { ...x, ...patch } : x)); setShipFor(null); notify(msg.kind, msg.text); }}
+          onLabel={(o) => printLabel(o, cfg)}
+        />
+      )}
+
+      {toast && <div className={`ord-toast is-${toast.kind}`} role="status">{toast.text}</div>}
     </div>
+  );
+};
+
+/* ── Ficha de resumen ── */
+const Kpi: React.FC<{ label: string; value: string; hint?: string; tone?: string; onClick?: () => void }> = ({ label, value, hint, tone, onClick }) => {
+  const inner = <><span className="ord-kpi__label">{label}</span><strong className="ord-kpi__value">{value}</strong>{hint && <span className="ord-kpi__hint">{hint}</span>}</>;
+  return onClick
+    ? <button type="button" role="listitem" className={`ord-kpi is-click ${tone ? `t-${tone}` : ''}`} onClick={onClick}>{inner}</button>
+    : <div role="listitem" className={`ord-kpi ${tone ? `t-${tone}` : ''}`}>{inner}</div>;
+};
+
+/* ── Nota interna ── */
+const NoteField: React.FC<{ order: Order; onSaved: (n: string) => void; onError: (m: string) => void }> = ({ order, onSaved, onError }) => {
+  const [v, setV] = useState(order.internal_note || '');
+  const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const dirty = v !== (order.internal_note || '');
+  return (
+    <div className="ord-note">
+      <label htmlFor={`note-${order.id}`}>Nota interna (no la ve el cliente)</label>
+      <textarea id={`note-${order.id}`} rows={2} value={v} onChange={e => { setV(e.target.value); setState('idle'); }} placeholder="Ej. comprado en Farmacias del Ahorro, llega el jueves" />
+      <button type="button" className="ord-btn" disabled={!dirty || state === 'saving'} onClick={async () => {
+        setState('saving');
+        const err = await updateOrder(order.id, { internal_note: v } as Partial<Order>);
+        if (err) { setState('idle'); return onError(`No se guardó la nota: ${err}`); }
+        setState('saved'); onSaved(v);
+      }}>{state === 'saving' ? 'Guardando…' : state === 'saved' && !dirty ? <><Check size={13} /> Guardada</> : 'Guardar nota'}</button>
+    </div>
+  );
+};
+
+/* ── Modal: enviar pedido ── */
+const ShipModal: React.FC<{
+  order: Order; onClose: () => void; onLabel: (o: Order) => void;
+  onDone: (patch: Partial<Order>, msg: { kind: 'ok' | 'err'; text: string }) => void;
+}> = ({ order, onClose, onDone, onLabel }) => {
+  const [carrier, setCarrier] = useState(order.shipping_carrier || 'Estafeta');
+  const [tracking, setTracking] = useState(order.tracking_number || '');
+  const [url, setUrl] = useState(order.tracking_url || '');
+  const [notifyCustomer, setNotifyCustomer] = useState(Boolean(order.customer_email) && !order.shipping_notified_at);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const firstRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    firstRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, saving]);
+
+  const urlOk = !url || /^https?:\/\//i.test(url.trim());
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tracking.trim() && carrier !== 'Entrega local') return setError('Escribe el número de guía.');
+    if (!urlOk) return setError('El enlace de rastreo debe empezar con https://');
+    setSaving(true); setError('');
+    const patch: Partial<Order> = { status: 'shipped', shipping_carrier: carrier, tracking_number: tracking.trim() || null, tracking_url: url.trim() || null, shipped_at: order.shipped_at || new Date().toISOString() };
+    const err = await updateOrder(order.id, patch);
+    if (err) { setSaving(false); return setError(`No se guardó: ${err}. ¿Ejecutaste la migración de pedidos v2?`); }
+    if (notifyCustomer) {
+      const { data } = await supabase.auth.getSession();
+      const r = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token || ''}` },
+        body: JSON.stringify({ type: 'order-shipped', orderId: order.id }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setSaving(false);
+      if (!r.ok) return onDone(patch, { kind: 'err', text: `Pedido marcado como enviado, pero el correo falló: ${d.error || r.status}` });
+      return onDone({ ...patch, shipping_notified_at: new Date().toISOString() }, { kind: 'ok', text: 'Pedido enviado y cliente avisado por correo.' });
+    }
+    setSaving(false);
+    onDone(patch, { kind: 'ok', text: 'Pedido marcado como enviado.' });
+  };
+
+  return (
+    <div className="ord-modal" role="dialog" aria-modal="true" aria-labelledby="ship-title" onClick={() => !saving && onClose()}>
+      <form className="ord-modal__panel" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <header>
+          <h2 id="ship-title"><Truck size={16} aria-hidden="true" /> Enviar pedido #{shortId(order.id)}</h2>
+          <button type="button" className="ord-icon" onClick={onClose} disabled={saving} aria-label="Cerrar"><X size={15} /></button>
+        </header>
+        <p className="ord-modal__to"><strong>{order.customer_name}</strong> · {[order.customer_city, order.customer_state].filter(Boolean).join(', ')}</p>
+        <div className="ord-grid2">
+          <label className="ord-field">Paquetería
+            <select ref={firstRef} value={carrier} onChange={e => setCarrier(e.target.value)}>{CARRIERS.map(c => <option key={c}>{c}</option>)}</select>
+          </label>
+          <label className="ord-field">Número de guía
+            <input value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Ej. 1234567890" autoComplete="off" />
+          </label>
+        </div>
+        <label className="ord-field">Enlace de rastreo (opcional)
+          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://… (pégalo desde la paquetería)" inputMode="url" aria-invalid={!urlOk} />
+        </label>
+        <label className="ord-check">
+          <input type="checkbox" checked={notifyCustomer} disabled={!order.customer_email} onChange={e => setNotifyCustomer(e.target.checked)} />
+          Avisar al cliente por correo{order.customer_email ? ` (${order.customer_email})` : ' (sin correo)'}{order.shipping_notified_at ? ' — ya se le avisó una vez' : ''}
+        </label>
+        {error && <p className="ord-error" role="alert">{error}</p>}
+        <footer>
+          <button type="button" className="ord-btn" onClick={() => onLabel({ ...order, shipping_carrier: carrier, tracking_number: tracking })}><Tag size={13} /> Etiqueta</button>
+          <span className="ord-spacer" />
+          <button type="button" className="ord-btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button type="submit" className="ord-btn ord-btn--primary" disabled={saving}>{saving ? 'Guardando…' : 'Marcar como enviado'}</button>
+        </footer>
+      </form>
+    </div>
+  );
+};
+
+/* ── Ajustes: correo de avisos y remitente de etiquetas ── */
+const ConfigPanel: React.FC<{ cfg: ShipCfg; onSaved: (c: ShipCfg) => void; onError: (m: string) => void }> = ({ cfg, onSaved, onError }) => {
+  const [v, setV] = useState<ShipCfg>(cfg);
+  const [saving, setSaving] = useState(false);
+  const emailsOk = v.orders_notify_email.split(',').map(x => x.trim()).filter(Boolean).every(x => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+  const field = (k: keyof ShipCfg, label: string, ph = '') => (
+    <label className="ord-field">{label}<input value={v[k]} onChange={e => setV({ ...v, [k]: e.target.value })} placeholder={ph} /></label>
+  );
+  return (
+    <section className="ord-cfg" aria-label="Ajustes de pedidos">
+      <div className="ord-cfg__grid">
+        <label className="ord-field ord-cfg__wide">Avisarme de pedidos nuevos en (separa varios con coma)
+          <input value={v.orders_notify_email} onChange={e => setV({ ...v, orders_notify_email: e.target.value })} placeholder="tu@correo.com" aria-invalid={!emailsOk} />
+        </label>
+        {field('ship_from_name', 'Remitente', 'Divina Store MX')}
+        {field('ship_from_phone', 'Teléfono remitente', '55 1234 5678')}
+        {field('ship_from_address', 'Calle y número, colonia')}
+        {field('ship_from_city', 'Ciudad / Alcaldía')}
+        {field('ship_from_state', 'Estado', 'CDMX')}
+        {field('ship_from_zip', 'CP')}
+      </div>
+      <div className="ord-inline">
+        <span className="ord-muted">El remitente sale en las etiquetas. El aviso llega cuando un pago se aprueba.</span>
+        <span className="ord-spacer" />
+        <button type="button" className="ord-btn ord-btn--primary" disabled={saving || !emailsOk} onClick={async () => {
+          setSaving(true);
+          const rows = CFG_KEYS.map(k => ({ key: k, value: v[k].trim() }));
+          const { error } = await supabase.from('store_config').upsert(rows, { onConflict: 'key' });
+          setSaving(false);
+          if (error) return onError(`No se pudieron guardar los ajustes: ${error.message}`);
+          onSaved(v);
+        }}>{saving ? 'Guardando…' : 'Guardar ajustes'}</button>
+      </div>
+    </section>
   );
 };

@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 4 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 8 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -82,7 +82,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 |---|---|
 | `products` | Catálogo. Columnas clave: `name, slug, brand, price, compare_price, image_url, images, collection_id, in_stock, stock, tags, ean, cost_price, fulfillment`. **No existe `sku`.** |
 | `collections` | Categorías: `name, slug, image_url, description, sort_order` |
-| `orders` | Pedidos. `status`: `pending`, `paid`, `shipped`, `delivered`, `cancelled` |
+| `orders` | Pedidos. `status`: `pending` (sin pagar), `paid` (por enviar), `shipped`, `delivered`, `cancelled`. Envío: `shipping_carrier`, `tracking_number`, `tracking_url`, `shipped_at`. Avisos: `admin_notified_at`, `customer_notified_at`, `shipping_notified_at`. `internal_note` (nota que no ve el cliente) |
 | `store_config` | Configuración llave–valor de toda la tienda (ver sección 8) |
 | `subscribers` | Correos del newsletter |
 | `contact_messages` | Mensajes de los formularios de contacto |
@@ -115,7 +115,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | Ruta | Pantalla |
 |---|---|
 | `/admin` | Resumen: ventas del mes, por surtir, sin foto, mensajes |
-| `/admin/reportes` | Pedidos |
+| `/admin/reportes` | Pedidos y clientes: resumen, filtros, borrar, enviar con guía, etiqueta, campañas |
 | `/admin/productos` | Catálogo unificado: precio, marca, fotos, badge, Home |
 | `/admin/abastecimiento` | Buscador de proveedores |
 | `/admin/config?section=…` | Diseño de la tienda (General, Home, colecciones, páginas, Clip) |
@@ -149,7 +149,9 @@ Flujo actual, en `CheckoutPage.tsx`:
 2. Al pagar, el SDK devuelve un **token** de la tarjeta. Los datos de la tarjeta nunca pasan por nuestro servidor.
 3. Se crea el pedido en `orders` con estado `pending`.
 4. Se llama a `/api/charge-clip`, que cobra en `api.payclip.com/payments` con las llaves secretas.
-5. Si Clip pide verificación del banco (3-D Secure), se redirige al usuario; si no, el pedido pasa a `paid` y se va a `/pago-exitoso`.
+5. Si Clip aprueba, **`charge-clip` marca el pedido como `paid` desde el servidor** (con la llave de servicio) y guarda el id de la transacción en `payment_info`. El navegador también lo marca, como respaldo.
+6. Si Clip pide verificación del banco (3-D Secure), se redirige al usuario; si no, se va a `/pago-exitoso`.
+7. El checkout y `/pago-exitoso` piden a `/api/send-email` el aviso `order-paid` (ver sección 11).
 
 **Código antiguo que sigue en el repo y no usa el checkout actual:** `api/clip-payment.ts`, `api/clip-card-token.ts`, `api/clip-installments.ts`, `api/clip-webhook.ts`, `api/create-payment.ts`, `api/test-clip.ts` y `src/hooks/useClipPayment.ts`. Antes de borrarlos, confirmar en el panel de Clip que no haya un webhook apuntando a `clip-webhook`.
 
@@ -188,8 +190,22 @@ Todo pasa por `/api/send-email`, según el campo `type`:
 | `newsletter` | Alta al newsletter | No |
 | `promoter-welcome` | Alta de promotora | No |
 | `test`, `campaign` | Envíos desde el admin | Sí |
+| `order-paid` | Pedido pagado: aviso a ti + confirmación al cliente. Solo si el pedido está `paid` en la base y una sola vez (usa `admin_notified_at` / `customer_notified_at`) | No |
+| `order-shipped` | Aviso de envío al cliente con paquetería, guía y enlace de rastreo | Sí |
 
-Remitente: `admin@divinastore.com.mx`. Los avisos llegan a `info@divinastore.com.mx`.
+Remitente: `admin@divinastore.com.mx`. Los avisos de contacto llegan a `info@divinastore.com.mx`. Los avisos de **pedido nuevo** llegan al correo (o correos separados por coma) guardado en `store_config.orders_notify_email`, que se edita en Pedidos → Ajustes.
+
+## 11 bis. Pedidos (`/admin/reportes`)
+
+Archivo: `src/pages/admin/AdminOrderReports.tsx` + `AdminOrders.css` (clases `.ord-*`).
+
+- **Resumen en fichas:** ventas pagadas, ticket promedio, por enviar, sin pagar, clientes; con selector de periodo (hoy, 7 días, 30 días, este mes, todo). Las fichas "Por enviar" y "Sin pagar" filtran la tabla.
+- **Buscador:** cliente, correo, teléfono, # de pedido, guía o producto.
+- **Selección múltiple** y **Borrar** (individual o en lote, con confirmación). Borrar es permanente.
+- **Enviar pedido** (camión): paquetería, número de guía, enlace de rastreo opcional y casilla para avisar al cliente por correo. Pasa el pedido a `shipped`.
+- **Etiqueta** (etiqueta 4×6" imprimible en ventana nueva): remitente desde Pedidos → Ajustes (`ship_from_*` en `store_config`) y destinatario del pedido. No es una guía de paquetería: la guía se compra en la paquetería y su número se captura en "Enviar pedido".
+- **Detalle del pedido:** productos con foto, dirección (copiar), correo, WhatsApp, registro de avisos enviados, "reenviarme el aviso" y nota interna.
+- **Clientes:** agrupados por correo; compras y total cuentan solo pedidos pagados. "Enviar email" o "Enviar campaña" abre `/admin/newsletter?para=correo1,correo2` con esos clientes ya seleccionados; si alguno no está en `subscribers`, el aviso permite agregarlo.
 
 ## 12. Blog
 
@@ -222,7 +238,7 @@ Nunca se guardan en el repositorio.
 | `VITE_CLIP_API_KEY` | Formulario de tarjeta | Sí |
 | `VITE_GA_MEASUREMENT_ID` | Google Analytics | Sí |
 | `SUPABASE_URL` | Funciones `/api` | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` | **No** |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` (avisos de pedido), `charge-clip` (marcar pagado) | **No** |
 | `CLIP_API_KEY`, `CLIP_SECRET` | Cobro | **No** |
 | `RESEND_API_KEY` | Correo | **No** |
 | `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE` | Buscador de proveedores | **No** |
@@ -258,6 +274,10 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - El checkout (`.cv2`) todavía usa su propio lima; no se ha pasado a la paleta nueva.
 
 ## 18. Pendientes conocidos
+
+- **SMS de pedido nuevo:** no está. Requiere una cuenta de un proveedor de SMS o de la API de WhatsApp (con costo por mensaje). Hoy el aviso llega por correo.
+- **Pagos con verificación del banco (3-D Secure):** el pedido solo se marca pagado si el cliente regresa a `/pago-exitoso`; falta un webhook de Clip para confirmarlo aunque cierre la página.
+- **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 
 - Rotar la llave de Bright Data (se compartió por chat) y actualizarla en Vercel.
 - Capturar la comisión real de Clip en Abastecimiento → Márgenes.

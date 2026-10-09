@@ -1,4 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
+
+/** Marca el pedido como pagado desde el servidor (fuente confiable). Si falla, el cobro no se afecta. */
+async function markOrderPaid(orderId: string, transactionId: unknown) {
+    try {
+        const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+        if (!url || !key || !/^[0-9a-f-]{36}$/i.test(orderId)) return;
+        const db = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+        await db.from('orders').update({ status: 'paid', payment_info: { provider: 'clip', transaction_id: transactionId ?? null, paid_at: new Date().toISOString() } }).eq('id', orderId);
+    } catch (e: any) {
+        console.error('[charge-clip] markOrderPaid:', e?.message);
+    }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -70,6 +84,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 transaction_id: data.transaction_id || data.id,
             });
         }
+
+        await markOrderPaid(String(orderId), data.transaction_id || data.id);
 
         return res.status(200).json({
             success: true,
