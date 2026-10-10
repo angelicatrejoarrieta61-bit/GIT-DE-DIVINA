@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 9 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 10 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -170,7 +170,7 @@ Flujo actual, en `CheckoutPage.tsx`:
 
 1. `AdminSourcing.tsx` envía a `/api/sourcing-search` el texto (nombre, marca o código de barras) junto con el token de sesión del admin.
 2. La función valida la sesión, aplica un límite de uso y revisa si esa búsqueda ya se hizo en las últimas **6 horas**; si es así, devuelve lo guardado sin gastar consulta.
-3. Si no, llama a Bright Data, que abre Google Shopping México (`google.com/search?...&udm=28&gl=mx`) y devuelve las ofertas ya estructuradas.
+3. Si no, hace **dos consultas a Google México en paralelo** vía Bright Data: la búsqueda normal (`google.com/search?q=…&gl=mx`), de donde toma el carrusel **"Productos patrocinados"** (`top_pla`, `jackpot_pla`, `bottom_pla`; ahí suele salir Amazon MX), y la pestaña Shopping (`udm=28`, campo `shopping`). Junta ambas, quita duplicados (misma tienda, título y precio) y, si una de las dos falla, usa la otra. Las búsquedas guardadas antes del 10 oct 2026 no se reutilizan porque no traían los patrocinados (`CACHE_VALID_FROM`).
 4. Limpia los datos: precio en pesos, piezas por paquete, nombre de la tienda y su sitio web cuando se conoce.
 5. Guarda la búsqueda (`sourcing_searches`), las ofertas (`sourcing_offers`) y actualiza el directorio de tiendas (`sourcing_merchants`).
 6. De vuelta en el navegador, `src/lib/sourcing.ts` clasifica cada oferta como **exacta**, **probable** o **no confirmada** (compara marca, tamaño, variante), suma el envío de la tienda y calcula el margen contra el precio de venta, descontando la comisión de Clip.
@@ -285,6 +285,8 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 
 - **SMS de pedido nuevo:** no está. SMS real cuesta por mensaje (Twilio, etc.). Opciones gratis evaluadas: notificación push de Gmail con un filtro para el correo de aviso, bot de Telegram o ntfy.sh (push al celular). Hoy el aviso llega por correo.
 - **Pagos con verificación del banco (3-D Secure):** Clip pide abrir `pending_action.url` en un iFrame y luego consultar el pago desde el servidor. No está implementado: el cliente ve "intenta con otra tarjeta" y el pedido queda "En proceso".
+- **Cálculo de margen (Abastecimiento):** valores acordados: comisión Clip 5 % total (sin IVA extra, sin cuota fija) y colchón de envío $20 por venta (`sourcing_customer_shipping`); el envío real se cobra aparte al cliente. Se guardan en `store_config` (`sourcing_*`).
+- **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 

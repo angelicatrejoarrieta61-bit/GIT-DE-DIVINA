@@ -14,6 +14,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  */
 
 const CACHE_HOURS = 6;
+/** Búsquedas guardadas antes de esta fecha no traían los productos patrocinados: no se reutilizan. */
+const CACHE_VALID_FROM = '2026-10-10T01:00:00Z';
 const MAX_SEARCHES_PER_MINUTE = 15;
 const BRIGHTDATA_TIMEOUT_MS = 55_000;
 const MAX_THUMB_CHARS = 24_000;
@@ -127,13 +129,13 @@ export function parsePackQty(title: string): number {
   return 1;
 }
 
-async function fetchShopping(query: string, start: number): Promise<{ items: RawShopping[]; nextStart: number | null }> {
+type SerpBody = Record<string, unknown> & { pagination?: { next_page_start?: number } };
+
+/** Una petición a Google vía Bright Data (JSON ya interpretado). */
+async function fetchSerp(params: URLSearchParams): Promise<SerpBody> {
   const apiKey = process.env.BRIGHTDATA_API_KEY;
   const zone = process.env.BRIGHTDATA_SERP_ZONE || 'divina_serp';
   if (!apiKey) throw new Error('Falta BRIGHTDATA_API_KEY en Vercel.');
-
-  const params = new URLSearchParams({ q: query, udm: '28', gl: 'mx', hl: 'es-419' });
-  if (start > 0) params.set('start', String(start));
   const target = `https://www.google.com/search?${params.toString()}`;
 
   const ctrl = new AbortController();
@@ -151,16 +153,68 @@ async function fetchShopping(query: string, start: number): Promise<{ items: Raw
       const code = wrapper.headers?.['x-brd-error-code'] || wrapper.headers?.['x-brd-error'] || wrapper.status_code;
       throw new Error(`Google no respondió (${code})`);
     }
-    const body = typeof wrapper.body === 'string' ? JSON.parse(wrapper.body || '{}') : (wrapper.body ?? {});
-    const items: RawShopping[] = Array.isArray(body.shopping) ? body.shopping : [];
-    const nextStart = typeof body.pagination?.next_page_start === 'number' ? body.pagination.next_page_start : null;
-    return { items, nextStart };
+    return (typeof wrapper.body === 'string' ? JSON.parse(wrapper.body || '{}') : (wrapper.body ?? {})) as SerpBody;
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw new Error('La búsqueda tardó demasiado. Intenta de nuevo.');
     throw e;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Productos que Google muestra en una página de resultados:
+ * - `top_pla`, `jackpot_pla`, `bottom_pla`: carrusel "Productos patrocinados" (anuncios de Shopping).
+ * - `shopping`: resultados de la pestaña Shopping.
+ * (Campos según la documentación de Bright Data: Parsed JSON results with SERP API.)
+ */
+function productsOf(body: SerpBody): RawShopping[] {
+  const out: RawShopping[] = [];
+  for (const key of ['top_pla', 'jackpot_pla', 'shopping', 'bottom_pla']) {
+    const list = body[key];
+    if (!Array.isArray(list)) continue;
+    for (const it of list as Array<RawShopping & { view_all?: boolean }>) {
+      if (!it || it.view_all) continue; // fila "Ver todo", no es un producto
+      out.push(it);
+    }
+  }
+  return out;
+}
+
+/**
+ * Busca en dos lugares de Google al mismo tiempo y junta los resultados:
+ * 1) la búsqueda normal (ahí sale el carrusel "Productos patrocinados", ej. Amazon MX),
+ * 2) la pestaña Shopping (udm=28).
+ * Si una de las dos falla, se usa la otra. Se quitan duplicados (misma tienda, título y precio).
+ */
+async function fetchShopping(query: string, start: number): Promise<{ items: RawShopping[]; nextStart: number | null }> {
+  const base = { q: query, gl: 'mx', hl: 'es-419' };
+  const shopParams = new URLSearchParams({ ...base, udm: '28' });
+  if (start > 0) shopParams.set('start', String(start));
+
+  // La búsqueda normal solo aporta en la primera página
+  const [web, shop] = await Promise.allSettled([
+    start === 0 ? fetchSerp(new URLSearchParams(base)) : Promise.resolve({} as SerpBody),
+    fetchSerp(shopParams),
+  ]);
+  if (web.status === 'rejected' && shop.status === 'rejected') throw shop.reason;
+
+  const webItems = web.status === 'fulfilled' ? productsOf(web.value) : [];
+  const shopItems = shop.status === 'fulfilled' ? productsOf(shop.value) : [];
+
+  const seen = new Set<string>();
+  const items: RawShopping[] = [];
+  for (const it of [...webItems, ...shopItems]) {
+    if (!it.title || !it.shop) continue;
+    const key = `${normalizeKey(it.shop)}|${normalizeKey(it.title).slice(0, 80)}|${parseMxn(it.price) ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(it);
+  }
+
+  const shopBody = shop.status === 'fulfilled' ? shop.value : null;
+  const nextStart = typeof shopBody?.pagination?.next_page_start === 'number' ? shopBody.pagination.next_page_start : null;
+  return { items, nextStart };
 }
 
 function altPriceText(item: RawShopping, main: number | null): string | null {
@@ -268,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // ── Caché ──────────────────────────────────────────────────────
     if (!refresh) {
-      const since = new Date(Date.now() - CACHE_HOURS * 3600_000).toISOString();
+      const since = new Date(Math.max(Date.now() - CACHE_HOURS * 3600_000, Date.parse(CACHE_VALID_FROM))).toISOString();
       const { data: cached } = await db
         .from('sourcing_searches')
         .select('id, created_at, results')
