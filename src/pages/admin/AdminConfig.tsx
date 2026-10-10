@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { FOOTER_DEFAULTS } from '../../components/Footer';
 import { buildPageBackground, hexLuminance, isHexColor, type PageBgMode } from '../../lib/storeBoot';
 // AdminConfig v1.5 - Optimized Master Product Logic
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { AssetUploader } from '../../components/AssetUploader';
 import { ImageUploaderModal } from '../../components/ImageUploaderModal';
-import { getStoreConfig, getCollections, getProducts, getOrders, getAdminProducts, updateProduct, createProduct, deleteProduct } from '../../lib/queries';
+import { getStoreConfig, getCollections, getProducts, getAdminProducts, updateProduct, createProduct, deleteProduct } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
-import type { Collection, Product, Order } from '../../types';
+import type { Collection, Product } from '../../types';
 import type { SectionBlock } from '../../sections/DynamicSections';
 import { ADMIN_PATCH_EVENT, type AdminPatchDetail, type CustomSection } from './AdminLayout';
 import './AdminConfig.css';
@@ -332,7 +332,6 @@ export const AdminConfig: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [adminProducts, setAdminProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<'global' | 'hero' | 'secciones' | 'editor' | 'cols' | 'pages'>('global');
@@ -490,11 +489,10 @@ export const AdminConfig: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [c, col, prods, ords, aProds] = await Promise.all([
+      const [c, col, prods, aProds] = await Promise.all([
         getStoreConfig(), 
         getCollections(), 
         getProducts(300), 
-        getOrders(),
         getAdminProducts()
       ]);
       setConfigs(c);
@@ -514,7 +512,6 @@ export const AdminConfig: React.FC = () => {
       }
       setCollections(col);
       setProducts(prods);
-      setOrders(ords);
       setAdminProducts(aProds);
       // Valores normalizados; también son la línea base del guardado seguro.
       let nextFrost = stateRef.current.frost;
@@ -766,11 +763,14 @@ export const AdminConfig: React.FC = () => {
     </div>
   );
 
+  // Pagos Clip ahora vive en Pedidos (modal con verificación directa en Clip)
+  if (section === 'clip-payments') return <Navigate to="/admin/reportes?pagos=clip" replace />;
+
   return (
     <div style={{ 
       height: '100vh', 
       display: 'grid', 
-      gridTemplateColumns: (section === 'products-config' || section === 'clip-payments') ? '1fr' : 'minmax(350px, 450px) 1fr', 
+      gridTemplateColumns: section === 'products-config' ? '1fr' : 'minmax(350px, 450px) 1fr', 
       overflow: 'hidden' 
     }}>
 
@@ -1374,67 +1374,6 @@ export const AdminConfig: React.FC = () => {
                   <div>
                     <AssetUploader label="Imagen de Esencia" configKey="about_essence_img" currentValue={configs.about_essence_img} onUpdate={(val) => updateConfig('about_essence_img', val)} />
                   </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* ── CLIP PAYMENTS ── */}
-          {section === 'clip-payments' && (
-            <section style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-                <div>
-                  <h2 style={{ fontSize: 22, marginBottom: 8, color: 'var(--c-lime)' }}>💳 Transacciones Clip</h2>
-                  <p className="muted-text">Historial de pagos y estado de transacciones procesadas.</p>
-                </div>
-              </div>
-
-              <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#080808', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>ORDEN</th>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>FECHA</th>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>CLIENTE</th>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>DIRECCIÓN</th>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>TOTAL</th>
-                        <th style={{ padding: '14px 16px', color: '#888', fontSize: 11, fontWeight: 700, letterSpacing: '1px' }}>ESTADO</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#666' }}>No hay transacciones registradas.</td>
-                        </tr>
-                      ) : (
-                        orders.map((o, i) => (
-                          <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                            <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#aaa', fontSize: 12 }}>{o.id.slice(0, 8).toUpperCase()}</td>
-                            <td style={{ padding: '12px 16px', color: '#888', fontSize: 12 }}>{new Date(o.created_at || '').toLocaleDateString('es-MX')}</td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <p style={{ margin: 0, fontWeight: 600 }}>{o.customer_name || '—'}</p>
-                              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#888' }}>{o.customer_email || '—'}</p>
-                            </td>
-                            <td style={{ padding: '12px 16px', color: '#aaa', fontSize: 12 }}>
-                              <p style={{ margin: 0 }}>{o.customer_address || '—'}</p>
-                              <p style={{ margin: '2px 0 0', fontSize: 11 }}>{o.customer_city || ''} {o.customer_state || ''}</p>
-                            </td>
-                            <td style={{ padding: '12px 16px', color: 'var(--c-lime)', fontWeight: 700 }}>
-                              ${o.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td style={{ padding: '12px 16px' }}>
-                              {o.status === 'paid' ? (
-                                <span style={{ background: 'rgba(76,175,80,0.15)', color: '#4CAF50', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, display: 'inline-block' }}>PAGADO</span>
-                              ) : (
-                                <span style={{ background: 'rgba(255,193,7,0.15)', color: '#FFC107', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, display: 'inline-block' }}>{o.status === 'pending' ? 'PENDIENTE' : o.status?.toUpperCase() || '—'}</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </section>

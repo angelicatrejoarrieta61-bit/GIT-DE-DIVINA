@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 8 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 9 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -19,6 +19,7 @@ Navegador (React SPA)
  ├── SDK de Clip (script externo)  convierte la tarjeta en un token
  └── /api/*  (funciones de Vercel, aquí viven las llaves secretas)
       ├── charge-clip       → API de Clip (cobro)
+      ├── clip-verify       → API de Clip (confirmar cobros, solo admin)
       ├── send-email        → Resend (correos) + Supabase
       ├── sourcing-search   → Bright Data (Google Shopping MX) + Supabase
       └── admin-users       → Supabase con llave de servicio
@@ -82,7 +83,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 |---|---|
 | `products` | Catálogo. Columnas clave: `name, slug, brand, price, compare_price, image_url, images, collection_id, in_stock, stock, tags, ean, cost_price, fulfillment`. **No existe `sku`.** |
 | `collections` | Categorías: `name, slug, image_url, description, sort_order` |
-| `orders` | Pedidos. `status`: `pending` (sin pagar), `paid` (por enviar), `shipped`, `delivered`, `cancelled`. Envío: `shipping_carrier`, `tracking_number`, `tracking_url`, `shipped_at`. Avisos: `admin_notified_at`, `customer_notified_at`, `shipping_notified_at`. `internal_note` (nota que no ve el cliente) |
+| `orders` | Pedidos. `status`: `pending` (sin pagar), `paid` (por enviar), `shipped`, `delivered`, `cancelled`. Envío: `shipping_carrier`, `tracking_number`, `tracking_url`, `shipped_at`. Avisos: `admin_notified_at`, `customer_notified_at`, `shipping_notified_at`. `internal_note` (nota que no ve el cliente). Cobro Clip: `clip_payment_id, clip_status, clip_status_code, clip_receipt_no, clip_auth_code, clip_card, clip_amount, clip_approved_at, clip_verified_at, clip_raw` — **solo los escribe el servidor** (un trigger ignora cambios del navegador y de la sesión del admin) |
 | `store_config` | Configuración llave–valor de toda la tienda (ver sección 8) |
 | `subscribers` | Correos del newsletter |
 | `contact_messages` | Mensajes de los formularios de contacto |
@@ -118,7 +119,8 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `/admin/reportes` | Pedidos y clientes: resumen, filtros, borrar, enviar con guía, etiqueta, campañas |
 | `/admin/productos` | Catálogo unificado: precio, marca, fotos, badge, Home |
 | `/admin/abastecimiento` | Buscador de proveedores |
-| `/admin/config?section=…` | Diseño de la tienda (General, Home, colecciones, páginas, Clip) |
+| `/admin/reportes?pagos=clip` | Abre el modal **Pagos Clip** dentro de Pedidos (el antiguo `/admin/config?section=clip-payments` redirige aquí) |
+| `/admin/config?section=…` | Diseño de la tienda (General, Home, colecciones, páginas) |
 | `/admin/mensajes`, `/admin/newsletter`, `/admin/blog` | Clientes y contenido |
 | `/admin/promotores`, `/admin/usuarios` | Promotoras y usuarios |
 
@@ -149,9 +151,12 @@ Flujo actual, en `CheckoutPage.tsx`:
 2. Al pagar, el SDK devuelve un **token** de la tarjeta. Los datos de la tarjeta nunca pasan por nuestro servidor.
 3. Se crea el pedido en `orders` con estado `pending`.
 4. Se llama a `/api/charge-clip`, que cobra en `api.payclip.com/payments` con las llaves secretas.
-5. Si Clip aprueba, **`charge-clip` marca el pedido como `paid` desde el servidor** (con la llave de servicio) y guarda el id de la transacción en `payment_info`. El navegador también lo marca, como respaldo.
-6. Si Clip pide verificación del banco (3-D Secure), se redirige al usuario; si no, se va a `/pago-exitoso`.
+5. `charge-clip` guarda en el pedido lo que respondió Clip (aprobado, pendiente o rechazado) en las columnas `clip_*`: id del pago, estado, `status_detail.code`, `receipt_no`, tarjeta (marca, últimos 4, banco), monto y fecha. Si Clip aprueba, **marca el pedido como `paid` desde el servidor**. El navegador también lo marca, como respaldo, pero eso no habilita el envío.
+6. Si Clip responde `pending` con verificación del banco (3-D Secure), al cliente se le pide intentar con otra tarjeta y el pedido queda "En proceso". (El flujo 3-D Secure completo, con la ventana del banco, sigue pendiente.)
 7. El checkout y `/pago-exitoso` piden a `/api/send-email` el aviso `order-paid` (ver sección 11).
+8. **Confirmación con Clip** (`/api/clip-verify`, requiere sesión del admin): consulta `GET https://api.payclip.com/payments/{id}` y actualiza las columnas `clip_*`. Si Clip aprueba un pedido que seguía "Sin pagar", lo pasa a pagado y manda los avisos. Pedidos la llama sola al abrir (para los cobros sin estado final) y desde los botones "Consultar a Clip" / "Verificar todo con Clip".
+
+**Número de autorización:** la documentación pública de Clip no lista un campo de código de autorización; se guarda `receipt_no` (recibo de Clip) y, si Clip llega a mandar `authorization_code`, también. La respuesta completa (sin el token) queda en `clip_raw` para revisar qué campos manda Clip en realidad.
 
 **Código antiguo que sigue en el repo y no usa el checkout actual:** `api/clip-payment.ts`, `api/clip-card-token.ts`, `api/clip-installments.ts`, `api/clip-webhook.ts`, `api/create-payment.ts`, `api/test-clip.ts` y `src/hooks/useClipPayment.ts`. Antes de borrarlos, confirmar en el panel de Clip que no haya un webhook apuntando a `clip-webhook`.
 
@@ -205,6 +210,9 @@ Archivo: `src/pages/admin/AdminOrderReports.tsx` + `AdminOrders.css` (clases `.o
 - **Enviar pedido** (camión): paquetería, número de guía, enlace de rastreo opcional y casilla para avisar al cliente por correo. Pasa el pedido a `shipped`.
 - **Etiqueta** (etiqueta 4×6" imprimible en ventana nueva): remitente desde Pedidos → Ajustes (`ship_from_*` en `store_config`) y destinatario del pedido. No es una guía de paquetería: la guía se compra en la paquetería y su número se captura en "Enviar pedido".
 - **Detalle del pedido:** productos con foto, dirección (copiar), correo, WhatsApp, registro de avisos enviados, "reenviarme el aviso" y nota interna.
+- **Pago Clip (columna):** Aprobado / En proceso / Rechazado / Cancelado / Reembolsado / Sin verificar / Sin cobro / Monto distinto, con el número de autorización o recibo. Clic = consultar a Clip.
+- **Candado de envío:** "Enviar pedido" y los estados Enviado/Entregado solo se habilitan si Clip reporta **Aprobado** y el monto cobrado coincide con el total. En el detalle hay "Enviar de todos modos" (con confirmación) por si ya se revisó en el panel de Clip; solo dura mientras la página esté abierta.
+- **Pagos Clip (botón y modal):** cobrado en Clip, en proceso, con problema (rechazados, reembolsados, monto distinto o "pagado sin cobro"), sin verificar; tabla con tarjeta, autorización/recibo, monto, estado y última consulta; "Verificar todo con Clip". Fichas del resumen "Cobrado en Clip" y "Por confirmar" lo abren.
 - **Clientes:** agrupados por correo; compras y total cuentan solo pedidos pagados. "Enviar email" o "Enviar campaña" abre `/admin/newsletter?para=correo1,correo2` con esos clientes ya seleccionados; si alguno no está en `subscribers`, el aviso permite agregarlo.
 
 ## 12. Blog
@@ -238,8 +246,8 @@ Nunca se guardan en el repositorio.
 | `VITE_CLIP_API_KEY` | Formulario de tarjeta | Sí |
 | `VITE_GA_MEASUREMENT_ID` | Google Analytics | Sí |
 | `SUPABASE_URL` | Funciones `/api` | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` (avisos de pedido), `charge-clip` (marcar pagado) | **No** |
-| `CLIP_API_KEY`, `CLIP_SECRET` | Cobro | **No** |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` (avisos de pedido), `charge-clip` (marcar pagado), `clip-verify` | **No** |
+| `CLIP_API_KEY`, `CLIP_SECRET` | Cobro y `clip-verify` (prueba `CLIP_API_KEY`; si Clip responde 401/403, usa `CLIP_SECRET`) | **No** |
 | `RESEND_API_KEY` | Correo | **No** |
 | `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE` | Buscador de proveedores | **No** |
 | `SUPABASE_SERVICE_KEY`, `CLIP_API_URL`, `CLIP_API_URL_SECURE` | Solo el código antiguo de Clip | No |
@@ -275,8 +283,9 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 
 ## 18. Pendientes conocidos
 
-- **SMS de pedido nuevo:** no está. Requiere una cuenta de un proveedor de SMS o de la API de WhatsApp (con costo por mensaje). Hoy el aviso llega por correo.
-- **Pagos con verificación del banco (3-D Secure):** el pedido solo se marca pagado si el cliente regresa a `/pago-exitoso`; falta un webhook de Clip para confirmarlo aunque cierre la página.
+- **SMS de pedido nuevo:** no está. SMS real cuesta por mensaje (Twilio, etc.). Opciones gratis evaluadas: notificación push de Gmail con un filtro para el correo de aviso, bot de Telegram o ntfy.sh (push al celular). Hoy el aviso llega por correo.
+- **Pagos con verificación del banco (3-D Secure):** Clip pide abrir `pending_action.url` en un iFrame y luego consultar el pago desde el servidor. No está implementado: el cliente ve "intenta con otra tarjeta" y el pedido queda "En proceso".
+- **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 
 - Rotar la llave de Bright Data (se compartió por chat) y actualizarla en Vercel.

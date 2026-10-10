@@ -310,6 +310,7 @@ export const AdminLayout: React.FC = () => {
   // ── Helpers de render ──────────────────────────────────────
   const isPath = (p: string) => location.pathname === p || location.pathname.startsWith(`${p}/`);
   const isSection = (key: string) => onConfig && currentSection === key;
+  const clipOpen = new URLSearchParams(location.search).get('pagos') === 'clip';
 
   const showSave = onConfig && currentSection !== 'clip-payments';
 
@@ -337,8 +338,8 @@ export const AdminLayout: React.FC = () => {
           <NavItem to="/admin" icon={LayoutDashboard} label="Resumen" active={location.pathname === '/admin'} />
 
           <NavGroup id="ventas" title="Ventas" closed={!!closed.ventas} onToggle={toggleGroup}>
-            <NavItem to="/admin/reportes" icon={ClipboardList} label="Pedidos" active={isPath('/admin/reportes')} />
-            <NavItem to="/admin/config?section=clip-payments" icon={CreditCard} label="Pagos Clip" active={isSection('clip-payments')} />
+            <NavItem to="/admin/reportes" icon={ClipboardList} label="Pedidos" active={isPath('/admin/reportes') && !clipOpen} />
+            <NavItem to="/admin/reportes?pagos=clip" icon={CreditCard} label="Pagos Clip" active={isPath('/admin/reportes') && clipOpen} />
             <NavItem to="/admin/promotores" icon={HeartHandshake} label="Promotores y comisiones" active={isPath('/admin/promotores')} />
           </NavGroup>
 

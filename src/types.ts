@@ -72,6 +72,16 @@ export interface Order {
   admin_notified_at?: string | null;
   customer_notified_at?: string | null;
   shipping_notified_at?: string | null;
+  /* Cobro confirmado con la API de Clip (solo lo escribe el servidor) */
+  clip_payment_id?: string | null;
+  clip_status?: string | null;
+  clip_status_code?: string | null;
+  clip_receipt_no?: string | null;
+  clip_auth_code?: string | null;
+  clip_card?: string | null;
+  clip_amount?: number | null;
+  clip_approved_at?: string | null;
+  clip_verified_at?: string | null;
 }
 
 export interface Promoter {

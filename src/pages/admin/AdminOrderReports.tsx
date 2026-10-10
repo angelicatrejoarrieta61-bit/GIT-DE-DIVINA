@@ -3,12 +3,14 @@
  * Resumen en fichas, búsqueda, filtros por estado y periodo, selección múltiple,
  * borrar, marcar como enviado (paquetería + guía + aviso por correo), etiqueta
  * imprimible, avisos de pedido nuevo y acceso a campañas desde Clientes.
+ * Pago Clip: cada cobro se confirma con la API de Clip (/api/clip-verify). Un pedido
+ * solo se puede enviar cuando Clip lo reporta aprobado y el monto coincide.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, RefreshCw, Download, Settings2, Truck, Tag, Trash2, ChevronDown, ChevronRight,
-  Mail, MessageCircle, Copy, Check, X, Send, Package, Users, AlertTriangle,
+  Mail, MessageCircle, Copy, Check, X, Send, Package, Users, AlertTriangle, CreditCard, ShieldCheck,
 } from 'lucide-react';
 import { getOrders, deleteOrders, updateOrder, getStoreConfig } from '../../lib/queries';
 import { supabase, getImageUrl } from '../../lib/supabase';
@@ -33,6 +35,29 @@ const PERIODS: Record<Period, string> = { all: 'Todo', today: 'Hoy', '7d': '7 d�
 const CFG_KEYS = ['orders_notify_email', 'ship_from_name', 'ship_from_phone', 'ship_from_address', 'ship_from_city', 'ship_from_state', 'ship_from_zip'] as const;
 type ShipCfg = Record<(typeof CFG_KEYS)[number], string>;
 const EMPTY_CFG: ShipCfg = { orders_notify_email: 'admin@divinastore.com.mx', ship_from_name: 'Divina Store MX', ship_from_phone: '', ship_from_address: '', ship_from_city: '', ship_from_state: '', ship_from_zip: '' };
+
+/* ── Pago Clip ── */
+type ClipKey = 'approved' | 'authorized' | 'pending' | 'rejected' | 'cancelled' | 'refunded' | 'unverified' | 'none';
+const CLIP: Record<ClipKey, { label: string; tone: string; hint: string }> = {
+  approved:   { label: 'Aprobado',      tone: 'ok',    hint: 'Clip confirma el cobro' },
+  authorized: { label: 'Autorizado',    tone: 'info',  hint: 'Autorizado, aún no capturado' },
+  pending:    { label: 'En proceso',    tone: 'warn',  hint: 'Clip aún no lo aprueba (ej. 3D Secure)' },
+  rejected:   { label: 'Rechazado',     tone: 'bad',   hint: 'El banco rechazó el cobro' },
+  cancelled:  { label: 'Cancelado',     tone: 'bad',   hint: 'Cobro cancelado en Clip' },
+  refunded:   { label: 'Reembolsado',   tone: 'bad',   hint: 'Se devolvió el dinero' },
+  unverified: { label: 'Sin verificar', tone: 'muted', hint: 'Tiene cobro en Clip; falta consultarlo' },
+  none:       { label: 'Sin cobro',     tone: 'muted', hint: 'No hay cobro de Clip para este pedido' },
+};
+const CLIP_FINAL = ['approved', 'rejected', 'cancelled', 'refunded'];
+const clipPid = (o: Order): string | null => o.clip_payment_id || o.payment_info?.transaction_id || null;
+const clipKey = (o: Order): ClipKey => {
+  const s = (o.clip_status || '').toLowerCase() as ClipKey;
+  if (s && s in CLIP && s !== 'unverified' && s !== 'none') return s;
+  return clipPid(o) ? 'unverified' : 'none';
+};
+const clipMismatch = (o: Order) => o.clip_amount != null && Math.abs(Number(o.clip_amount) - Number(o.total || 0)) > 0.01;
+const clipOk = (o: Order) => clipKey(o) === 'approved' && !clipMismatch(o);
+const clipNo = (o: Order) => o.clip_auth_code ? `Aut. ${o.clip_auth_code}` : o.clip_receipt_no ? `Rec. ${o.clip_receipt_no}` : '';
 
 const shortId = (id: string) => id.slice(0, 8).toUpperCase();
 const money = (n: number) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -115,6 +140,8 @@ function printLabel(o: Order, cfg: ShipCfg) {
 
 export const AdminOrderReports: React.FC = () => {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const clipOpen = params.get('pagos') === 'clip';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('orders');
@@ -131,7 +158,10 @@ export const AdminOrderReports: React.FC = () => {
   const [cfg, setCfg] = useState<ShipCfg>(EMPTY_CFG);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState<string[] | 'all' | null>(null);
+  const [override, setOverride] = useState<Set<string>>(new Set());
   const toastTimer = useRef<number | undefined>(undefined);
+  const autoChecked = useRef(false);
 
   const notify = useCallback((kind: 'ok' | 'err', text: string) => {
     setToast({ kind, text });
@@ -154,6 +184,63 @@ export const AdminOrderReports: React.FC = () => {
     }));
   }, [load]);
 
+  const setClipOpen = useCallback((on: boolean) => {
+    setParams(prev => { const n = new URLSearchParams(prev); if (on) n.set('pagos', 'clip'); else n.delete('pagos'); return n; }, { replace: true });
+  }, [setParams]);
+
+  /** Consulta a Clip (servidor) y actualiza los pedidos. Sin ids: revisa los cobros sin confirmar. */
+  const verifyClip = useCallback(async (ids?: string[], silent = false) => {
+    setVerifying(ids ?? 'all');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/clip-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` },
+        body: JSON.stringify(ids ? { orderIds: ids } : {}),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { if (!silent) notify('err', d.error || `No se pudo consultar Clip (${r.status}).`); return; }
+      const results: any[] = Array.isArray(d.results) ? d.results : [];
+      const byId = new Map(results.filter(x => x.result === 'ok').map(x => [x.id, x]));
+      if (byId.size) {
+        setOrders(prev => prev.map(o => {
+          const x = byId.get(o.id);
+          if (!x) return o;
+          return {
+            ...o, status: x.status ?? o.status,
+            clip_payment_id: x.clip_payment_id, clip_status: x.clip_status, clip_status_code: x.clip_status_code,
+            clip_receipt_no: x.clip_receipt_no, clip_auth_code: x.clip_auth_code, clip_card: x.clip_card,
+            clip_amount: x.clip_amount, clip_approved_at: x.clip_approved_at, clip_verified_at: x.clip_verified_at,
+          };
+        }));
+      }
+      // Pedidos que Clip aprobó y seguían "Sin pagar": mandar los avisos (el servidor evita duplicados)
+      results.filter(x => x.promoted).forEach(x => {
+        void fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId: x.id }) }).catch(() => {});
+      });
+      if (silent) return;
+      const errs = results.filter(x => x.result === 'error');
+      const none = results.filter(x => x.result === 'no_payment').length;
+      if (!results.length) return notify('ok', 'Todo al día: no hay cobros pendientes de confirmar.');
+      if (errs.length) return notify('err', `Clip: ${byId.size} consultado${byId.size === 1 ? '' : 's'}, ${errs.length} con error — ${errs[0].error}`);
+      notify('ok', `Clip: ${byId.size} cobro${byId.size === 1 ? '' : 's'} consultado${byId.size === 1 ? '' : 's'}${none ? ` · ${none} sin cobro` : ''}.`);
+    } catch {
+      if (!silent) notify('err', 'No se pudo conectar con el servidor.');
+    } finally {
+      setVerifying(null);
+    }
+  }, [notify]);
+
+  // Al abrir: confirmar en segundo plano los cobros que aún no tienen estado final
+  useEffect(() => {
+    if (loading || autoChecked.current) return;
+    autoChecked.current = true;
+    if (orders.some(o => clipPid(o) && !CLIP_FINAL.includes((o.clip_status || '').toLowerCase()))) void verifyClip(undefined, true);
+  }, [loading, orders, verifyClip]);
+
+  const isVerifying = (id: string) => verifying === 'all' || (Array.isArray(verifying) && verifying.includes(id));
+  const canShip = (o: Order) => PAID.includes((o.status || 'pending') as Status) && (clipOk(o) || override.has(o.id));
+
   /* ── Datos derivados ── */
   const inRange = useMemo(() => orders.filter(o => inPeriod(o.created_at, period)), [orders, period]);
 
@@ -162,7 +249,7 @@ export const AdminOrderReports: React.FC = () => {
     return inRange.filter(o => {
       if (status !== 'all' && (o.status || 'pending') !== status) return false;
       if (!t) return true;
-      return [o.customer_name, o.customer_email, o.customer_phone, o.id, o.tracking_number, o.customer_city]
+      return [o.customer_name, o.customer_email, o.customer_phone, o.id, o.tracking_number, o.customer_city, o.clip_receipt_no, o.clip_auth_code, clipPid(o)]
         .some(v => (v || '').toLowerCase().includes(t))
         || itemsOf(o).some(i => (i.product?.name || '').toLowerCase().includes(t));
     });
@@ -182,6 +269,9 @@ export const AdminOrderReports: React.FC = () => {
       avg: paid.length ? sales / paid.length : 0,
       toShip: inRange.filter(o => o.status === 'paid').length,
       unpaid: inRange.filter(o => (o.status || 'pending') === 'pending').length,
+      clipSum: inRange.filter(o => clipKey(o) === 'approved').reduce((s, o) => s + Number(o.clip_amount ?? o.total ?? 0), 0),
+      clipCount: inRange.filter(o => clipKey(o) === 'approved').length,
+      toConfirm: inRange.filter(o => PAID.includes((o.status || 'pending') as Status) && !clipOk(o)).length,
     };
   }, [inRange]);
 
@@ -250,10 +340,10 @@ export const AdminOrderReports: React.FC = () => {
   const goCampaign = (emails: string[]) => navigate(`/admin/newsletter?para=${encodeURIComponent(emails.join(','))}`);
 
   const exportOrders = () => downloadCSV(`divina_pedidos_${new Date().toISOString().slice(0, 10)}.csv`, [
-    ['Pedido', 'Fecha', 'Estado', 'Cliente', 'Email', 'Teléfono', 'Dirección', 'Colonia', 'Ciudad', 'Estado (lugar)', 'CP', 'Referencia', 'Productos', 'Piezas', 'Total', 'Paquetería', 'Guía'],
+    ['Pedido', 'Fecha', 'Estado', 'Cliente', 'Email', 'Teléfono', 'Dirección', 'Colonia', 'Ciudad', 'Estado (lugar)', 'CP', 'Referencia', 'Productos', 'Piezas', 'Total', 'Pago Clip', 'Recibo Clip', 'Autorización Clip', 'Tarjeta', 'Paquetería', 'Guía'],
     ...filtered.map(o => [shortId(o.id), fmtDate(o.created_at), STATUS[(o.status || 'pending') as Status]?.label || o.status || '', o.customer_name || '', o.customer_email || '', o.customer_phone || '',
       o.customer_address || '', o.customer_neighborhood || '', o.customer_city || '', o.customer_state || '', o.customer_zip || '', o.customer_reference || '',
-      itemsOf(o).map(i => `${i.quantity}x ${i.product?.name}`).join(' | '), String(unitsOf(o)), money(o.total), o.shipping_carrier || '', o.tracking_number || '']),
+      itemsOf(o).map(i => `${i.quantity}x ${i.product?.name}`).join(' | '), String(unitsOf(o)), money(o.total), clipMismatch(o) ? 'Monto distinto' : CLIP[clipKey(o)].label, o.clip_receipt_no || '', o.clip_auth_code || '', o.clip_card || '', o.shipping_carrier || '', o.tracking_number || '']),
   ]);
   const exportCustomers = () => downloadCSV(`divina_clientes_${new Date().toISOString().slice(0, 10)}.csv`, [
     ['Email', 'Nombre', 'Teléfono', 'Ciudad', 'Estado', 'Compras pagadas', 'Total', 'Último pedido', 'Acepta marketing'],
@@ -273,6 +363,9 @@ export const AdminOrderReports: React.FC = () => {
           <button type="button" className="ord-btn" onClick={() => void load()} disabled={loading} title="Volver a cargar">
             <RefreshCw size={14} className={loading ? 'ord-spin' : ''} aria-hidden="true" /> Actualizar
           </button>
+          <button type="button" className={`ord-btn ${clipOpen ? 'is-on' : ''}`} onClick={() => setClipOpen(true)} title="Cobros confirmados con Clip">
+            <CreditCard size={14} aria-hidden="true" /> Pagos Clip
+          </button>
           <button type="button" className="ord-btn" onClick={tab === 'orders' ? exportOrders : exportCustomers}>
             <Download size={14} aria-hidden="true" /> CSV
           </button>
@@ -287,6 +380,8 @@ export const AdminOrderReports: React.FC = () => {
       {/* Resumen en fichas */}
       <div className="ord-kpis" role="list">
         <Kpi label="Ventas" value={money(kpi.sales)} hint={`${kpi.paidCount} pagados`} />
+        <Kpi label="Cobrado en Clip" value={money(kpi.clipSum)} hint={`${kpi.clipCount} confirmados`} onClick={() => setClipOpen(true)} />
+        <Kpi label="Por confirmar" value={String(kpi.toConfirm)} tone={kpi.toConfirm ? 'warn' : undefined} hint="pagados sin OK de Clip" onClick={() => setClipOpen(true)} />
         <Kpi label="Ticket prom." value={money(kpi.avg)} />
         <Kpi label="Por enviar" value={String(kpi.toShip)} tone={kpi.toShip ? 'ok' : undefined} onClick={() => { setTab('orders'); setStatus('paid'); }} />
         <Kpi label="Sin pagar" value={String(kpi.unpaid)} tone={kpi.unpaid ? 'warn' : undefined} onClick={() => { setTab('orders'); setStatus('pending'); }} />
@@ -352,7 +447,7 @@ export const AdminOrderReports: React.FC = () => {
                 <thead>
                   <tr>
                     <th className="c-check"><input type="checkbox" checked={allVisibleSelected} onChange={() => setSel(allVisibleSelected ? new Set() : new Set(filtered.map(o => o.id)))} aria-label="Seleccionar todos" /></th>
-                    <th>Pedido</th><th>Cliente</th><th className="c-num c-hide-sm">Pzs</th><th className="c-num">Total</th><th>Estado</th><th className="c-hide-sm">Envío</th><th className="c-act">Acciones</th>
+                    <th>Pedido</th><th>Cliente</th><th className="c-num c-hide-sm">Pzs</th><th className="c-num">Total</th><th>Pago Clip</th><th>Estado</th><th className="c-hide-sm">Envío</th><th className="c-act">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -373,9 +468,14 @@ export const AdminOrderReports: React.FC = () => {
                           <td className="c-client"><strong>{o.customer_name || '—'}</strong><span>{o.customer_email || ''}</span></td>
                           <td className="c-num c-hide-sm">{unitsOf(o)}</td>
                           <td className="c-num ord-money">{money(o.total)}</td>
+                          <td><ClipCell order={o} busy={isVerifying(o.id)} onVerify={() => void verifyClip([o.id])} /></td>
                           <td>
                             <select className={`ord-status t-${STATUS[st]?.tone}`} value={st} disabled={busy === o.id} onChange={e => void changeStatus(o, e.target.value as Status)} aria-label="Estado del pedido">
-                              {(Object.keys(STATUS) as Status[]).map(k => <option key={k} value={k}>{STATUS[k].label}</option>)}
+                              {(Object.keys(STATUS) as Status[]).map(k => (
+                                <option key={k} value={k} disabled={(k === 'shipped' || k === 'delivered') && k !== st && !canShip(o)}>
+                                  {STATUS[k].label}{(k === 'shipped' || k === 'delivered') && k !== st && !canShip(o) ? ' (falta Clip)' : ''}
+                                </option>
+                              ))}
                             </select>
                           </td>
                           <td className="c-ship c-hide-sm">{o.tracking_number ? <><strong>{o.shipping_carrier || 'Guía'}</strong><span>{o.tracking_number}</span></> : <span className="ord-muted">—</span>}</td>
@@ -388,7 +488,7 @@ export const AdminOrderReports: React.FC = () => {
                               </span>
                             ) : (
                               <>
-                                <button type="button" className="ord-icon ord-icon--primary" onClick={() => setShipFor(o)} disabled={!PAID.includes(st)} title={!PAID.includes(st) ? 'Solo pedidos pagados' : o.tracking_number ? 'Editar envío' : 'Enviar pedido'} aria-label="Enviar pedido"><Truck size={15} /></button>
+                                <button type="button" className="ord-icon ord-icon--primary" onClick={() => setShipFor(o)} disabled={!canShip(o)} title={!PAID.includes(st) ? 'Solo pedidos pagados' : !canShip(o) ? 'Primero confirma el cobro con Clip' : o.tracking_number ? 'Editar envío' : 'Enviar pedido'} aria-label="Enviar pedido"><Truck size={15} /></button>
                                 <button type="button" className="ord-icon" onClick={() => printLabel(o, cfg)} title="Crear etiqueta" aria-label="Crear etiqueta"><Tag size={15} /></button>
                                 <button type="button" className="ord-icon ord-icon--danger" onClick={() => setConfirmDel(o.id)} title="Borrar pedido" aria-label="Borrar pedido"><Trash2 size={15} /></button>
                               </>
@@ -396,7 +496,7 @@ export const AdminOrderReports: React.FC = () => {
                           </td>
                         </tr>
                         {isOpen && (
-                          <tr className="ord-detail"><td colSpan={8}>
+                          <tr className="ord-detail"><td colSpan={9}>
                             <div className="ord-detail__grid">
                               <section>
                                 <h4>Productos</h4>
@@ -411,6 +511,13 @@ export const AdminOrderReports: React.FC = () => {
                                 </ul>
                                 <p className="ord-total">Total <strong>{money(o.total)} MXN</strong></p>
                                 {o.promoter_code && <p className="ord-muted">Promotora: {o.promoter_code}</p>}
+                                <ClipDetail
+                                  order={o}
+                                  busy={isVerifying(o.id)}
+                                  overridden={override.has(o.id)}
+                                  onVerify={() => void verifyClip([o.id])}
+                                  onOverride={() => setOverride(s => new Set(s).add(o.id))}
+                                />
                               </section>
                               <section>
                                 <h4>Enviar a</h4>
@@ -507,6 +614,16 @@ export const AdminOrderReports: React.FC = () => {
           onClose={() => setShipFor(null)}
           onDone={(patch, msg) => { setOrders(prev => prev.map(x => x.id === shipFor.id ? { ...x, ...patch } : x)); setShipFor(null); notify(msg.kind, msg.text); }}
           onLabel={(o) => printLabel(o, cfg)}
+        />
+      )}
+
+      {clipOpen && (
+        <ClipModal
+          orders={orders}
+          verifying={verifying}
+          onVerify={(ids) => void verifyClip(ids)}
+          onClose={() => setClipOpen(false)}
+          onGo={(id) => { setClipOpen(false); setTab('orders'); setStatus('all'); setPeriod('all'); setQ(shortId(id).toLowerCase()); setOpen(id); }}
         />
       )}
 
@@ -656,5 +773,197 @@ const ConfigPanel: React.FC<{ cfg: ShipCfg; onSaved: (c: ShipCfg) => void; onErr
         }}>{saving ? 'Guardando…' : 'Guardar ajustes'}</button>
       </div>
     </section>
+  );
+};
+
+/* ── Pago Clip: celda de la tabla ── */
+const ClipCell: React.FC<{ order: Order; busy: boolean; onVerify: () => void }> = ({ order: o, busy, onVerify }) => {
+  const k = clipKey(o);
+  const mm = clipMismatch(o);
+  const c = CLIP[k];
+  const tone = mm ? 'bad' : c.tone;
+  const no = clipNo(o);
+  return (
+    <div className="ord-pay">
+      <button
+        type="button"
+        className={`ord-pay__chip t-${tone}`}
+        onClick={onVerify}
+        disabled={busy || k === 'none'}
+        title={mm ? `Clip cobró ${money(Number(o.clip_amount))} y el pedido es de ${money(o.total)}` : `${c.hint}${k !== 'none' ? ' · clic para consultar a Clip' : ''}`}
+        aria-label={`Pago Clip: ${mm ? 'monto distinto' : c.label}. Consultar a Clip`}
+      >
+        {busy ? <RefreshCw size={11} className="ord-spin" aria-hidden="true" /> : k === 'approved' && !mm ? <ShieldCheck size={11} aria-hidden="true" /> : null}
+        {busy ? 'Consultando' : mm ? 'Monto distinto' : c.label}
+      </button>
+      {no && <span className="ord-pay__no" title={o.clip_card || undefined}>{no}</span>}
+    </div>
+  );
+};
+
+/* ── Pago Clip: detalle dentro del pedido ── */
+const ClipDetail: React.FC<{ order: Order; busy: boolean; overridden: boolean; onVerify: () => void; onOverride: () => void }> = ({ order: o, busy, overridden, onVerify, onOverride }) => {
+  const [ask, setAsk] = useState(false);
+  const k = clipKey(o);
+  const mm = clipMismatch(o);
+  const pid = clipPid(o);
+  const paid = PAID.includes((o.status || 'pending') as Status);
+  const rows: [string, string][] = [
+    ['Estado en Clip', mm ? 'Monto distinto' : CLIP[k].label + (o.clip_status_code ? ` (${o.clip_status_code})` : '')],
+    ['Autorización', o.clip_auth_code || '—'],
+    ['Recibo Clip', o.clip_receipt_no || '—'],
+    ['Tarjeta', o.clip_card || '—'],
+    ['Monto cobrado', o.clip_amount != null ? money(Number(o.clip_amount)) : '—'],
+    ['Aprobado', fmtDate(o.clip_approved_at)],
+    ['ID de pago', pid || '—'],
+    ['Consultado', o.clip_verified_at ? fmtDate(o.clip_verified_at) : 'nunca'],
+  ];
+  return (
+    <div className={`ord-paybox t-${mm ? 'bad' : CLIP[k].tone}`}>
+      <div className="ord-paybox__head">
+        <h4><CreditCard size={12} aria-hidden="true" /> Pago Clip</h4>
+        <button type="button" className="ord-btn" disabled={busy || !pid} onClick={onVerify}>
+          <RefreshCw size={12} className={busy ? 'ord-spin' : ''} aria-hidden="true" /> {busy ? 'Consultando…' : 'Consultar a Clip'}
+        </button>
+      </div>
+      <dl>
+        {rows.map(([a, b]) => <React.Fragment key={a}><dt>{a}</dt><dd className={a === 'ID de pago' ? 'is-mono' : ''}>{b}</dd></React.Fragment>)}
+      </dl>
+      {paid && !clipOk(o) && (
+        overridden ? (
+          <p className="ord-paybox__warn"><AlertTriangle size={12} aria-hidden="true" /> Envío habilitado manualmente para este pedido.</p>
+        ) : ask ? (
+          <p className="ord-paybox__warn">
+            <AlertTriangle size={12} aria-hidden="true" /> ¿Ya lo viste aprobado en tu panel de Clip?
+            <button type="button" className="ord-btn ord-btn--danger" onClick={() => { onOverride(); setAsk(false); }}>Sí, habilitar envío</button>
+            <button type="button" className="ord-btn" onClick={() => setAsk(false)}>No</button>
+          </p>
+        ) : (
+          <p className="ord-paybox__warn">
+            <AlertTriangle size={12} aria-hidden="true" /> No se puede enviar hasta que Clip confirme el cobro.
+            <button type="button" className="ord-link" onClick={() => setAsk(true)}>Enviar de todos modos</button>
+          </p>
+        )
+      )}
+    </div>
+  );
+};
+
+/* ── Modal: pagos Clip ── */
+type ClipFilter = 'all' | 'approved' | 'pending' | 'problem' | 'unverified';
+const ClipModal: React.FC<{
+  orders: Order[]; verifying: string[] | 'all' | null;
+  onVerify: (ids?: string[]) => void; onClose: () => void; onGo: (id: string) => void;
+}> = ({ orders, verifying, onVerify, onClose, onGo }) => {
+  const [f, setF] = useState<ClipFilter>('all');
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Cobros de Clip + pedidos marcados como pagados sin cobro registrado (sospechosos)
+  const rows = useMemo(() => orders
+    .filter(o => clipPid(o) || o.clip_status || PAID.includes((o.status || 'pending') as Status))
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')), [orders]);
+
+  const group = (o: Order): ClipFilter => {
+    const k = clipKey(o);
+    if (k === 'approved' && !clipMismatch(o)) return 'approved';
+    if (k === 'pending' || k === 'authorized') return 'pending';
+    if (k === 'unverified') return 'unverified';
+    return 'problem'; // rechazado, cancelado, reembolsado, monto distinto o pagado sin cobro
+  };
+  const n = (g: ClipFilter) => rows.filter(o => group(o) === g).length;
+  const charged = rows.filter(o => clipKey(o) === 'approved');
+  const approvedSum = charged.reduce((s, o) => s + Number(o.clip_amount ?? o.total ?? 0), 0);
+  const shown = f === 'all' ? rows : rows.filter(o => group(o) === f);
+  const all = verifying === 'all';
+  const busyRow = (id: string) => all || (Array.isArray(verifying) && verifying.includes(id));
+  const checkable = rows.filter(o => clipPid(o)).map(o => o.id);
+
+  const FILTERS: [ClipFilter, string, string?][] = [
+    ['all', 'Todos'], ['approved', 'Aprobados', 'ok'], ['pending', 'En proceso', 'warn'], ['problem', 'Con problema', 'bad'], ['unverified', 'Sin verificar'],
+  ];
+
+  return (
+    <div className="ord-modal" role="dialog" aria-modal="true" aria-labelledby="clip-title" onClick={onClose}>
+      <div className="ord-modal__panel ord-clipm" onClick={e => e.stopPropagation()}>
+        <header>
+          <h2 id="clip-title"><CreditCard size={16} aria-hidden="true" /> Pagos Clip</h2>
+          <div className="ord-inline">
+            <button type="button" className="ord-btn ord-btn--primary" disabled={Boolean(verifying) || !checkable.length} onClick={() => onVerify(checkable.slice(0, 60))}>
+              <RefreshCw size={13} className={all || Array.isArray(verifying) ? 'ord-spin' : ''} aria-hidden="true" /> {verifying ? 'Consultando a Clip…' : 'Verificar todo con Clip'}
+            </button>
+            <button ref={closeRef} type="button" className="ord-icon" onClick={onClose} aria-label="Cerrar"><X size={15} /></button>
+          </div>
+        </header>
+
+        <div className="ord-kpis ord-kpis--tight" role="list">
+          <Kpi label="Cobrado (Clip)" value={money(approvedSum)} hint={`${charged.length} cobro${charged.length === 1 ? '' : 's'}`} tone="ok" />
+          <Kpi label="En proceso" value={String(n('pending'))} tone={n('pending') ? 'warn' : undefined} />
+          <Kpi label="Con problema" value={String(n('problem'))} tone={n('problem') ? 'warn' : undefined} />
+          <Kpi label="Sin verificar" value={String(n('unverified'))} />
+        </div>
+
+        <div className="ord-chips" role="group" aria-label="Filtrar pagos">
+          {FILTERS.map(([k, label, tone]) => (
+            <button key={k} type="button" className={`ord-chip ${f === k ? 'is-on' : ''} ${tone ? `t-${tone}` : ''}`} aria-pressed={f === k} onClick={() => setF(k)}>
+              {label} <em>{k === 'all' ? rows.length : n(k)}</em>
+            </button>
+          ))}
+        </div>
+
+        <div className="ord-table-wrap ord-clipm__table">
+          {shown.length === 0 ? <div className="ord-empty">Nada en esta vista.</div> : (
+            <table className="ord-table">
+              <thead>
+                <tr>
+                  <th>Pedido</th><th>Cliente</th><th className="c-hide-sm">Tarjeta</th><th>Autorización / recibo</th><th className="c-num">Monto</th><th>Estado Clip</th><th className="c-hide-sm">Consultado</th><th className="c-act" aria-label="Acciones" />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map(o => {
+                  const k = clipKey(o); const mm = clipMismatch(o);
+                  const noCharge = k === 'none';
+                  return (
+                    <tr key={o.id}>
+                      <td>
+                        <button type="button" className="ord-rowbtn" onClick={() => onGo(o.id)} title="Ver pedido"><span className="ord-id">#{shortId(o.id)}</span></button>
+                        <span className="ord-date ord-date--flat">{fmtDate(o.created_at)}</span>
+                      </td>
+                      <td className="c-client"><strong>{o.customer_name || '—'}</strong><span>{o.customer_email || ''}</span></td>
+                      <td className="ord-muted c-hide-sm">{o.clip_card || '—'}</td>
+                      <td className="ord-mono">{o.clip_auth_code || o.clip_receipt_no || (noCharge ? '—' : <span className="ord-muted">pendiente</span>)}{o.clip_auth_code && o.clip_receipt_no ? <span className="ord-sub2">Rec. {o.clip_receipt_no}</span> : null}</td>
+                      <td className="c-num">
+                        <span className="ord-money">{o.clip_amount != null ? money(Number(o.clip_amount)) : '—'}</span>
+                        {mm && <span className="ord-sub2 is-bad">pedido {money(o.total)}</span>}
+                      </td>
+                      <td>
+                        <span className={`ord-pay__chip is-static t-${mm ? 'bad' : noCharge && PAID.includes((o.status || 'pending') as Status) ? 'bad' : CLIP[k].tone}`} title={CLIP[k].hint}>
+                          {mm ? 'Monto distinto' : noCharge && PAID.includes((o.status || 'pending') as Status) ? 'Pagado sin cobro' : CLIP[k].label}
+                        </span>
+                      </td>
+                      <td className="ord-muted c-hide-sm">{o.clip_verified_at ? fmtDate(o.clip_verified_at) : '—'}</td>
+                      <td className="c-act">
+                        <button type="button" className="ord-icon" disabled={!clipPid(o) || busyRow(o.id)} onClick={() => onVerify([o.id])} title="Consultar a Clip" aria-label={`Consultar a Clip el pedido ${shortId(o.id)}`}>
+                          <RefreshCw size={14} className={busyRow(o.id) ? 'ord-spin' : ''} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <p className="ord-muted ord-clipm__note">
+          Estado, recibo, tarjeta y monto vienen directo de la API de Clip. Solo se puede enviar un pedido cuando Clip lo reporta <strong>Aprobado</strong> y el monto coincide.
+        </p>
+      </div>
+    </div>
   );
 };
