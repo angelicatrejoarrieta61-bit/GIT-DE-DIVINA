@@ -66,6 +66,7 @@ export interface TargetSpec {
   sizeValue: number | null;
   sizeUnit: 'ml' | 'g' | 'oz' | null;
   spf: number | null;
+  combo: boolean;          // la búsqueda misma es un combo ("A + B")
 }
 
 export interface EvaluatedOffer extends SourcingOffer {
@@ -151,6 +152,9 @@ const STOPWORDS = new Set([
   'protector', 'protectora', 'solar', 'fotoprotector', 'bloqueador', 'facial', 'rostro', 'piel',
   'tipo', 'todo', 'todos', 'mixta', 'grasa', 'seca', 'normal', 'muy', 'original', 'nuevo', 'nueva',
   'envio', 'gratis', 'ml', 'g', 'gr', 'grs', 'gramos', 'oz', 'spf', 'fps', 'pza', 'pieza', 'piezas', 'x',
+  // Relleno de títulos tipo Amazon ("Ayuda a reducir la caída del cabello y estimula el crecimiento capilar")
+  'ayuda', 'ayudar', 'reducir', 'reduce', 'estimula', 'estimular', 'crecimiento', 'cabello', 'capilar', 'caida',
+  'mejora', 'ideal', 'hasta', 'horas', 'efecto', 'resultados', 'visible', 'visibles',
 ]);
 
 // ─── Normalización ────────────────────────────────────────────
@@ -165,6 +169,7 @@ export function norm(s: string): string {
     .replace(/\bonzas?\b/g, 'oz')
     .replace(/\b(spf|fps|fp)\s*-?\s*(\d{2,3})\s*\+?/g, ' spf $2 ')
     .replace(/\b(moisturizing|moisturising|moisturiser|moisturizer)\b/g, 'hidratante')
+    .replace(/\b(champu|champus|shampu|shampoos)\b/g, 'shampoo')
     .replace(/[^a-z0-9.]+/g, ' ')
     .replace(/(^|[^\d])\.|\.(?!\d)/g, '$1 ')
     .replace(/\s+/g, ' ')
@@ -204,6 +209,10 @@ function findGroups(t: string, groups: Record<string, string[]>): string[] {
     .map(([g]) => g);
 }
 
+/** Combo de dos productos en un anuncio: "Lambdacaps 30 cápsulas + Lambdapil champú". No cuenta "SPF 50+". */
+const COMBO_RE = /[a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1.')]\s*\+\s*[a-z0-9\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1]/i;
+export const isCombo = (title: string): boolean => COMBO_RE.test(title);
+
 // ─── Especificación del producto buscado ─────────────────────
 export function buildSpec(text: string, brandHint?: string | null): TargetSpec {
   const t = norm(text);
@@ -229,7 +238,7 @@ export function buildSpec(text: string, brandHint?: string | null): TargetSpec {
     .filter((w) => !allVariantWords.includes(w))
     .filter((w, i, arr) => w && arr.indexOf(w) === i);
 
-  return { brand, core, forms, strong, soft, sizeValue: size.value, sizeUnit: size.unit, spf };
+  return { brand, core, forms, strong, soft, sizeValue: size.value, sizeUnit: size.unit, spf, combo: isCombo(text) };
 }
 
 export function isBarcode(q: string): boolean {
@@ -261,7 +270,9 @@ export function classify(spec: TargetSpec, title: string): { match: MatchLevel; 
     const found = spec.core.filter((w) => has(t, w));
     const missing = spec.core.filter((w) => !has(t, w));
     const ratio = found.length / spec.core.length;
+    const brandMissing = spec.brand ? reasons.some((r) => r === 'No menciona la marca') : false;
     if (ratio < 0.5) { hard = true; reasons.push(`Faltan: ${missing.join(', ')}`); }
+    else if (brandMissing && !has(t, spec.core[0])) { hard = true; reasons.push(`Sin marca ni línea (${spec.core[0]})`); }
     else if (missing.length) { soft = true; reasons.push(`No dice: ${missing.join(', ')}`); }
   }
 
@@ -288,6 +299,9 @@ export function classify(spec: TargetSpec, title: string): { match: MatchLevel; 
   if (spec.forms.length && forms.length && !forms.some((f) => spec.forms.includes(f))) {
     hard = true; reasons.push(`Es ${forms.join('/')}, no ${spec.forms.join('/')}`);
   }
+
+  // Combo con otro producto (precio de dos productos juntos)
+  if (!spec.combo && isCombo(title)) { hard = true; reasons.push('Combo: incluye otro producto'); }
 
   // Variantes fuertes (color, tono, pediátrico, kit, recarga)
   const strong = findGroups(t, STRONG_VARIANTS);

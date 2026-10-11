@@ -28,7 +28,8 @@ interface CatalogProduct {
   in_stock: boolean | null;
 }
 interface CollectionLite { id: string; name: string }
-interface SearchMeta { searchId: string; fetchedAt: string; cached: boolean; nextStart: number | null; query: string }
+interface SourceInfo { sponsored: number; shopping: number; sponsoredError: string | null; shoppingError: string | null }
+interface SearchMeta { searchId: string; fetchedAt: string; cached: boolean; nextStart: number | null; query: string; sources?: SourceInfo | null }
 interface HistoryRow { id: string; query: string; page: number; results: number; duration_ms: number | null; status: string; error: string | null; created_at: string; product_id: string | null }
 type Tab = 'buscar' | 'tiendas' | 'historial';
 type MatchFilter = 'exactas' | 'probables' | 'todas';
@@ -207,7 +208,7 @@ export function AdminSourcing() {
 
       setOffers((prev) => (opts.append ? [...prev, ...data.offers] : data.offers));
       setMerchants((prev) => (opts.append ? { ...prev, ...data.merchants } : data.merchants));
-      setMeta({ searchId: data.searchId, fetchedAt: data.fetchedAt, cached: data.cached, nextStart: data.nextStart, query: clean });
+      setMeta((prev) => ({ searchId: data.searchId, fetchedAt: data.fetchedAt, cached: data.cached, nextStart: data.nextStart, query: clean, sources: opts.append ? prev?.sources ?? null : data.sources ?? null }));
       if (!opts.append) {
         setAddMode('ask');
         setChangingLink(false);
@@ -504,6 +505,11 @@ export function AdminSourcing() {
               </div>
               <div className="src-summary__meta">
                 {meta.cached ? 'Guardado ' : 'Consultado '}{timeAgo(meta.fetchedAt)}
+                {meta.sources && (
+                  <span className={meta.sources.sponsoredError ? 'src-warn-text' : ''} title={meta.sources.sponsoredError || meta.sources.shoppingError || undefined}>
+                    {' · '}Google: {meta.sources.sponsoredError ? 'patrocinados no disponibles' : `${meta.sources.sponsored} patrocinados`} + {meta.sources.shoppingError ? 'Shopping no disponible' : `${meta.sources.shopping} de Shopping`}
+                  </span>
+                )}
                 <button type="button" className="src-link-btn" onClick={() => void runSearch(meta.query, { refresh: true })} disabled={loading}>
                   Actualizar precios
                 </button>

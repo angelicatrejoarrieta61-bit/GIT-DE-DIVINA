@@ -15,7 +15,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const CACHE_HOURS = 6;
 /** Búsquedas guardadas antes de esta fecha no traían los productos patrocinados: no se reutilizan. */
-const CACHE_VALID_FROM = '2026-10-10T01:00:00Z';
+const CACHE_VALID_FROM = '2026-10-10T02:00:00Z';
 const MAX_SEARCHES_PER_MINUTE = 15;
 const BRIGHTDATA_TIMEOUT_MS = 55_000;
 const MAX_THUMB_CHARS = 24_000;
@@ -187,7 +187,9 @@ function productsOf(body: SerpBody): RawShopping[] {
  * 2) la pestaña Shopping (udm=28).
  * Si una de las dos falla, se usa la otra. Se quitan duplicados (misma tienda, título y precio).
  */
-async function fetchShopping(query: string, start: number): Promise<{ items: RawShopping[]; nextStart: number | null }> {
+type SourceInfo = { sponsored: number; shopping: number; sponsoredError: string | null; shoppingError: string | null };
+
+async function fetchShopping(query: string, start: number): Promise<{ items: RawShopping[]; nextStart: number | null; sources: SourceInfo }> {
   const base = { q: query, gl: 'mx', hl: 'es-419' };
   const shopParams = new URLSearchParams({ ...base, udm: '28' });
   if (start > 0) shopParams.set('start', String(start));
@@ -201,6 +203,13 @@ async function fetchShopping(query: string, start: number): Promise<{ items: Raw
 
   const webItems = web.status === 'fulfilled' ? productsOf(web.value) : [];
   const shopItems = shop.status === 'fulfilled' ? productsOf(shop.value) : [];
+  const sources: SourceInfo = {
+    sponsored: webItems.length,
+    shopping: shopItems.length,
+    sponsoredError: web.status === 'rejected' ? String((web.reason as Error)?.message || web.reason).slice(0, 160) : null,
+    shoppingError: shop.status === 'rejected' ? String((shop.reason as Error)?.message || shop.reason).slice(0, 160) : null,
+  };
+  if (web.status === 'rejected') console.warn('[sourcing-search] productos patrocinados:', sources.sponsoredError);
 
   const seen = new Set<string>();
   const items: RawShopping[] = [];
@@ -214,7 +223,7 @@ async function fetchShopping(query: string, start: number): Promise<{ items: Raw
 
   const shopBody = shop.status === 'fulfilled' ? shop.value : null;
   const nextStart = typeof shopBody?.pagination?.next_page_start === 'number' ? shopBody.pagination.next_page_start : null;
-  return { items, nextStart };
+  return { items, nextStart, sources };
 }
 
 function altPriceText(item: RawShopping, main: number | null): string | null {
@@ -367,8 +376,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const t0 = Date.now();
     let items: RawShopping[] = [];
     let nextStart: number | null = null;
+    let sources: SourceInfo | null = null;
     try {
-      ({ items, nextStart } = await fetchShopping(query, start));
+      ({ items, nextStart, sources } = await fetchShopping(query, start));
     } catch (e) {
       await db.from('sourcing_searches').insert({
         query, query_key: queryKey, page: start, product_id: productId,
@@ -435,6 +445,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchedAt: search.created_at,
       durationMs: duration,
       nextStart,
+      sources,
       offers,
       merchants: await merchantsForOffers(db, offers),
     });
