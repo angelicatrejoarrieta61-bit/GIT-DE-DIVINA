@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 10 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 12 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -280,6 +280,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Encabezado:** transparente sobre la foto; al bajar se vuelve barra sólida (`.header--scrolled`).
 - **Footer en tres pisos:** newsletter, marca + enlaces, barra legal. El newsletter guarda en `subscribers` con `source: 'footer'`.
 - El checkout (`.cv2`) todavía usa su propio lima; no se ha pasado a la paleta nueva.
+- **Carrito vacío → "Te recomendamos"** (`CartDrawer.tsx`): 3 productos al azar, en existencia y con foto (de `getProducts(60)`, se cargan una vez y se barajan cada vez que se abre). Foto cuadrada con corte diagonal (dos esquinas redondeadas y dos rectas, `--rc-cut`), tarjeta de cristal con brillo al pasar el cursor y nombre abajo; clic lleva a `/producto/:slug`. **Con productos en el carrito no se muestra.**
 
 ## 18. Pendientes conocidos
 

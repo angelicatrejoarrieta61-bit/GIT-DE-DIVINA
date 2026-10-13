@@ -236,7 +236,7 @@
 
 /* Vacío */
 .cart-drawer__empty {
-  margin: auto 0;
+  margin: auto 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -260,6 +260,149 @@
 }
 .cart-drawer__empty-btn:hover { background: #222; }
 .cart-drawer__empty-btn:active { transform: scale(0.97); }
+
+/* ── Te recomendamos (carrito vacío) ─────────────────────
+   Editorial: título con filete, foto cuadrada con corte diagonal
+   (dos esquinas redondeadas, dos rectas) sobre tarjeta de cristal. */
+.cart-reco {
+  --rc-cut: 18px 0 18px 0;
+  margin-top: 6px;
+  margin-bottom: auto; /* junto con el vacío, el bloque queda centrado */
+  padding-top: 14px;
+  border-top: 1px solid var(--cd-line);
+}
+.cart-reco__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-family: var(--f-sub);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cd-ink);
+}
+.cart-reco__title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0));
+}
+.cart-reco__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.cart-reco__item { min-width: 0; }
+.cart-drawer--open .cart-reco__item:not(.is-loading) {
+  animation: cd-reco-in 0.5s var(--cd-ease) both;
+  animation-delay: calc(0.18s + var(--i, 0) * 0.07s);
+}
+
+.cart-reco__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  height: 100%;
+  padding: 6px 6px 9px;
+  border-radius: var(--rc-cut);
+  color: var(--cd-ink);
+  text-decoration: none;
+  /* Cristal */
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.28) 55%, rgba(255, 255, 255, 0.4) 100%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+    0 6px 18px -10px rgba(8, 19, 15, 0.45);
+  overflow: hidden;
+  transition: transform 0.35s var(--cd-ease), box-shadow 0.35s var(--cd-ease), background 0.25s ease;
+}
+/* Brillo diagonal del cristal */
+.cart-reco__card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.55) 48%, transparent 62%);
+  transform: translateX(-120%);
+  transition: transform 0.7s var(--cd-ease);
+  pointer-events: none;
+  z-index: 2;
+}
+.cart-reco__card:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.4) 55%, rgba(255, 255, 255, 0.52) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 12px 26px -12px rgba(8, 19, 15, 0.55);
+}
+.cart-reco__card:hover::before { transform: translateX(120%); }
+.cart-reco__card:active { transform: translateY(0) scale(0.98); }
+.cart-reco__card:focus-visible { outline: 2px solid var(--cd-ink); outline-offset: 2px; }
+
+.cart-reco__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--rc-cut);
+  overflow: hidden;
+  background: #f4f3ef;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+.cart-reco__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s var(--cd-ease);
+}
+.cart-reco__card:hover .cart-reco__media img { transform: scale(1.05); }
+
+.cart-reco__name {
+  padding: 0 2px;
+  font-family: var(--f-body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--cd-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(11px * 1.25 * 2);
+}
+
+/* Cargando */
+.cart-reco__item.is-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--rc-cut);
+  background: rgba(255, 255, 255, 0.3);
+}
+.cart-reco__item.is-loading .cart-reco__media,
+.cart-reco__line {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0.35) 100%);
+  background-size: 200% 100%;
+  animation: cd-shimmer 1.2s linear infinite;
+}
+.cart-reco__line { display: block; height: 8px; border-radius: 4px; }
+.cart-reco__line--short { width: 60%; }
+
+@keyframes cd-reco-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cd-shimmer { to { background-position: -200% 0; } }
 
 /* Footer */
 .cart-drawer__footer {
@@ -425,7 +568,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cart-overlay, .cart-drawer--open .cart-item { animation: none; }
+  .cart-overlay, .cart-drawer--open .cart-item, .cart-drawer--open .cart-reco__item, .cart-reco__line, .cart-reco__item.is-loading .cart-reco__media { animation: none; }
+  .cart-reco__card, .cart-reco__card::before, .cart-reco__media img { transition: none; }
   .cart-drawer { transition: opacity 0.15s ease, visibility 0s; transform: none; }
   .cart-drawer__close:hover { transform: none; }
 }

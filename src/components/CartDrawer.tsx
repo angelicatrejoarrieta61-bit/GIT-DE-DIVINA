@@ -1,13 +1,25 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useCartStore } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { getImageUrl, supabase } from '../lib/supabase';
-import { getStoreConfig } from '../lib/queries';
+import { getImageUrl } from '../lib/supabase';
+import { getProducts } from '../lib/queries';
+import type { Product } from '../types';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
 
 type CheckoutState = 'idle' | 'loading' | 'error';
+
+const RECO_COUNT = 3;
+/** 3 productos al azar (con foto y en existencia) para el carrito vacío. */
+function pickRandom(list: Product[], n: number): Product[] {
+  const pool = list.filter((p) => p.image_url && p.slug);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
 
 export const CartDrawer: React.FC = () => {
   const {
@@ -26,21 +38,27 @@ export const CartDrawer: React.FC = () => {
   } = useCartStore();
   const navigate = useNavigate();
 
-  const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
-  const [errorMsg, setErrorMsg] = useState<string>('');
-  const [footerImg, setFooterImg] = useState<string | null>(null);
+  const [checkoutState] = useState<CheckoutState>('idle');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+  const [reco, setReco] = useState<Product[] | null>(null); // null = cargando
+  const catalogRef = useRef<Product[] | null>(null);
 
+  // "Te recomendamos": solo con el carrito vacío; 3 productos distintos cada vez que se abre
+  const isEmpty = items.length === 0;
   useEffect(() => {
-    const fetchConfig = async () => {
-      const config = await getStoreConfig();
-      if (config?.cart_footer_img) {
-        setFooterImg(config.cart_footer_img);
+    if (!isOpen || !isEmpty) return;
+    let alive = true;
+    const run = async () => {
+      if (!catalogRef.current) {
+        setReco(null);
+        catalogRef.current = await getProducts(60);
       }
+      if (alive) setReco(pickRandom(catalogRef.current, RECO_COUNT));
     };
-    fetchConfig();
-  }, []);
+    void run();
+    return () => { alive = false; };
+  }, [isOpen, isEmpty]);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,13 +121,41 @@ export const CartDrawer: React.FC = () => {
         {/* Items */}
         <div className="cart-drawer__items">
           {items.length === 0 ? (
-            <div className="cart-drawer__empty">
-              <ShoppingBag size={36} aria-hidden="true" />
-              <p>Tu carrito está vacío</p>
-              <Link to="/catalogo" onClick={closeCart} className="cart-drawer__empty-btn">
-                Ver productos
-              </Link>
-            </div>
+            <>
+              <div className="cart-drawer__empty">
+                <ShoppingBag size={36} aria-hidden="true" />
+                <p>Tu carrito está vacío</p>
+                <Link to="/catalogo" onClick={closeCart} className="cart-drawer__empty-btn">
+                  Ver productos
+                </Link>
+              </div>
+
+              {(reco === null || reco.length > 0) && (
+                <section className="cart-reco" aria-labelledby="cart-reco-title" aria-busy={reco === null}>
+                  <h3 id="cart-reco-title" className="cart-reco__title"><span>Te recomendamos</span></h3>
+                  <ul className="cart-reco__grid">
+                    {reco === null
+                      ? Array.from({ length: RECO_COUNT }, (_, i) => (
+                          <li key={i} className="cart-reco__item is-loading" aria-hidden="true">
+                            <span className="cart-reco__media" />
+                            <span className="cart-reco__line" />
+                            <span className="cart-reco__line cart-reco__line--short" />
+                          </li>
+                        ))
+                      : reco.map((p, i) => (
+                          <li key={p.id} className="cart-reco__item" style={{ '--i': i } as React.CSSProperties}>
+                            <Link to={`/producto/${p.slug}`} onClick={closeCart} className="cart-reco__card">
+                              <span className="cart-reco__media">
+                                <img src={getImageUrl(p.image_url || '', { width: 240, quality: 75 })} alt="" loading="lazy" />
+                              </span>
+                              <span className="cart-reco__name">{p.name}</span>
+                            </Link>
+                          </li>
+                        ))}
+                  </ul>
+                </section>
+              )}
+            </>
           ) : (
             items.map((item, i) => (
               <div
