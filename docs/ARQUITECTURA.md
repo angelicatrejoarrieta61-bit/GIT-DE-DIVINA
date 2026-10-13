@@ -280,6 +280,8 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Encabezado:** transparente sobre la foto; al bajar se vuelve barra sólida (`.header--scrolled`).
 - **Footer en tres pisos:** newsletter, marca + enlaces, barra legal. El newsletter guarda en `subscribers` con `source: 'footer'`.
 - El checkout (`.cv2`) todavía usa su propio lima; no se ha pasado a la paleta nueva.
+- **Ficha de producto** (`ProductPage.tsx` + `ProductPage.css`, clases `.pdp-*`): ruta compacta; galería con miniaturas verticales, corte diagonal y zoom que sigue al cursor; precio, 3 beneficios (la descripción en formato `TÍTULO: texto` se convierte en lista), cantidad + "Agregar · $total" y "Comprar ahora" (agrega y va a `/checkout`); envío gratis desde $999, producto original, pago seguro; acordeón de detalles (descripción, modo de uso, ingredientes, preguntas) que solo muestra lo que tiene datos; 4 relacionados (misma marca, luego misma categoría); barra fija de compra en celular. Se conservan Helmet, Schema.org y canonical. **Las etiquetas internas (`bajo-pedido`, `TOP_HOME`, `BADGE:*`) ya no se muestran como texto**; `BADGE:X` se ve como insignia sobre la foto.
+- **Insignias** (`BADGE:*` en tarjetas y ficha): salvia nacarada con punto que late y destello; el descuento va en verde profundo. Un descuento menor a 1 % no se muestra.
 - **Carrito vacío → "Te recomendamos"** (`CartDrawer.tsx`): 3 productos al azar, en existencia y con foto (de `getProducts(60)`, se cargan una vez y se barajan cada vez que se abre). Foto cuadrada con corte diagonal (dos esquinas redondeadas y dos rectas, `--rc-cut`), tarjeta de cristal con brillo al pasar el cursor y nombre abajo; clic lleva a `/producto/:slug`. **Con productos en el carrito no se muestra.**
 
 ## 18. Pendientes conocidos
@@ -289,6 +291,8 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Cálculo de margen (Abastecimiento):** valores acordados: comisión Clip 5 % total (sin IVA extra, sin cuota fija) y colchón de envío $20 por venta (`sourcing_customer_shipping`); el envío real se cobra aparte al cliente. Se guardan en `store_config` (`sourcing_*`).
 - **Coincidencia:** un anuncio que junta dos productos ("Lambdacaps + Lambdapil", "Loción + Champú"; no cuenta "SPF 50+") es **No confirmada** (combo). "Champú" = "shampoo". Se ignoran palabras de relleno de títulos de Amazon (ayuda, reducir, estimula, crecimiento, cabello, capilar…). Si el anuncio no trae la marca ni el nombre de la línea, es No confirmada.
 - **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.
+- **Seguridad:** `products.cost_price` (costo de proveedor) se puede leer con la llave pública. Falta ocultarlo al público.
+- **SEO automático de productos al crearlos** (con IA o por reglas): propuesto, pendiente de decisión.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 

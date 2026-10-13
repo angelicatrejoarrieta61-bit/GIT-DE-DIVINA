@@ -21,9 +21,10 @@ export const ProductCard: React.FC<Props> = ({ product, featured }) => {
     trackEvent('add_to_cart', { currency: 'MXN', value: product.price, items: [analyticsItem(product)] });
   };
 
-  const discount = product.compare_price && product.compare_price > product.price
+  const pct = product.compare_price && product.compare_price > product.price
     ? Math.round((1 - product.price / product.compare_price) * 100)
-    : null;
+    : 0;
+  const discount = pct >= 1 ? pct : null; // nunca mostrar un 0 suelto
 
   return (
     <Link to={`/producto/${product.slug}`} className={`product-card ${featured ? 'is-featured' : ''} ${product.in_stock ? '' : 'is-out'}`} aria-label={product.name}>

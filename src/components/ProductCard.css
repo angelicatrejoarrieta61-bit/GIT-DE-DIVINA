@@ -60,9 +60,51 @@
   padding: 8px 11px;
   border-radius: 0;
 }
-.badge-lime { background: var(--b-green-800); color: var(--b-cream); }
-.badge-discount { background: var(--b-sage); color: var(--b-green-950); }
+/* Insignia llamativa: salvia nacarada con destello que recorre la etiqueta */
+.product-card .badge-lime {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 800;
+  color: var(--b-green-950);
+  background: linear-gradient(115deg, #dbe8ca 0%, #a9bd93 40%, #8aa076 68%, #cfdfbc 100%);
+  border-radius: 0 0 12px 0;
+  box-shadow: 0 8px 18px -8px rgba(156, 175, 136, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(8, 19, 15, 0.12);
+}
+.product-card .badge-lime::before {
+  content: '';
+  width: 6px; height: 6px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--b-green-950);
+  box-shadow: 0 0 0 3px rgba(8, 19, 15, 0.14);
+  animation: badge-pulse 2.4s ease-in-out infinite;
+}
+.product-card .badge-lime::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  mix-blend-mode: soft-light;
+  transform: translateX(-130%);
+  animation: badge-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Descuento: contraste fuerte, verde profundo con cifra salvia */
+.product-card .badge-discount {
+  background: var(--b-green-950);
+  color: var(--b-sage-light);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(195, 209, 179, 0.35);
+}
+.product-card .badge-discount::before { background: var(--b-sage-light); box-shadow: 0 0 0 3px rgba(195, 209, 179, 0.2); }
+.product-card .badge-discount::after { background: linear-gradient(105deg, transparent 35%, rgba(195, 209, 179, 0.35) 50%, transparent 65%); }
 .product-card .badge-dark { background: rgba(43, 45, 48, 0.94); color: var(--b-cream); }
+
+@keyframes badge-shine { 0%, 55% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+@keyframes badge-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.7); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) {
+  .product-card .badge-lime::before, .product-card .badge-lime::after { animation: none; }
+}
 
 /* Botón "+" en el corte: círculo crema, visible sobre cualquier foto */
 .product-card__add-btn {
