@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 12 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 13 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -159,6 +159,8 @@ Flujo actual, en `CheckoutPage.tsx`:
 **Número de autorización:** la documentación pública de Clip no lista un campo de código de autorización; se guarda `receipt_no` (recibo de Clip) y, si Clip llega a mandar `authorization_code`, también. La respuesta completa (sin el token) queda en `clip_raw` para revisar qué campos manda Clip en realidad.
 
 **Código antiguo que sigue en el repo y no usa el checkout actual:** `api/clip-payment.ts`, `api/clip-card-token.ts`, `api/clip-installments.ts`, `api/clip-webhook.ts`, `api/create-payment.ts`, `api/test-clip.ts` y `src/hooks/useClipPayment.ts`. Antes de borrarlos, confirmar en el panel de Clip que no haya un webhook apuntando a `clip-webhook`.
+
+**Envío** (`src/lib/shipping.ts`, única fuente de la regla): **$120 MXN con IVA** por pedido si los productos (ya con cupón) suman menos de **$999**; desde $999 es gratis. Se suma al total que se cobra en Clip y que se guarda en `orders.total`. El carrito y el checkout muestran Subtotal, Descuento, Envío (o "Gratis") y una barra de "te faltan $X para envío gratis"; la ficha de producto dice "Envío $120 · gratis desde $999". No hay columna aparte para el envío en `orders`.
 
 **Cupón:** hay un solo código de descuento (10 %) escrito directamente en `src/store/cartStore.ts`. No se administra desde el panel.
 

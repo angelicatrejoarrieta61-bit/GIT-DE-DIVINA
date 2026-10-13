@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { createOrder, updateOrderStatus, getStoreConfig } from '../lib/queries';
+import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
@@ -39,7 +40,11 @@ export const CheckoutPage: React.FC = () => {
     discountAmount, totalAfterDiscount,
   } = useCartStore();
 
-  const finalTotal = couponCode ? totalAfterDiscount() : total();
+  // Productos (con cupón) + envío: $120 si no llega a $999, gratis desde $999
+  const productsTotal = couponCode ? totalAfterDiscount() : total();
+  const shipping = shippingFor(productsTotal);
+  const finalTotal = orderTotal(productsTotal);
+  const missingFree = missingForFreeShipping(productsTotal);
   const navigate = useNavigate();
   const sdkCardRef = useRef<any>(null);
 
@@ -453,19 +458,27 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="cv2__summary-total">
+                <div className="cv2__summary-row"><span>Subtotal</span><span>${total().toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
                 {couponCode && (
-                  <>
-                    <div className="cv2__summary-row"><span>Subtotal</span><span>${total().toLocaleString('es-MX')}</span></div>
-                    <div className="cv2__summary-row cv2__summary-row--discount">
-                      <span>Descuento ({discountPercentage}%)</span>
-                      <span>-${discountAmount().toLocaleString('es-MX')}</span>
-                    </div>
-                  </>
+                  <div className="cv2__summary-row cv2__summary-row--discount">
+                    <span>Descuento ({discountPercentage}%)</span>
+                    <span>-${discountAmount().toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                <div className={`cv2__summary-row ${shipping === 0 ? 'cv2__summary-row--discount' : ''}`}>
+                  <span>Envío</span>
+                  <span>{shipping === 0 ? 'Gratis' : `$${shipping.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}</span>
+                </div>
+                {missingFree > 0 && (
+                  <p className="cv2__ship-hint">
+                    Agrega <strong>${missingFree.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong> más y tu envío es gratis.
+                    <span className="cv2__ship-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (productsTotal / FREE_SHIPPING_FROM) * 100)}%` }} /></span>
+                  </p>
                 )}
                 <div className="cv2__summary-row cv2__summary-row--total">
                   <span>Total</span>
                   <span className="cv2__summary-total-price">
-                    ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} <small>MXN</small>
+                    ${finalTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} <small>MXN · IVA incluido</small>
                   </span>
                 </div>
               </div>
@@ -473,7 +486,7 @@ export const CheckoutPage: React.FC = () => {
               <div className="cv2__msi">💳 Hasta 12 MSI según tu banco</div>
 
               <ul className="cv2__benefits">
-                <li>🚚 Envío gratis en compras mayores a $999 MXN</li>
+                <li>🚚 Envío $120 · gratis en compras desde $999 MXN</li>
                 <li>🔒 Tu información está protegida</li>
                 <li>⚡ Proceso rápido y seguro con Clip México</li>
               </ul>

@@ -3,6 +3,7 @@ import { useCartStore } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../lib/supabase';
 import { getProducts } from '../lib/queries';
+import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
 import type { Product } from '../types';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
@@ -73,6 +74,10 @@ export const CartDrawer: React.FC = () => {
   };
 
   const cartTotal = total();
+  const productsTotal = couponCode ? totalAfterDiscount() : cartTotal;
+  const shipping = shippingFor(productsTotal);
+  const grandTotal = orderTotal(productsTotal);
+  const missingFree = missingForFreeShipping(productsTotal);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -84,10 +89,10 @@ export const CartDrawer: React.FC = () => {
 
   const handleCheckout = useCallback(() => {
     if (!items.length) return;
-    trackEvent('begin_checkout', { currency: 'MXN', value: totalAfterDiscount(), coupon: couponCode || undefined, items: analyticsItems(items) });
+    trackEvent('begin_checkout', { currency: 'MXN', value: grandTotal, coupon: couponCode || undefined, items: analyticsItems(items) });
     closeCart();
     navigate('/checkout');
-  }, [items, closeCart, navigate, totalAfterDiscount, couponCode]);
+  }, [items, closeCart, navigate, grandTotal, couponCode]);
 
   return (
     <>
@@ -237,28 +242,31 @@ export const CartDrawer: React.FC = () => {
               {couponError && <p className="cart-drawer__coupon-error">{couponError}</p>}
             </div>
 
-            {couponCode ? (
-              <>
-                <div className="cart-drawer__row-item">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(cartTotal)}</span>
-                </div>
-                <div className="cart-drawer__row-item discount">
-                  <span>Descuento ({discountPercentage}%):</span>
-                  <span>-{formatCurrency(discountAmount())}</span>
-                </div>
-                <div className="cart-drawer__total-row cart-drawer__total-row--split">
-                  <span>Total:</span>
-                  <span>{formatCurrency(totalAfterDiscount())}</span>
-                </div>
-              </>
-            ) : (
-              <div className="cart-drawer__total-row">
-                <span>Total:</span>
-                <span>{formatCurrency(cartTotal)}</span>
+            <div className="cart-drawer__row-item">
+              <span>Subtotal:</span>
+              <span>{formatCurrency(cartTotal)}</span>
+            </div>
+            {couponCode && (
+              <div className="cart-drawer__row-item discount">
+                <span>Descuento ({discountPercentage}%):</span>
+                <span>-{formatCurrency(discountAmount())}</span>
               </div>
             )}
-            
+            <div className={`cart-drawer__row-item ${shipping === 0 ? 'discount' : ''}`}>
+              <span>Envío:</span>
+              <span>{shipping === 0 ? 'Gratis' : formatCurrency(shipping)}</span>
+            </div>
+            {missingFree > 0 && (
+              <p className="cart-drawer__ship-hint">
+                Te faltan <strong>{formatCurrency(missingFree)}</strong> para envío gratis
+                <span className="cart-drawer__ship-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (productsTotal / FREE_SHIPPING_FROM) * 100)}%` }} /></span>
+              </p>
+            )}
+            <div className="cart-drawer__total-row cart-drawer__total-row--split">
+              <span>Total:</span>
+              <span>{formatCurrency(grandTotal)}</span>
+            </div>
+
             <button
               type="button"
               onClick={handleCheckout}

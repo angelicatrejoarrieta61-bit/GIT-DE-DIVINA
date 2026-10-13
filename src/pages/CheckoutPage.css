@@ -380,7 +380,7 @@
   margin: 0; font-size: 13px; color: var(--cv2-dark-text);
   font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
 }
-.cv2__summary-row--discount + .cv2__summary-row--total {
+.cv2__summary-total .cv2__summary-row--total {
   padding-top: 8px; margin-top: 6px; border-top: 1px solid var(--cv2-dark-line);
 }
 .cv2__summary-total-price {
@@ -389,6 +389,12 @@
 }
 .cv2__summary-total-price small { font-size: 11px; font-weight: 700; color: var(--cv2-dark-muted); }
 
+/* Envío: cuánto falta para que sea gratis */
+.cv2__ship-hint { margin: 2px 0 8px; font-size: 11.5px; line-height: 1.4; color: var(--cv2-dark-muted); }
+.cv2__ship-hint strong { color: #fff; }
+.cv2__ship-bar { display: block; height: 4px; margin-top: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.cv2__ship-bar span { display: block; height: 100%; border-radius: inherit; background: var(--cv2-lime); transition: width 0.4s ease; }
+@media (prefers-reduced-motion: reduce) { .cv2__ship-bar span { transition: none; } }
 /* MSI */
 .cv2__msi {
   display: flex; align-items: center; justify-content: center; gap: 6px;

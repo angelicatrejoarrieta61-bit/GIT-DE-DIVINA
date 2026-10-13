@@ -24,6 +24,7 @@ import { ProductCard } from '../components/ProductCard';
 import type { Product } from '../types';
 import './ProductPage.css';
 import { analyticsItem, trackEvent, trackOnce } from '../lib/analytics';
+import { FREE_SHIPPING_FROM, SHIPPING_COST } from '../lib/shipping';
 
 // ── Tipos extendidos ────────────────────────────────────────────────────────
 interface IngredientInfo { name: string; pct?: string; benefit: string; aka?: string }
@@ -64,7 +65,6 @@ const ROUTINE_LABELS: Record<string, string> = {
   'tratamiento': 'Tratamiento especial',
 };
 
-const FREE_SHIPPING_FROM = 999; // misma regla que muestra el checkout
 const money = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const hasHtml = (s: string) => /<\/?[a-z][\s\S]*>/i.test(s);
 
@@ -369,7 +369,7 @@ export const ProductPage: React.FC = () => {
               </div>
 
               <ul className="pdp-trust">
-                <li><Truck size={15} aria-hidden="true" /><span>{product.price >= FREE_SHIPPING_FROM ? 'Envío gratis' : `Envío gratis desde ${money(FREE_SHIPPING_FROM)}`}</span></li>
+                <li><Truck size={15} aria-hidden="true" /><span>{product.price >= FREE_SHIPPING_FROM ? 'Envío gratis' : <>Envío ${SHIPPING_COST} · <strong>gratis desde ${FREE_SHIPPING_FROM}</strong></>}</span></li>
                 <li><BadgeCheck size={15} aria-hidden="true" /><span>Producto original</span></li>
                 <li><ShieldCheck size={15} aria-hidden="true" /><span>Pago seguro con tarjeta</span></li>
               </ul>
