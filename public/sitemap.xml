@@ -1,146 +1,320 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://www.divinastore.com.mx/</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/catalogo</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/quienes-somos</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.divinastore.com.mx/programa-promocion</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.divinastore.com.mx/contacto</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/coleccion/cremas-serums</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/coleccion/cremas-faciales</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/coleccion/fotoprotectores-solares-copia</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/coleccion/limpiadores</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/coleccion/limpiadores-faciales</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/coleccion/fotoprotectores</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/coleccion/grooming</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/solucion-micelar-4-en-1</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/la-roche-posay-effaclar-gel-limpiador-microexfoliante-facial-reduce-sebo-y-marcas</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/la-roche-posay-effaclar-gel-limpiador-microexfoliante-facial-reduce-sebo-y-marcas-1791310771210.png</image:loc>
+      <image:title>La Roche-Posay, Effaclar Gel Limpiador Microexfoliante Facial, Reduce Sebo y Marcas</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/la-roche-posay-effaclar-gel-limpiador-microexfoliante-facial-reduce-sebo-y-marcas-1-1791310771210.png</image:loc>
+      <image:title>La Roche-Posay, Effaclar Gel Limpiador Microexfoliante Facial, Reduce Sebo y Marcas</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/la-roche-posay-effaclar-gel-limpiador-microexfoliante-facial-reduce-sebo-y-marcas-2-1791310771210.png</image:loc>
+      <image:title>La Roche-Posay, Effaclar Gel Limpiador Microexfoliante Facial, Reduce Sebo y Marcas</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/essential-cleansing-aceite-limpiador-facial</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/hyaluronic-eyes-cream-2</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/hyaluronic-eyes-cream-2-1791512715297.png</image:loc>
+      <image:title>ISDIN Hyaluronic Eyes cream</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/hyaluronic-eyes-cream-2-1-1791512715297.png</image:loc>
+      <image:title>ISDIN Hyaluronic Eyes cream</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/hyaluronic-eyes-cream-2-2-1791512715297.png</image:loc>
+      <image:title>ISDIN Hyaluronic Eyes cream</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/salicylic-reneweal-serum</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/neutrogena-facial-hydro-boost-water-gel-50-g</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/neutrogena-facial-hydro-boost-water-gel-50-g-1791593309108.png</image:loc>
+      <image:title>Neutrogena Facial Hydro Boost Water gel 50 g</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/hyaluronic-eyes-cream</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/2pzs-dermaroller-rodillo-facial-0-25mm-derma-roller-de-titanio-para-cabello-y-barba-estimu</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/2pzs-dermaroller-rodillo-facial-0-25mm-derma-roller-de-titanio-para-cabello-y-barba-estimu-1791814700580.png</image:loc>
+      <image:title>2PZS Dermaroller Rodillo Facial, 0.25MM Derma Roller de Titanio para Cabello y Barba, Estimular La Regeneración del Cabello, Rodillo Facial para Masaje facial</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/2pzs-dermaroller-rodillo-facial-0-25mm-derma-roller-de-titanio-para-cabello-y-barba-estimu-1-1791814700580.png</image:loc>
+      <image:title>2PZS Dermaroller Rodillo Facial, 0.25MM Derma Roller de Titanio para Cabello y Barba, Estimular La Regeneración del Cabello, Rodillo Facial para Masaje facial</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/2pzs-dermaroller-rodillo-facial-0-25mm-derma-roller-de-titanio-para-cabello-y-barba-estimu-2-1791814700580.png</image:loc>
+      <image:title>2PZS Dermaroller Rodillo Facial, 0.25MM Derma Roller de Titanio para Cabello y Barba, Estimular La Regeneración del Cabello, Rodillo Facial para Masaje facial</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/2pzs-dermaroller-rodillo-facial-0-25mm-derma-roller-de-titanio-para-cabello-y-barba-estimu-3-1791814700580.png</image:loc>
+      <image:title>2PZS Dermaroller Rodillo Facial, 0.25MM Derma Roller de Titanio para Cabello y Barba, Estimular La Regeneración del Cabello, Rodillo Facial para Masaje facial</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/hyaluronic-and-moisture-oily-crema</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/rodillo-de-hielo-para-cara-y-ojos-hielo-para-masaje-facial-reutilizable</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/rodillo-de-hielo-para-cara-y-ojos-hielo-para-masaje-facial-reutilizable-1791849726207.png</image:loc>
+      <image:title>Rodillo de Hielo para Cara y Ojos, Hielo para Masaje Facial Reutilizable</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/rodillo-de-hielo-para-cara-y-ojos-hielo-para-masaje-facial-reutilizable-1-1791849726207.png</image:loc>
+      <image:title>Rodillo de Hielo para Cara y Ojos, Hielo para Masaje Facial Reutilizable</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/rodillo-de-hielo-para-cara-y-ojos-hielo-para-masaje-facial-reutilizable-2-1791849726207.png</image:loc>
+      <image:title>Rodillo de Hielo para Cara y Ojos, Hielo para Masaje Facial Reutilizable</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/a-g-e-reverse-day-crema-de-d-a</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original-1791850629712.png</image:loc>
+      <image:title>Vaseline - Bálsamo Corporal en Barra (1 Pieza de 40 g.)</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original-1-1791850629712.png</image:loc>
+      <image:title>Vaseline - Bálsamo Corporal en Barra (1 Pieza de 40 g.)</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original-2-1791850629712.png</image:loc>
+      <image:title>Vaseline - Bálsamo Corporal en Barra (1 Pieza de 40 g.)</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original-3-1791850629712.png</image:loc>
+      <image:title>Vaseline - Bálsamo Corporal en Barra (1 Pieza de 40 g.)</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/vaseline-balsamo-corporal-en-barra-1-pieza-de-40-g-original-4-1791850629712.png</image:loc>
+      <image:title>Vaseline - Bálsamo Corporal en Barra (1 Pieza de 40 g.)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.divinastore.com.mx/producto/dove-serum-corporal-en-crema-tono-uniforme-niacinamida</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/dove-serum-corporal-en-crema-tono-uniforme-niacinamida-1791990949552.jpg</image:loc>
+      <image:title>Dove Sérum Corporal en Crema Tono Uniforme Niacinamida</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/dove-serum-corporal-en-crema-tono-uniforme-niacinamida-1-1791990949552.jpg</image:loc>
+      <image:title>Dove Sérum Corporal en Crema Tono Uniforme Niacinamida</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/dove-serum-corporal-en-crema-tono-uniforme-niacinamida-2-1791990949552.jpg</image:loc>
+      <image:title>Dove Sérum Corporal en Crema Tono Uniforme Niacinamida</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/dove-serum-corporal-en-crema-tono-uniforme-niacinamida-3-1791990949552.jpg</image:loc>
+      <image:title>Dove Sérum Corporal en Crema Tono Uniforme Niacinamida</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.divinastore.com.mx/producto/tocobo-bloqueador</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/tocobo-bloqueador-1791101365239.png</image:loc>
+      <image:title>Tocobo Cotton Soft Sun Stick</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/tocobo-bloqueador-1-1791101365239.png</image:loc>
+      <image:title>Tocobo Cotton Soft Sun Stick</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/tocobo-bloqueador-2-1791101365239.png</image:loc>
+      <image:title>Tocobo Cotton Soft Sun Stick</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.divinastore.com.mx/producto/isdin-fusion-water-urban</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/isdin-fusion-water-urban-2-1791061829398.webp</image:loc>
+      <image:title>ISDIN Fusion Water Urban</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/producto/retinal-smooth-serum</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/retinal-smooth-serum-1776666993356.jpg</image:loc>
+      <image:title>ISDIN Retinal Smooth Sérum</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/retinal-smooth-serum-1-1776666993356.jpg</image:loc>
+      <image:title>ISDIN Retinal Smooth Sérum</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/retinal-smooth-serum-2-1776666993356.jpg</image:loc>
+      <image:title>ISDIN Retinal Smooth Sérum</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/retinal-smooth-serum-3-1776666993356.jpg</image:loc>
+      <image:title>ISDIN Retinal Smooth Sérum</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/retinal-smooth-serum-4-1776666993356.jpg</image:loc>
+      <image:title>ISDIN Retinal Smooth Sérum</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://www.divinastore.com.mx/producto/a-g-e-reverse-night-50ml</loc>
-    <lastmod>2026-07-19</lastmod>
+    <loc>https://www.divinastore.com.mx/producto/cerave-gel-limpiador-espumoso-para-piel-normal-a-grasa-con-ceramidas-esenciales</loc>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/cerave-gel-limpiador-espumoso-para-piel-normal-a-grasa-con-ceramidas-esenciales-2-1791310086470.webp</image:loc>
+      <image:title>CeraVe Gel Limpiador Espumoso para Piel Normal a Grasa con Ceramidas Esenciales</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://www.divinastore.com.mx/producto/avene-cleanance-gel-limpiador-400-ml</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/avene-cleanance-gel-limpiador-400-ml-1791849942621.png</image:loc>
+      <image:title>Avene Cleanance Gel Limpiador 400 ml</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/avene-cleanance-gel-limpiador-400-ml-1-1791849954074.png</image:loc>
+      <image:title>Avene Cleanance Gel Limpiador 400 ml</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://zqxhatthhmjrakfqjngc.supabase.co/storage/v1/object/public/divina-assets/products/avene-cleanance-gel-limpiador-400-ml-2-1791849954074.png</image:loc>
+      <image:title>Avene Cleanance Gel Limpiador 400 ml</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/contaminacion-cdmx-como-afecta-tu-piel</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/limpieza-nocturna-eliminar-contaminacion</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/rutina-matutina-piel-cdmx</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/ingredientes-activos-contra-contaminacion</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/fotoproteccion-spf-beneficios-reales-para-tu-piel-en-cdmx-mprmlr3g</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/que-hace-el-fotoproteccion-spf-en-tu-piel-y-por-que-debes-usarlo-mqd0aqo8</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.divinastore.com.mx/blog/fotoproteccion-spf-guia-completa-con-evidencia-cientifica-mrlfpxgy</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

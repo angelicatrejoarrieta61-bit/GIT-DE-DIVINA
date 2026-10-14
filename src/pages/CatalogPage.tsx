@@ -52,7 +52,7 @@ export const CatalogPage: React.FC = () => {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: 'Catalogo Completo — Divina Store MX',
-    description: 'Explora todos los productos de skincare y grooming premium disponibles en Divina Store MX. ISDIN, La Roche-Posay, Vichy y mas.',
+    description: 'Explora todos los productos de skincare y grooming premium disponibles en Divina Store MX. ISDIN, La Roche-Posay, Avène, CeraVe y más.',
     url: `${SITE_URL}/catalogo`,
     breadcrumb: {
       '@type': 'BreadcrumbList',
@@ -119,13 +119,13 @@ export const CatalogPage: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Catalogo Completo | Skincare y Grooming Premium — Divina Store MX</title>
-        <meta name="description" content="Explora todos nuestros productos de skincare y grooming premium en Mexico. ISDIN, La Roche-Posay, Vichy y mas. Envio a CDMX y toda la republica." />
+        <title>Catálogo de skincare original en México | Divina Store</title>
+        <meta name="description" content="Todo el skincare 100% original: ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999." />
         <link rel="canonical" href={`${SITE_URL}/catalogo`} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${SITE_URL}/catalogo`} />
-        <meta property="og:title" content="Catalogo Completo | Skincare Premium — Divina Store MX" />
-        <meta property="og:description" content="ISDIN, La Roche-Posay, Vichy y mas. Skincare premium original con envio a CDMX y toda la republica." />
+        <meta property="og:title" content="Catálogo de skincare original en México | Divina Store" />
+        <meta property="og:description" content="Todo el skincare 100% original: ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999." />
         <meta property="og:image" content={`${SITE_URL}/og-image.jpg`} />
         <meta property="og:locale" content="es_MX" />
         <meta property="og:site_name" content="Divina Store MX" />

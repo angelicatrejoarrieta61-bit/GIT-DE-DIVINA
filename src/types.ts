@@ -14,6 +14,7 @@ export interface Product {
   category?: string;
   image_status?: string;
   sku?: string;
+  ean?: string | null;
   collection?: Collection | null;
   routine_step?: string;
   concentration?: string;

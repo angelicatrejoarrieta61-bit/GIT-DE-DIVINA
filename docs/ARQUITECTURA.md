@@ -76,6 +76,8 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `blog-queries.ts` | Lecturas y escrituras del blog |
 | `promoterTracking.ts` | Guarda el código de promotora (`?ref=`) 30 días |
 | `analytics.ts` | Eventos de Google Analytics |
+| `seoRules.js` (+ `seoRules.d.ts`) | **Única fuente de SEO**: títulos, descripciones vendedoras, Product schema, URL de colección, schema de la tienda y montos de envío. JS puro porque también lo usa el build en Node |
+| `shipping.ts` | Regla de envío del carrito/checkout (reexporta los montos de `seoRules.js`) |
 
 ## 6. Base de datos (Supabase)
 
@@ -236,7 +238,18 @@ Un enlace con `?ref=CODIGO` guarda el código 30 días en el navegador. En el ch
 2. `vite build` — compila la aplicación.
 3. `scripts/prerender-seo.mjs` — crea un HTML por producto, colección, artículo y página con su título, descripción y datos estructurados ya escritos, para que Google y las redes los lean sin ejecutar JavaScript.
 
-Consecuencia: un producto nuevo funciona de inmediato en la tienda, pero **su SEO se genera hasta el siguiente deploy**.
+Consecuencia: un producto nuevo funciona de inmediato en la tienda, pero **su HTML prerenderizado se genera hasta el siguiente deploy** (en el navegador su SEO ya sale completo desde que se crea).
+
+**Reglas (`src/lib/seoRules.js`, octubre 2026)** — se aplican solas a cada producto, también a los nuevos, sin IA ni costo:
+- **Título:** marca + nombre limpio (sin MAYÚSCULAS sueltas, "ml" en minúscula, conectores en minúscula, sin ", Original" al final), recortado a ~58 caracteres en coma o palabra + " | Divina Store".
+- **Descripción (≤ 158):** "Compra {producto} original a $precio (antes $X si hay descuento ≥ 1 %). {primer beneficio}. Pago seguro con tarjeta. Envío a todo México: $120, gratis desde $999." Se recorta por prioridad (beneficio → "Compra" → pago → nombre).
+- **Product schema:** imágenes con URL absoluta, `sku` (id), `gtin` si hay EAN válido, `brand`, `category`, `Offer` con precio, `InStock`, `NewCondition`, envío ($120 o $0 si el producto vale ≥ $999, MX) y **sin devoluciones** (`MerchantReturnNotPermitted`). No se inventan reseñas ni calificaciones.
+- **Colecciones:** una sola URL, la del menú: `/coleccion/<nombre>` (cremas-faciales, limpiadores, fotoprotectores, grooming). El slug interno (`cremas-serums`, `…-copia`) sigue abriendo la página pero su canonical apunta a la del menú; el sitemap sólo lleva la del menú.
+- **Tienda:** schema `Store` en todas las páginas con `sameAs` = redes del footer (Facebook, X, Instagram) leídas en el build. Sin `SearchAction` (no existe ruta de búsqueda). Sin la frase "hasta 30 % más barato" (retirada por decisión del dueño).
+- **Sin duplicados:** el HTML trae el bloque `SEO_PRERENDER_*` para bots sin JavaScript; `src/main.tsx` lo retira al arrancar y Helmet escribe los mismos datos → un solo canonical y un solo Product schema.
+- **H1:** todas las páginas tienen uno. Home: título del hero + texto oculto (sólo Google y lectores de pantalla) "Skincare 100% original en México…". Colección y Quiénes somos: H1 oculto si el título se apaga desde el admin.
+- **Sitemap:** incluye fotos de cada producto (`image:image`) para Google Imágenes. `lang="es-MX"`.
+- **Peso:** el admin se descarga sólo al entrar a `/admin` (`React.lazy`). JS inicial de la tienda: 1,359 KB → 638 KB (408 → 186 KB gzip).
 
 ## 15. Variables de entorno (Vercel → Settings → Environment Variables)
 
@@ -296,7 +309,8 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Coincidencia:** un anuncio que junta dos productos ("Lambdacaps + Lambdapil", "Loción + Champú"; no cuenta "SPF 50+") es **No confirmada** (combo). "Champú" = "shampoo". Se ignoran palabras de relleno de títulos de Amazon (ayuda, reducir, estimula, crecimiento, cabello, capilar…). Si el anuncio no trae la marca ni el nombre de la línea, es No confirmada.
 - **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.
 - **Seguridad:** `products.cost_price` (costo de proveedor) se puede leer con la llave pública. Falta ocultarlo al público.
-- **SEO automático de productos al crearlos** (con IA o por reglas): propuesto, pendiente de decisión.
+- **Search Console:** después del deploy, enviar `https://www.divinastore.com.mx/sitemap.xml` y pedir indexación de las 4 colecciones (cambiaron de URL canónica).
+- **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Collection } from '../types';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
+import { collectionPath } from '../lib/seoRules';
 import './CategoriesSection.css';
 
 const FALLBACK_EMOJIS: Record<string, string> = {
@@ -33,7 +34,7 @@ export const CategoriesSection: React.FC<Props> = ({ collections, catConfigs = {
           const subtitle = catConfigs[`cat_subtitle_${cat.id}`] || 'COLECCIÓN';
 
           return (
-            <Link key={cat.id || i} to={`/coleccion/${cat.slug}`} className="category-card">
+            <Link key={cat.id || i} to={collectionPath(cat)} className="category-card">
               <div className="category-card__bg">
                 {imgSrc ? (
                   <img

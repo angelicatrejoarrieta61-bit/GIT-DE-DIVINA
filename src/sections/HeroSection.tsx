@@ -176,13 +176,15 @@ export const HeroSection: React.FC<Props> = ({
             ) : (
               <span className="hero__heading-accent">{title}</span>
             )}
+            {/* Texto para Google y lectores de pantalla: no se ve, da contexto de búsqueda al H1 */}
+            <span className="sr-only"> — Skincare 100% original en México: ISDIN, La Roche-Posay, Avène y CeraVe</span>
           </h1>
 
           <p className="hero__text">{subtitle}</p>
 
           <div className="hero__ctas">
             <Link to="/catalogo" className="btn btn-primary">{btn1}</Link>
-            <Link to="/coleccion/cremas-serums" className="btn btn-outline">{btn2}</Link>
+            <Link to="/coleccion/cremas-faciales" className="btn btn-outline">{btn2}</Link>
           </div>
         </div>
       </div>

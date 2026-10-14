@@ -8,6 +8,7 @@ import { getBestSellers, getCollections, getStoreConfig } from '../lib/queries';
 import { supabase } from '../lib/supabase';
 import type { Product, Collection } from '../types';
 import { Seo } from '../components/Seo';
+import { HOME_TITLE, HOME_DESCRIPTION } from '../lib/seoRules';
 import { readCachedStoreConfig } from '../lib/storeBoot';
 
 // Orden por defecto si no hay nada guardado en Supabase
@@ -134,8 +135,8 @@ export const HomePage: React.FC = () => {
   return (
     <>
       <Seo
-        title="Divina Store MX | Skincare y belleza premium en México"
-        description="Compra skincare y productos de belleza originales en México. Descubre rutinas, marcas premium y envío a toda la República en Divina Store MX."
+        title={HOME_TITLE}
+        description={HOME_DESCRIPTION}
         path="/"
       />
       {sectionOrder.map(id => sectionMap[id] ?? null)}

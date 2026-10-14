@@ -51,6 +51,7 @@ export const QuienesSomosPage: React.FC = () => {
         description="Conoce el origen, propósito y legado familiar de Divina Store MX: belleza, autocuidado e identidad inspirados por Angélica."
         path="/quienes-somos"
       />
+      {!heroTitle && <h1 className="sr-only">Quiénes somos: la historia de Divina Store MX</h1>}
       {/* Hero */}
       <section className="about-hero">
         {config.about_hero_img && (

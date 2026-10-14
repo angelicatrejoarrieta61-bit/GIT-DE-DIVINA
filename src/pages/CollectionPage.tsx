@@ -7,6 +7,7 @@ import { ProductCard } from '../components/ProductCard';
 import type { Product, Collection } from '../types';
 import { Seo } from '../components/Seo';
 import { buildCollectionSemantic } from '../lib/useSemantic';
+import { collectionPath } from '../lib/seoRules';
 import { NotFoundPage } from './NotFoundPage';
 import './CollectionPage.css';
 
@@ -127,8 +128,8 @@ export const CollectionPage: React.FC = () => {
       <Seo
         title={semantic.title}
         description={semantic.description}
-        path={`/coleccion/${slug || ''}`}
-        image={semantic.ogImage}
+        path={collectionPath(collection ?? { slug })}
+        image={collection?.image_url ? getImageUrl(collection.image_url) : semantic.ogImage}
       />
       <Helmet>
         <meta name="keywords" content={semantic.keywords} />
@@ -136,6 +137,10 @@ export const CollectionPage: React.FC = () => {
           <script key={index} type="application/ld+json">{JSON.stringify(schema)}</script>
         ))}
       </Helmet>
+      {/* Sin título visible (oculto desde el admin): la página conserva su H1 para Google */}
+      {!(showCard && config[`col_${blockId}_hero_title`] !== '') && (
+        <h1 className="sr-only">{collection?.name || catTitle} originales en México</h1>
+      )}
       {/* Banner */}
       <div 
         className="collection-page__banner"

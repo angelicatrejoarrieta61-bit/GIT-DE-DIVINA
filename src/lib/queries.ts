@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { Product, Collection, Order } from '../types';
 import { writeCachedStoreConfig } from './storeBoot';
+import { slugify } from './seoRules';
 
 // ─── COLLECTIONS ────────────────────────────────────────────────
 export const getCollections = async (): Promise<Collection[]> => {
@@ -29,6 +30,7 @@ export const getCollectionBySlug = async (slug: string): Promise<Collection | nu
     const matched = data.find(c => 
       (c.slug || '').toLowerCase() === lowerSlug ||
       (c.name || '').toLowerCase().replace(/\s+/g, '-') === lowerSlug ||
+      slugify(c.name) === lowerSlug ||
       (c.id || '').toLowerCase() === lowerSlug
     );
     
@@ -84,6 +86,7 @@ export const getProductsByCollection = async (collectionSlug: string): Promise<P
         const c: any = p.collection;
         if ((c.slug || '').toLowerCase() === lowerSlug) return true;
         if ((c.name || '').toLowerCase().replace(/\s+/g, '-') === lowerSlug) return true;
+        if (slugify(c.name) === lowerSlug) return true;
       }
       
       return false;

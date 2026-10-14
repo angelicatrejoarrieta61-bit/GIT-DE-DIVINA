@@ -10,12 +10,25 @@
  *  - ItemList de relacionados
  *  - Meta keywords expandidas
  *  - Canonical URL correcta (divinastore.com.mx, no vercel)
+ *  Título, descripción y Product schema salen de seoRules.js (igual que el prerender del build).
  */
 
 import type { Product } from '../types';
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_OG_IMAGE,
+  absoluteImage,
+  collectionPath,
+  collectionTitle,
+  collectionDescription,
+  productTitle,
+  productDescription,
+  productSchema as buildProductSchema,
+  productBreadcrumb,
+} from './seoRules';
 
-const SITE_URL = 'https://www.divinastore.com.mx';
-const SITE_NAME = 'Divina Store MX';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
 
 // Expansión semántica: sinónimos y términos relacionados por concern
 const CONCERN_KEYWORDS: Record<string, string[]> = {
@@ -57,31 +70,13 @@ export interface SemanticData {
 }
 
 export function buildProductSemantic(product: Product, slug: string): SemanticData {
-  const productUrl = `${SITE_URL}/producto/${slug}`;
-  const imageUrl   = product.image_url || '';
+  const seoInput = { ...product, slug: slug || product.slug };
+  const productUrl = `${SITE_URL}/producto/${encodeURIComponent(seoInput.slug)}`;
+  const imageUrl   = product.image_url ? absoluteImage(product.image_url, SUPABASE_URL) : DEFAULT_OG_IMAGE;
 
-  // ── 1. Meta title con jerarquía de información ──────────────────────────
-  const routineLabel = product.routine_step ? ROUTINE_LABELS[product.routine_step] : '';
-  const concentration = product.concentration ? ` ${product.concentration}` : '';
-  const title = [
-    product.name,
-    product.brand,
-    concentration || routineLabel || '',
-    'Divina Store MX',
-  ].filter(Boolean).join(' | ');
-
-  // ── 2. Meta description densa y natural ─────────────────────────────────
-  const concerns = (product.concerns || []).join(', ');
-  const skinTypes = (product.skin_types || []).map(s => `piel ${s}`).join(', ');
-  const priceStr = `$${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
-
-  const description = [
-    `Compra ${product.name}${product.brand ? ` de ${product.brand}` : ''} en México.`,
-    priceStr + ' con envío a CDMX y toda la república.',
-    concerns ? `Ideal para: ${concerns}.` : '',
-    skinTypes ? `Apto para ${skinTypes}.` : '',
-    product.how_to_use ? '' : 'Producto 100% original en Divina Store MX.',
-  ].filter(Boolean).join(' ').slice(0, 320);
+  // ── 1-2. Título y descripción vendedores (mismas reglas que el prerender del build) ──
+  const title = productTitle(seoInput);
+  const description = productDescription(seoInput);
 
   // ── 3. Keywords expandidas semánticamente ───────────────────────────────
   const baseKeywords = [
@@ -106,63 +101,19 @@ export function buildProductSemantic(product: Product, slug: string): SemanticDa
     ...(product.meta_keywords || []),
   ])].filter(Boolean).join(', ');
 
-  // ── 4. Product Schema ────────────────────────────────────────────────────
+  // ── 4. Product Schema (precio, envío $120 / gratis desde $999, sin devoluciones, GTIN si hay EAN) ──
   const productSchema: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    url: productUrl,
-    description: product.description
-      ? product.description.replace(/<[^>]*>/g, '').trim()
-      : description,
-    image: imageUrl,
-    sku: product.id,
-    brand: { '@type': 'Brand', name: product.brand || SITE_NAME },
-    offers: {
-      '@type': 'Offer',
-      url: productUrl,
-      price: product.price,
-      priceCurrency: 'MXN',
-      availability: product.in_stock
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/OutOfStock',
-      seller: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
-      shippingDetails: {
-        '@type': 'OfferShippingDetails',
-        shippingRate: { '@type': 'MonetaryAmount', currency: 'MXN' },
-        shippingDestination: {
-          '@type': 'DefinedRegion',
-          addressCountry: 'MX',
-        },
-      },
-    },
-    ...(product.compare_price && product.compare_price > product.price
-      ? { hasMerchantReturnPolicy: { '@type': 'MerchantReturnPolicy', returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow' } }
-      : {}),
-    ...(product.ingredients && product.ingredients.length > 0
-      ? { material: product.ingredients.join(', ') }
-      : {}),
+    ...buildProductSchema(seoInput, { supabaseUrl: SUPABASE_URL, collection: product.collection }),
     ...(product.benefits && product.benefits.length > 0
       ? { additionalProperty: product.benefits.map(b => ({ '@type': 'PropertyValue', name: 'Beneficio', value: b })) }
       : {}),
     ...(product.skin_types && product.skin_types.length > 0
-      ? { audience: { '@type': 'Audience', audienceType: product.skin_types.map(s => `Piel ${s}`).join(', ') } }
+      ? { audience: { '@type': 'PeopleAudience', audienceType: product.skin_types.map(s => `Piel ${s}`).join(', ') } }
       : {}),
   };
 
-  // ── 5. BreadcrumbList ────────────────────────────────────────────────────
-  const breadcrumbSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE_URL },
-      { '@type': 'ListItem', position: 2, name: 'Catálogo', item: `${SITE_URL}/catalogo` },
-      ...(product.brand
-        ? [{ '@type': 'ListItem', position: 3, name: product.brand, item: `${SITE_URL}/catalogo?brand=${encodeURIComponent(product.brand)}` }]
-        : []),
-      { '@type': 'ListItem', position: product.brand ? 4 : 3, name: product.name, item: productUrl },
-    ],
-  };
+  // ── 5. BreadcrumbList (Inicio › Colección › Producto) ───────────────────
+  const breadcrumbSchema = productBreadcrumb(seoInput, product.collection);
 
   // ── 6. FAQPage ───────────────────────────────────────────────────────────
   const schemas: object[] = [productSchema, breadcrumbSchema];
@@ -208,10 +159,11 @@ export function buildCollectionSemantic(params: {
   products?: Product[];
 }): SemanticData {
   const { name, slug, description, products = [] } = params;
-  const collectionUrl = `${SITE_URL}/coleccion/${slug}`;
+  // Una sola URL por colección (la del menú): /coleccion/cremas-faciales aunque se abra por su slug interno.
+  const collectionUrl = `${SITE_URL}${collectionPath({ name, slug })}`;
 
-  const title = `${name} | Skincare Premium México — Divina Store MX`;
-  const desc = description || `Descubre ${name} en Divina Store MX. Productos originales con envío a toda la república mexicana.`;
+  const title = collectionTitle(name);
+  const desc = collectionDescription(name, description);
 
   const schemas: object[] = [
     {
@@ -226,7 +178,7 @@ export function buildCollectionSemantic(params: {
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE_URL },
+        { '@type': 'ListItem', position: 1, name: 'Inicio', item: `${SITE_URL}/` },
         { '@type': 'ListItem', position: 2, name: name, item: collectionUrl },
       ],
     },
@@ -242,7 +194,7 @@ export function buildCollectionSemantic(params: {
       itemListElement: products.slice(0, 20).map((p, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${SITE_URL}/producto/${p.slug}`,
+        url: `${SITE_URL}/producto/${encodeURIComponent(p.slug)}`,
         name: p.name,
       })),
     });
@@ -250,10 +202,10 @@ export function buildCollectionSemantic(params: {
 
   return {
     title,
-    description: desc.slice(0, 320),
+    description: desc,
     keywords: `${name}, skincare México, ${SITE_NAME}, productos originales`,
     canonical: collectionUrl,
     schemas,
-    ogImage: `${SITE_URL}/og-image.jpg`,
+    ogImage: DEFAULT_OG_IMAGE,
   };
 }

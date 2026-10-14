@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
   <meta charset="UTF-8" />
   <meta name="google-site-verification" content="WQbZfG6LtuUH_McbNptJTqDESl_7jOefrPQI41D1UVc" />
@@ -9,54 +9,32 @@
   <link rel="shortcut icon" href="/favicon.ico?v=20260719-3" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- TODO (prioridad alta): este title/description deben volverse dinámicos
-       por ruta con react-helmet-async. Mientras tanto, optimizados para el HOME -->
+  <!-- Metadatos del HOME. El build (scripts/prerender-seo.mjs) genera un HTML por ruta
+       reemplazando este bloque; en el navegador, react-helmet-async toma el control
+       (src/main.tsx retira este bloque al arrancar para no duplicar canonical/schema).
+       Textos: src/lib/seoRules.js (HOME_TITLE / HOME_DESCRIPTION). -->
   <!-- SEO_PRERENDER_START -->
-  <title>ISDIN México hasta 30% más barato | Divina Store</title>
-  <meta name="description" content="Compra ISDIN, La Roche-Posay y Vichy 100% originales con hasta 30% de descuento vs precio oficial. Envío a toda la República Mexicana." />
+  <title>Skincare original en México | ISDIN, La Roche-Posay | Divina Store</title>
+  <meta name="description" content="Compra skincare 100% original de ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999." />
   <meta name="robots" content="index, follow" />
-
-  <!-- TODO (prioridad alta): canonical debe ser dinámico por ruta (window.location)
-       vía react-helmet-async; hardcodeado al home rompe el SEO de categorías y productos -->
   <link rel="canonical" href="https://www.divinastore.com.mx/" />
-
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.divinastore.com.mx/" />
-  <meta property="og:title" content="ISDIN México hasta 30% más barato | Divina Store" />
-  <meta property="og:description" content="ISDIN, La Roche-Posay, Vichy 100% originales con hasta 30% de descuento. Envío a toda la República." />
+  <meta property="og:title" content="Skincare original en México | ISDIN, La Roche-Posay | Divina Store" />
+  <meta property="og:description" content="Compra skincare 100% original de ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999." />
   <meta property="og:image" content="https://www.divinastore.com.mx/og-image.jpg" />
   <meta property="og:locale" content="es_MX" />
   <meta property="og:site_name" content="Divina Store MX" />
-
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="ISDIN México hasta 30% más barato | Divina Store" />
-  <meta name="twitter:description" content="ISDIN, La Roche-Posay, Vichy 100% originales con hasta 30% de descuento. Envío a toda la República." />
+  <meta name="twitter:title" content="Skincare original en México | ISDIN, La Roche-Posay | Divina Store" />
+  <meta name="twitter:description" content="Compra skincare 100% original de ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999." />
   <meta name="twitter:image" content="https://www.divinastore.com.mx/og-image.jpg" />
   <!-- SEO_PRERENDER_END -->
 
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Store",
-    "name": "Divina Store MX",
-    "url": "https://www.divinastore.com.mx",
-    "description": "Tienda de skincare premium en Mexico con hasta 30% de descuento vs precio oficial ISDIN.",
-    "image": "https://www.divinastore.com.mx/og-image.jpg",
-    "priceRange": "$$",
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "Benito Juárez",
-      "addressRegion": "CDMX",
-      "postalCode": "03100",
-      "addressCountry": "MX"
-    },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://www.divinastore.com.mx/buscar?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
-  }
-  </script>
+  <!-- Schema de la tienda (todas las páginas). El build lo regenera con las redes del footer (sameAs). -->
+  <!-- STORE_SCHEMA_START -->
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Store","@id":"https://www.divinastore.com.mx/#store","name":"Divina Store MX","url":"https://www.divinastore.com.mx/","description":"Tienda en línea de skincare y dermocosmética 100% original en México: ISDIN, La Roche-Posay, Avène, CeraVe y más.","image":"https://www.divinastore.com.mx/og-image.jpg","logo":"https://www.divinastore.com.mx/favicon.ico","priceRange":"$$","currenciesAccepted":"MXN","paymentAccepted":"Tarjeta de crédito, Tarjeta de débito","areaServed":{"@type":"Country","name":"México"},"address":{"@type":"PostalAddress","addressLocality":"Benito Juárez","addressRegion":"CDMX","postalCode":"03100","addressCountry":"MX"}}</script>
+  <!-- STORE_SCHEMA_END -->
 
   <meta name="theme-color" content="#000000" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -98,16 +76,14 @@
 
   <!-- Fallback para bots/usuarios sin JS: contenido mínimo indexable -->
   <noscript>
-    <h1>ISDIN México hasta 30% más barato | Divina Store</h1>
+    <h1>Skincare 100% original en México | Divina Store</h1>
+    <p>Compra skincare 100% original de ISDIN, La Roche-Posay, Avène, CeraVe y más. Pago seguro con tarjeta y envío a todo México, gratis desde $999.</p>
     <p>
-      Compra ISDIN, La Roche-Posay y Vichy 100% originales con hasta 30% de
-      descuento vs precio oficial. Envío a toda la República Mexicana.
-    </p>
-    <p>
-      Categorías: <a href="/cremas-faciales">Cremas Faciales</a> ·
-      <a href="/limpiadores">Limpiadores</a> ·
-      <a href="/fotoproteccion">Fotoprotección</a> ·
-      <a href="/grooming">Grooming</a>
+      Categorías: <a href="/coleccion/cremas-faciales">Cremas Faciales</a> ·
+      <a href="/coleccion/limpiadores">Limpiadores</a> ·
+      <a href="/coleccion/fotoprotectores">Fotoprotectores</a> ·
+      <a href="/coleccion/grooming">Grooming</a> ·
+      <a href="/catalogo">Catálogo completo</a>
     </p>
   </noscript>
 

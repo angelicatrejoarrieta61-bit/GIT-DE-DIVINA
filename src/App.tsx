@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Header } from './components/Header';
@@ -12,32 +12,32 @@ import { ContactPage } from './pages/ContactPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentErrorPage } from './pages/PaymentErrorPage';
-import { AdminLayout } from './pages/admin/AdminLayout';
-import { AdminLogin } from './pages/admin/AdminLogin';
-import { AdminProducts } from './pages/admin/AdminProducts';
-import { AdminImport } from './pages/admin/AdminImport';
-import { AdminConfig } from './pages/admin/AdminConfig';
-import { AdminOrderReports } from './pages/admin/AdminOrderReports';
-import { AdminMessages } from './pages/admin/AdminMessages';
-import { AdminNewsletter } from './pages/admin/AdminNewsletter';
-import { AdminBlog } from './pages/admin/AdminBlog';
-import { AdminUsers } from './pages/admin/AdminUsers';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
-import { SiteGeneral } from './pages/admin/SiteGeneral';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
 import { CatalogPage } from './pages/CatalogPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { trackPageView } from './lib/analytics';
 import { capturePromoterReferral } from './lib/promoterTracking';
 import { PromotionProgramPage } from './pages/PromotionProgramPage';
-import { AdminPromoters } from './pages/admin/AdminPromoters';
-import { AdminSourcing } from './pages/admin/AdminSourcing';
-import { AdminHome } from './pages/admin/AdminHome';
 import { InfoPage } from './pages/InfoPage';
-
-// ── Blog ──────────────────────────────────────────────────────
 import { BlogPage }     from './pages/blog/BlogPage';
 import { BlogPostPage } from './pages/blog/BlogPostPage';
+
+// ── Admin: se descarga sólo al entrar a /admin (no pesa en la tienda pública) ──
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin').then((m) => ({ default: m.AdminLogin })));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts').then((m) => ({ default: m.AdminProducts })));
+const AdminImport = lazy(() => import('./pages/admin/AdminImport').then((m) => ({ default: m.AdminImport })));
+const AdminConfig = lazy(() => import('./pages/admin/AdminConfig').then((m) => ({ default: m.AdminConfig })));
+const AdminOrderReports = lazy(() => import('./pages/admin/AdminOrderReports').then((m) => ({ default: m.AdminOrderReports })));
+const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((m) => ({ default: m.AdminMessages })));
+const AdminNewsletter = lazy(() => import('./pages/admin/AdminNewsletter').then((m) => ({ default: m.AdminNewsletter })));
+const AdminBlog = lazy(() => import('./pages/admin/AdminBlog').then((m) => ({ default: m.AdminBlog })));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((m) => ({ default: m.AdminUsers })));
+const AdminPromoters = lazy(() => import('./pages/admin/AdminPromoters').then((m) => ({ default: m.AdminPromoters })));
+const AdminSourcing = lazy(() => import('./pages/admin/AdminSourcing').then((m) => ({ default: m.AdminSourcing })));
+const AdminHome = lazy(() => import('./pages/admin/AdminHome').then((m) => ({ default: m.AdminHome })));
+
 
 function RouteRedirector() {
   const navigate = useNavigate();
@@ -85,6 +85,7 @@ export default function App() {
     <BrowserRouter>
       <RouteRedirector />
       <AnalyticsRouteTracker />
+      <Suspense fallback={<div className="admin-lazy-fallback" role="status" aria-label="Cargando" style={{ minHeight: '100vh' }} />}>
       <Routes>
         {/* Admin routes — no header/footer */}
         <Route path="/admin/login" element={<NoIndex><AdminLogin /></NoIndex>} />
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/blog/:slug" element={<PublicLayout><BlogPostPage /></PublicLayout>} />
         <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

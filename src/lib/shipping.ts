@@ -2,8 +2,10 @@
  * Envío — una sola regla para carrito, checkout y ficha de producto.
  * $120 MXN (IVA incluido) por pedido; gratis cuando los productos (ya con descuento) suman $999 o más.
  */
-export const SHIPPING_COST = 120;
-export const FREE_SHIPPING_FROM = 999;
+import { SHIPPING_COST, FREE_SHIPPING_FROM } from './seoRules';
+
+// Los montos viven en seoRules.js para que el SEO (también en el build) use exactamente los mismos.
+export { SHIPPING_COST, FREE_SHIPPING_FROM };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
