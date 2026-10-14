@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 13 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 14 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -280,6 +280,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - Toda la tienda pública va dentro de `<div class="store">` (en `App.tsx`). Ahí el acento antiguo `--c-lime` se redefine a salvia, así que cualquier estilo viejo que use `var(--c-lime)` toma el color nuevo. **El admin queda fuera** y conserva el lima.
 - **Forma "hoja"** (`--b-leaf`, `--b-leaf-alt`): dos esquinas amplias y dos casi rectas, tomada del logo. La usan las tarjetas de producto, las de categoría y la tarjeta del hero.
 - **Encabezado:** transparente sobre la foto; al bajar se vuelve barra sólida (`.header--scrolled`).
+- **Redes sociales** (`src/components/SocialIcons.tsx`): Facebook, X e Instagram. Los enlaces se capturan en Admin → Footer → Redes sociales (`footer_facebook_url`, `footer_x_url`, `footer_instagram_url`; el antiguo `footer_twitter_url` sirve de respaldo para X). Se muestran en el footer y como columna vertical a la izquierda del hero del Home (en celular, centrada sobre la foto). Solo aparece el ícono que tiene enlace.
 - **Footer en tres pisos:** newsletter, marca + enlaces, barra legal. El newsletter guarda en `subscribers` con `source: 'footer'`.
 - **Checkout editable** en Admin → Tu tienda → **Checkout (pago)** (`/admin/config?section=checkout`). Llaves `checkout_*` en `store_config`: imágenes `checkout_hero_img`, `checkout_trustbar_img`, `checkout_payment_img`, `checkout_side_img`, `checkout_footer_img` (vacío = imagen original de `public/checkout/`), visibilidad `checkout_show_trustbar|side|footer`, colores `checkout_bg`, `checkout_card_bg`, `checkout_text`, `checkout_summary_bg`, `checkout_summary_text`, `checkout_accent` y letra `checkout_font` (Google Fonts). Valores por defecto en `CHECKOUT_DEFAULTS` (`CheckoutPage.tsx`). La vista previa del admin muestra 2 productos de ejemplo si el carrito está vacío y bloquea el pago.
 - La imagen principal del checkout va a todo lo ancho desde el borde superior y **el menú queda encima** (sin `padding-top`); si se quita la imagen se deja el espacio del menú. Los logos de pago ocupan todo el ancho del resumen.

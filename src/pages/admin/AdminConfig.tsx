@@ -1628,19 +1628,20 @@ export const AdminConfig: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 420 }}>
                 <div>
                   <label style={lbl}>URL de Facebook</label>
-                  <input type="url" className="input-dark" value={configs.footer_facebook_url || ''}
+                  <input type="url" className="input-dark" value={configs.footer_facebook_url || ''} placeholder="https://facebook.com/divinastore"
                     onChange={e => updateConfig('footer_facebook_url', e.target.value)} />
                 </div>
                 <div>
-                  <label style={lbl}>URL de Twitter</label>
-                  <input type="url" className="input-dark" value={configs.footer_twitter_url || ''}
-                    onChange={e => updateConfig('footer_twitter_url', e.target.value)} />
+                  <label style={lbl}>URL de X</label>
+                  <input type="url" className="input-dark" value={configs.footer_x_url || configs.footer_twitter_url || ''} placeholder="https://x.com/divinastore"
+                    onChange={e => { updateConfig('footer_x_url', e.target.value); if (configs.footer_twitter_url) updateConfig('footer_twitter_url', ''); }} />
                 </div>
                 <div>
-                  <label style={lbl}>URL de X (nuevo Twitter)</label>
-                  <input type="url" className="input-dark" value={configs.footer_x_url || ''}
-                    onChange={e => updateConfig('footer_x_url', e.target.value)} />
+                  <label style={lbl}>URL de Instagram</label>
+                  <input type="url" className="input-dark" value={configs.footer_instagram_url || ''} placeholder="https://instagram.com/divinastore"
+                    onChange={e => updateConfig('footer_instagram_url', e.target.value)} />
                 </div>
+                <p className="muted-text" style={{ fontSize: 11, margin: '-8px 0 0', lineHeight: 1.4 }}>Estos enlaces se usan en el footer y en los íconos verticales del Home (lado izquierdo del hero). Solo aparece el ícono que tenga enlace.</p>
               </div>
 
               <h2 style={{ fontSize: 18, margin: '40px 0 20px', color: 'var(--c-lime)' }}>🔗 Enlaces del Footer</h2>

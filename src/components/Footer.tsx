@@ -5,6 +5,7 @@ import { getStoreConfig } from '../lib/queries';
 import { getImageUrl, supabase } from '../lib/supabase';
 import { LegalModal } from './LegalModal';
 import { ContactModal } from './ContactModal';
+import { socialLinks, SocialIcon } from './SocialIcons';
 import './Footer.css';
 
 /** Textos y enlaces por defecto del footer. El admin los muestra tal cual para poder editarlos. */
@@ -14,8 +15,8 @@ export const FOOTER_DEFAULTS: Record<string, string> = {
     footer_nl_subtitle: 'Recibe ofertas exclusivas, descuentos y mucho más',
     logo_url: '',
     footer_facebook_url: '',
-    footer_twitter_url: '',
     footer_x_url: '',
+    footer_instagram_url: '',
     
     // Columns
     footer_col1_title: 'Nuestras Secciones',
@@ -316,21 +317,11 @@ export const Footer: React.FC = () => {
         </p>
 
         <div className="divina-footer__socials" role="list" aria-label="Redes sociales">
-          {configs.footer_facebook_url && (
-            <a href={configs.footer_facebook_url} target="_blank" rel="noopener noreferrer" className="divina-footer__social-btn" aria-label="Facebook" role="listitem">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          {socialLinks(configs).map((l) => (
+            <a key={l.key} href={l.url} target="_blank" rel="noopener noreferrer" className="divina-footer__social-btn" aria-label={l.label} title={l.label} role="listitem">
+              <SocialIcon name={l.key} size={18} />
             </a>
-          )}
-          {configs.footer_twitter_url && (
-            <a href={configs.footer_twitter_url} target="_blank" rel="noopener noreferrer" className="divina-footer__social-btn" aria-label="Twitter" role="listitem">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53A4.48 4.48 0 0 0 22.43 1s-2 .91-3.18 1.16A4.46 4.46 0 0 0 11.85 6a12.65 12.65 0 0 1-9.19-4.66s-4 9.08 5 13a10.94 10.94 0 0 1-6.59 1.88c9.04 5.38 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg>
-            </a>
-          )}
-          {configs.footer_x_url && (
-            <a href={configs.footer_x_url} target="_blank" rel="noopener noreferrer" className="divina-footer__social-btn" aria-label="X" role="listitem">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.261 5.632 5.902-5.632zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            </a>
-          )}
+          ))}
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>

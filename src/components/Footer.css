@@ -232,6 +232,7 @@
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
+.divina-footer__social-btn { width: 40px; height: 40px; }
 .divina-footer__social-btn:hover,
 .divina-footer__totop:hover {
   background: var(--b-cream);

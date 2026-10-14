@@ -86,6 +86,47 @@
 }
 
 /* Scroll hint */
+/* Redes sociales: columna vertical a la izquierda, sobre la imagen */
+.hero__socials {
+  position: absolute;
+  left: clamp(16px, 2.4vw, 36px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.hero__social {
+  width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  color: var(--b-cream, #efece6);
+  background: rgba(8, 19, 15, 0.38);
+  border: 1px solid rgba(239, 236, 230, 0.32);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.hero__social:hover { background: var(--b-cream, #efece6); color: var(--b-green-900, #0c1a15); border-color: var(--b-cream, #efece6); transform: translateX(3px) scale(1.06); }
+.hero__social:active { transform: scale(0.94); }
+.hero__social:focus-visible { outline: 2px solid var(--b-sage-light, #c3d1b3); outline-offset: 3px; }
+.hero__socials-line { width: 1px; height: 56px; background: linear-gradient(rgba(239, 236, 230, 0.45), rgba(239, 236, 230, 0)); }
+@media (max-width: 1024px) {
+  .hero__social { width: 40px; height: 40px; }
+  .hero__socials { gap: 10px; }
+}
+@media (max-width: 768px) {
+  /* En celular: misma columna vertical, centrada sobre la foto (antes de la tarjeta) */
+  .hero__socials { left: 12px; top: calc(var(--hero-photo-h, 60vh) * 0.48); gap: 8px; }
+  .hero__socials-line { height: 36px; }
+  .hero__social { width: 38px; height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) { .hero__social { transition: none; } }
+
 .hero__scroll-hint {
   position: absolute;
   bottom: 40px; left: 60px;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getImageUrl, getImageSrcSet } from '../lib/supabase';
+import { SocialIcon, type SocialLink } from '../components/SocialIcons';
 import './HeroSection.css';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   subtitle?: string;
   btn1?: string;
   btn2?: string;
+  socials?: SocialLink[];
 }
 
 export const HeroSection: React.FC<Props> = ({
@@ -17,6 +19,7 @@ export const HeroSection: React.FC<Props> = ({
   subtitle = 'Descubre la nueva generación de tratamientos cremas, Sérums, fotoprotectores y vitamínicos, así como agua micelar y otros que ayudarán a la mejora de tu piel.',
   btn1 = 'Explorar Catálogo',
   btn2 = 'Ver Cremas & Sérums',
+  socials = [],
 }) => {
   const [leftColor, setLeftColor] = useState('rgba(6,6,6,1)');
   const [rightColor, setRightColor] = useState('rgba(6,6,6,1)');
@@ -139,6 +142,17 @@ export const HeroSection: React.FC<Props> = ({
 
       <div className="hero__overlay" />
       <div className="hero__glow" />
+
+      {socials.length > 0 && (
+        <nav className="hero__socials" aria-label="Síguenos en redes sociales">
+          {socials.map((l) => (
+            <a key={l.key} href={l.url} target="_blank" rel="noopener noreferrer" className="hero__social" aria-label={l.label} title={l.label}>
+              <SocialIcon name={l.key} size={20} />
+            </a>
+          ))}
+          <span className="hero__socials-line" aria-hidden="true" />
+        </nav>
+      )}
 
       <div className="hero__scroll-hint" aria-hidden="true">
         <div className="hero__scroll-line" />

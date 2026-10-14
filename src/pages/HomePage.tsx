@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroSection } from '../sections/HeroSection';
+import { socialLinks } from '../components/SocialIcons';
 import { CategoriesSection } from '../sections/CategoriesSection';
 import { ProductListSection } from '../sections/ProductListSection';
 import { getBestSellers, getCollections, getStoreConfig } from '../lib/queries';
@@ -96,6 +97,7 @@ export const HomePage: React.FC = () => {
         subtitle={config.hero_subtitle || undefined}
         btn1={config.hero_btn1 || undefined}
         btn2={config.hero_btn2 || undefined}
+        socials={socialLinks(config)}
       />
     ),
     'home-segmentos': (
