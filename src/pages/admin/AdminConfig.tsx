@@ -735,7 +735,8 @@ export const AdminConfig: React.FC = () => {
             title="Vista previa tienda"
             src={(() => {
               const sec = searchParams.get('section');
-              if (!sec || sec === 'home' || sec === 'site-general' || sec === 'footer' || sec === 'checkout') return `/?preview=1&r=${previewRefreshKey}`;
+              if (!sec || sec === 'home' || sec === 'site-general' || sec === 'footer') return `/?preview=1&r=${previewRefreshKey}`;
+              if (sec === 'checkout') return `/?preview=1&admin_path=/checkout&r=${previewRefreshKey}`;
               if (sec === 'catalogo') return `/?preview=1&admin_path=/catalogo&r=${previewRefreshKey}`;
               if (sec === 'quienes-somos') return `/?preview=1&admin_path=/quienes-somos&r=${previewRefreshKey}`;
               if (sec === 'contacto') return `/?preview=1&admin_path=/contacto&r=${previewRefreshKey}`;
@@ -1378,6 +1379,95 @@ export const AdminConfig: React.FC = () => {
               </div>
             </section>
           )}
+
+          {/* ── CHECKOUT ── */}
+          {section === 'checkout' && (() => {
+            const ckDefaults: Record<string, string> = {
+              checkout_bg: '#f1f2ee', checkout_card_bg: '#ffffff', checkout_text: '#111111',
+              checkout_summary_bg: '#101011', checkout_summary_text: '#f4f4f2', checkout_accent: '#d4ff2b',
+            };
+            const imgs: [string, string, string, string | null][] = [
+              ['checkout_hero_img', 'Imagen principal (arriba, a todo lo ancho)', 'Recomendado: 1920 × 400 px', null],
+              ['checkout_trustbar_img', 'Barra de confianza (debajo de la principal)', 'Recomendado: 1600 × 120 px', 'checkout_show_trustbar'],
+              ['checkout_payment_img', 'Logos de pago (resumen de compra)', 'Recomendado: 1200 × 460 px, PNG', null],
+              ['checkout_side_img', 'Sello lateral (debajo del resumen)', 'Recomendado: 600 × 300 px', 'checkout_show_side'],
+              ['checkout_footer_img', 'Sellos de seguridad (abajo de la página)', 'Recomendado: 1800 × 150 px, PNG', 'checkout_show_footer'],
+            ];
+            const color = (key: string, label: string) => {
+              const value = configs[key] || '';
+              const shownValue = value || ckDefaults[key];
+              return (
+                <div key={key}>
+                  <label style={lbl} htmlFor={`ck-${key}`}>{label}</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input id={`ck-${key}`} type="color" value={isHexColor(shownValue) ? shownValue : '#000000'} onChange={e => updateConfig(key, e.target.value)} style={{ width: 38, height: 34, padding: 0, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, background: 'transparent', cursor: 'pointer' }} />
+                    <input type="text" className="input-dark" value={value} maxLength={7} placeholder={ckDefaults[key]} aria-label={`${label} en hexadecimal`}
+                      onChange={e => { const v = e.target.value.trim(); if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) updateConfig(key, v); }}
+                      style={{ height: 34, padding: '0 8px', fontSize: 12, fontFamily: 'monospace', borderColor: value && !isHexColor(value) ? '#e5484d' : undefined }} />
+                  </div>
+                </div>
+              );
+            };
+            const customized = Object.keys(ckDefaults).some(k => configs[k]) || !!configs.checkout_font;
+            return (
+              <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <h2 style={{ fontSize: 18, marginBottom: 4, color: 'var(--c-lime)' }}>🛒 Checkout (página de pago)</h2>
+                  <p className="muted-text" style={{ fontSize: 11, margin: 0, lineHeight: 1.4 }}>La vista previa muestra productos de ejemplo si tu carrito está vacío. Ahí no se puede pagar.</p>
+                </div>
+
+                <div style={box}>
+                  <h3 style={{ fontSize: 14, marginBottom: 12 }}>Imágenes</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {imgs.map(([key, label, hint, showKey]) => (
+                      <div key={key} style={{ paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <AssetUploader label={label} configKey={key} currentValue={configs[key]} onUpdate={v => updateConfig(key, v)} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                          <span className="muted-text" style={{ fontSize: 10.5 }}>{hint}</span>
+                          {showKey && (
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                              <input type="checkbox" checked={configs[showKey] !== 'false'} onChange={e => updateConfig(showKey, e.target.checked ? 'true' : 'false')} style={{ width: 14, height: 14, accentColor: 'var(--c-lime)', appearance: 'auto', WebkitAppearance: 'checkbox', opacity: 1, position: 'static' }} />
+                              Mostrar
+                            </label>
+                          )}
+                          <button type="button" className="btn btn-outline" disabled={!configs[key]} onClick={() => updateConfig(key, '')}
+                            style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 10.5, opacity: configs[key] ? 1 : 0.45, cursor: configs[key] ? 'pointer' : 'not-allowed' }}
+                            title="Vuelve a la imagen original del sitio">↺ Original</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={box}>
+                  <h3 style={{ fontSize: 14, marginBottom: 12 }}>Colores</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {color('checkout_bg', 'Fondo de la página')}
+                    {color('checkout_card_bg', 'Fondo de los recuadros')}
+                    {color('checkout_text', 'Texto de los recuadros')}
+                    {color('checkout_accent', 'Color de acento')}
+                    {color('checkout_summary_bg', 'Fondo del resumen de compra')}
+                    {color('checkout_summary_text', 'Texto del resumen de compra')}
+                  </div>
+                </div>
+
+                <div style={box}>
+                  <h3 style={{ fontSize: 14, marginBottom: 12 }}>Tipografía</h3>
+                  <label style={lbl} htmlFor="ck-font">Letra del checkout</label>
+                  <select id="ck-font" className="input-dark" value={configs.checkout_font || ''} onChange={e => updateConfig('checkout_font', e.target.value)} style={{ backgroundColor: '#111', color: '#fff' }}>
+                    <option value="" style={{ backgroundColor: '#111', color: '#fff' }}>Igual que la tienda</option>
+                    {FONTS.map(f => <option key={f} value={f} style={{ backgroundColor: '#111', color: '#fff' }}>{f}</option>)}
+                  </select>
+                </div>
+
+                <button type="button" className="btn btn-outline" disabled={!customized}
+                  onClick={() => { Object.keys(ckDefaults).forEach(k => updateConfig(k, '')); updateConfig('checkout_font', ''); }}
+                  style={{ alignSelf: 'flex-start', padding: '8px 14px', fontSize: 11, opacity: customized ? 1 : 0.45, cursor: customized ? 'pointer' : 'not-allowed' }}>
+                  ↺ Restablecer colores y letra
+                </button>
+              </section>
+            );
+          })()}
 
           {/* ── FOOTER / CONTACT INFO ── */}
           {(part === 'home-footer' || section === 'contacto') && (

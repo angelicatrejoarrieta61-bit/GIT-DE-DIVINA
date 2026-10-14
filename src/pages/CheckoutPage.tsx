@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
-import { createOrder, updateOrderStatus, getStoreConfig } from '../lib/queries';
+import { createOrder, updateOrderStatus, getStoreConfig, getProducts } from '../lib/queries';
+import { useAdminPreview } from '../hooks/useadminpreview';
+import type { CartItem } from '../types';
 import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
@@ -27,6 +29,27 @@ const MEXICAN_STATES = [
 
 type PaymentTab = 'card' | 'applepay' | 'googlepay';
 
+/** Imágenes y estilo del checkout (editables en Admin → Tu tienda → Checkout). */
+export const CHECKOUT_DEFAULTS: Record<string, string> = {
+  checkout_hero_img: '/checkout/hero-banner.png',
+  checkout_trustbar_img: '/checkout/trust-bar.png',
+  checkout_payment_img: '/checkout/payment-methods.png',
+  checkout_side_img: '/checkout/trust-badges.png',
+  checkout_footer_img: '/checkout/footer-badges.png',
+  checkout_show_trustbar: 'true',
+  checkout_show_side: 'true',
+  checkout_show_footer: 'true',
+  checkout_bg: '#f1f2ee',
+  checkout_card_bg: '#ffffff',
+  checkout_text: '#111111',
+  checkout_summary_bg: '#101011',
+  checkout_summary_text: '#f4f4f2',
+  checkout_accent: '#d4ff2b',
+  checkout_font: '',
+};
+const imgSrc = (v: string) => (!v ? '' : v.startsWith('/') ? v : getImageUrl(v));
+const isHex = (v?: string) => !!v && /^#[0-9a-f]{6}$/i.test(v);
+
 const IconLock = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
     <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -40,8 +63,19 @@ export const CheckoutPage: React.FC = () => {
     discountAmount, totalAfterDiscount,
   } = useCartStore();
 
+  // Vista previa del admin (iframe): con el carrito vacío se muestran productos de ejemplo
+  const isPreview = typeof window !== 'undefined' && window.self !== window.top;
+  const [demoItems, setDemoItems] = useState<CartItem[]>([]);
+  useEffect(() => {
+    if (!isPreview || items.length) return;
+    getProducts(2).then((ps) => setDemoItems(ps.map((product) => ({ product, quantity: 1 }))));
+  }, [isPreview, items.length]);
+  const isDemo = items.length === 0 && demoItems.length > 0;
+  const viewItems = isDemo ? demoItems : items;
+  const subtotal = isDemo ? viewItems.reduce((s, i) => s + i.product.price * i.quantity, 0) : total();
+
   // Productos (con cupón) + envío: $120 si no llega a $999, gratis desde $999
-  const productsTotal = couponCode ? totalAfterDiscount() : total();
+  const productsTotal = isDemo ? subtotal : (couponCode ? totalAfterDiscount() : total());
   const shipping = shippingFor(productsTotal);
   const finalTotal = orderTotal(productsTotal);
   const missingFree = missingForFreeShipping(productsTotal);
@@ -50,7 +84,7 @@ export const CheckoutPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [, setConfig] = useState<Record<string, string>>({});
+  const [config, setConfig] = useState<Record<string, string>>({});
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -67,6 +101,29 @@ export const CheckoutPage: React.FC = () => {
   const [clipStatus, setClipStatus] = useState<'loading' | 'ready' | 'error' | 'missing_key'>('loading');
 
   useEffect(() => { getStoreConfig().then(setConfig); }, []);
+  useAdminPreview(setConfig);
+  const cfg = (k: string) => (config[k] !== undefined && config[k] !== '' ? config[k] : CHECKOUT_DEFAULTS[k]);
+  const shown = (k: string) => cfg(k) !== 'false';
+
+  // Tipografía elegida para el checkout (Google Fonts)
+  const font = cfg('checkout_font');
+  useEffect(() => {
+    if (!font) return;
+    const id = 'checkout-font';
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) { link = document.createElement('link'); link.id = id; link.rel = 'stylesheet'; document.head.appendChild(link); }
+    link.href = `https://fonts.googleapis.com/css2?family=${font.trim().replace(/ /g, '+')}:wght@400;500;600;700;800&display=swap`;
+  }, [font]);
+
+  const themeVars = {
+    ...(isHex(cfg('checkout_bg')) && { '--cv2-bg': cfg('checkout_bg') }),
+    ...(isHex(cfg('checkout_card_bg')) && { '--cv2-card-bg': cfg('checkout_card_bg'), '--cv2-input-bg': cfg('checkout_card_bg') }),
+    ...(isHex(cfg('checkout_text')) && { '--cv2-text': cfg('checkout_text') }),
+    ...(isHex(cfg('checkout_summary_bg')) && { '--cv2-dark': cfg('checkout_summary_bg') }),
+    ...(isHex(cfg('checkout_summary_text')) && { '--cv2-dark-text': cfg('checkout_summary_text') }),
+    ...(isHex(cfg('checkout_accent')) && { '--cv2-lime': cfg('checkout_accent') }),
+    ...(font && { fontFamily: `"${font}", var(--f-body), sans-serif` }),
+  } as React.CSSProperties;
 
   // Init Clip SDK
   useEffect(() => {
@@ -132,6 +189,10 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handlePagar = async () => {
+    if (isDemo) {
+      setError('Vista previa del admin: aquí no se puede pagar.');
+      return;
+    }
     if (paymentTab !== 'card') {
       setError('Este método está próximamente. Usa Tarjeta por ahora.');
       return;
@@ -202,7 +263,7 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  if (items.length === 0) {
+  if (viewItems.length === 0) {
     return (
       <div className="cv2-empty">
         <h2>Tu carrito está vacío</h2>
@@ -212,17 +273,22 @@ export const CheckoutPage: React.FC = () => {
   }
 
   return (
-    <div className="cv2" style={{ paddingTop: 'var(--nav-h)' }}>
+    <div className="cv2" style={themeVars}>
 
-      {/* HERO — IMAGEN 1 */}
-      <div className="cv2__hero">
-        <img src="/checkout/hero-banner.png" alt="Finaliza tu compra" />
-      </div>
+      {/* HERO — IMAGEN 1 (a todo lo ancho; el menú queda encima de la imagen) */}
+      {!cfg('checkout_hero_img') && <div style={{ height: 'var(--nav-h)' }} aria-hidden="true" />}
+      {cfg('checkout_hero_img') && (
+        <div className="cv2__hero">
+          <img src={imgSrc(cfg('checkout_hero_img'))} alt="Finaliza tu compra" />
+        </div>
+      )}
 
       {/* TRUST BAR — IMAGEN 2 */}
-      <div className="cv2__trust-bar">
-        <img src="/checkout/trust-bar.png" alt="Pago seguro" />
-      </div>
+      {shown('checkout_show_trustbar') && cfg('checkout_trustbar_img') && (
+        <div className="cv2__trust-bar">
+          <img src={imgSrc(cfg('checkout_trustbar_img'))} alt="Pago seguro" />
+        </div>
+      )}
 
       <div className="cv2__wrapper">
         <div className="cv2__grid">
@@ -404,7 +470,7 @@ export const CheckoutPage: React.FC = () => {
               <h2 className="cv2__summary-title">Resumen de tu compra</h2>
 
               <div className="cv2__summary-items">
-                {items.map(item => (
+                {viewItems.map(item => (
                   <div key={item.product.id} className="cv2__summary-item">
                     <div className="cv2__summary-item-img">
                       <img src={getImageUrl(item.product.image_url)} alt={item.product.name} />
@@ -458,7 +524,7 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="cv2__summary-total">
-                <div className="cv2__summary-row"><span>Subtotal</span><span>${total().toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
+                <div className="cv2__summary-row"><span>Subtotal</span><span>${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
                 {couponCode && (
                   <div className="cv2__summary-row cv2__summary-row--discount">
                     <span>Descuento ({discountPercentage}%)</span>
@@ -494,22 +560,26 @@ export const CheckoutPage: React.FC = () => {
               {/* IMAGEN 3 */}
               <div className="cv2__payment-methods">
                 <p>Métodos de pago aceptados</p>
-                <img src="/checkout/payment-methods.png" alt="Visa Mastercard Amex Carnet SPEI Apple Pay Google Pay Clip" />
+                <img src={imgSrc(cfg('checkout_payment_img'))} alt="Clip, Visa, Mastercard, Diners, Discover, American Express, PayPal y SPEI" />
               </div>
             </div>
 
             {/* IMAGEN 4 */}
-            <div className="cv2__trust-badges-side">
-              <img src="/checkout/trust-badges.png" alt="Safe & Secure Checkout" />
-            </div>
+            {shown('checkout_show_side') && cfg('checkout_side_img') && (
+              <div className="cv2__trust-badges-side">
+                <img src={imgSrc(cfg('checkout_side_img'))} alt="Compra segura" />
+              </div>
+            )}
           </aside>
         </div>
       </div>
 
       {/* IMAGEN 5 */}
-      <div className="cv2__footer-badges">
-        <img src="/checkout/footer-badges.png" alt="PCI DSS SSL Verified Visa Mastercard Clip Empresa Mexicana" />
-      </div>
+      {shown('checkout_show_footer') && cfg('checkout_footer_img') && (
+        <div className="cv2__footer-badges">
+          <img src={imgSrc(cfg('checkout_footer_img'))} alt="PCI DSS nivel 1, cifrado SSL de 256 bits, Verified by Visa, Mastercard ID Check, Clip partner oficial, empresa mexicana" />
+        </div>
+      )}
     </div>
   );
 };

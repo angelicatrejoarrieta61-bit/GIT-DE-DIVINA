@@ -8,7 +8,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, CreditCard, HeartHandshake, Package, Search, Mail, Megaphone, PenLine,
   Settings, Home, LayoutTemplate, FileText, Users, ChevronDown, Plus, ExternalLink, LogOut, Save, Menu, X,
-  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, type LucideIcon,
+  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, ShoppingCart, type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import './AdminLayout.css';
@@ -381,6 +381,8 @@ export const AdminLayout: React.FC = () => {
                 ))}
               </div>
             )}
+
+            <NavItem to="/admin/config?section=checkout" icon={ShoppingCart} label="Checkout (pago)" active={isSection('checkout')} />
 
             {BUILT_IN_SECTIONS.map((s) => (
               <React.Fragment key={s.key}>
