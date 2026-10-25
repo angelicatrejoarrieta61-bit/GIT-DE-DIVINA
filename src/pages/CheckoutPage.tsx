@@ -9,6 +9,7 @@ import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
 import { getPromoterCode, normalizePromoterCode, savePromoterCode } from '../lib/promoterTracking';
+import { couponLabel } from '../lib/coupons';
 
 declare const ClipSDK: new (apiKey: string) => {
   element: {
@@ -59,9 +60,10 @@ const IconLock = () => (
 export const CheckoutPage: React.FC = () => {
   const {
     items, total, clearCart,
-    couponCode, discountPercentage, applyCoupon, removeCoupon,
-    discountAmount, totalAfterDiscount,
+    couponCode, couponType, couponValue, couponMin, applyCoupon, revalidateCoupon, removeCoupon,
+    couponBelowMin, discountAmount, totalAfterDiscount,
   } = useCartStore();
+  const couponText = couponLabel(couponType, couponValue);
 
   // Vista previa del admin (iframe): con el carrito vacío se muestran productos de ejemplo
   const isPreview = typeof window !== 'undefined' && window.self !== window.top;
@@ -88,6 +90,7 @@ export const CheckoutPage: React.FC = () => {
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+  const [couponBusy, setCouponBusy] = useState(false);
   const [promoterCode, setPromoterCode] = useState(() => getPromoterCode());
 
   const [form, setForm] = useState({
@@ -180,13 +183,25 @@ export const CheckoutPage: React.FC = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError('');
-    if (!couponInput.trim()) return;
-    const success = applyCoupon(couponInput);
-    if (success) { setCouponInput(''); } else { setCouponError('Código no válido'); }
+    if (!couponInput.trim() || couponBusy) return;
+    setCouponBusy(true);
+    const err = await applyCoupon(couponInput);
+    setCouponBusy(false);
+    if (err) setCouponError(err); else setCouponInput('');
   };
+
+  // Al entrar al checkout se confirma que el cupón guardado siga vigente
+  useEffect(() => {
+    if (!couponCode || isDemo) return;
+    let alive = true;
+    revalidateCoupon().then((msg) => { if (alive && msg) setCouponError(msg); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const belowMin = couponBelowMin();
 
   const handlePagar = async () => {
     if (isDemo) {
@@ -208,6 +223,17 @@ export const CheckoutPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      // El cupón se vuelve a validar justo antes de cobrar (pudo pausarse, vencer o agotarse)
+      if (couponCode) {
+        const msg = await revalidateCoupon();
+        if (msg) {
+          setCouponError(msg);
+          throw new Error('Tu código de descuento ya no aplica. Revisa el nuevo total antes de pagar.');
+        }
+      }
+      const appliedCoupon = couponCode && !couponBelowMin() ? couponCode : undefined;
+      const appliedDiscount = appliedCoupon ? discountAmount() : 0;
+
       let cardToken: { id: string };
       try {
         cardToken = await sdkCardRef.current.cardToken();
@@ -226,6 +252,7 @@ export const CheckoutPage: React.FC = () => {
         items, total: finalTotal, status: 'pending',
         accepts_marketing: form.accepts_marketing,
         promoter_code: promoterCode || undefined,
+        ...(appliedCoupon && { coupon_code: appliedCoupon, discount_amount: appliedDiscount }),
       });
       if (!order) throw new Error('No se pudo registrar la orden.');
 
@@ -491,7 +518,7 @@ export const CheckoutPage: React.FC = () => {
                 <label className="cv2__summary-label" htmlFor="co-coupon">Código de descuento</label>
                 {couponCode ? (
                   <div className="cv2__coupon-active">
-                    <span>🏷️ {couponCode} (-{discountPercentage}%)</span>
+                    <span>🏷️ {couponCode} (-{couponText})</span>
                     <button type="button" onClick={removeCoupon} aria-label="Quitar cupón">✕</button>
                   </div>
                 ) : (
@@ -502,11 +529,21 @@ export const CheckoutPage: React.FC = () => {
                       placeholder="Ingresa tu código"
                       value={couponInput}
                       onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
+                      aria-invalid={!!couponError}
+                      autoCapitalize="characters"
+                      disabled={couponBusy}
                     />
-                    <button type="submit">APLICAR</button>
+                    <button type="submit" disabled={couponBusy || !couponInput.trim()} aria-busy={couponBusy}>
+                      {couponBusy ? 'VALIDANDO…' : 'APLICAR'}
+                    </button>
                   </form>
                 )}
-                {couponError && <p className="cv2__coupon-error">{couponError}</p>}
+                {couponError && <p className="cv2__coupon-error" role="alert">{couponError}</p>}
+                {belowMin && (
+                  <p className="cv2__coupon-error" role="status">
+                    {couponCode} aplica en compras desde ${couponMin.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </p>
+                )}
               </div>
 
               <div className="cv2__summary-block">
@@ -525,9 +562,9 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="cv2__summary-total">
                 <div className="cv2__summary-row"><span>Subtotal</span><span>${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
-                {couponCode && (
+                {couponCode && !belowMin && (
                   <div className="cv2__summary-row cv2__summary-row--discount">
-                    <span>Descuento ({discountPercentage}%)</span>
+                    <span>Descuento ({couponText})</span>
                     <span>-${discountAmount().toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}

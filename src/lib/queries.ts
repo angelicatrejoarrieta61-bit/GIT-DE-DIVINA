@@ -193,8 +193,21 @@ export const createOrder = async (order: Omit<Order, 'id' | 'created_at'>): Prom
     .insert([order])
     .select()
     .single();
-  if (error) { console.error(error); return null; }
-  return data;
+  if (!error) return data;
+  // Si aún no existen las columnas del cupón (migración pendiente), el pedido se guarda sin ellas
+  // para no detener la venta.
+  const missingCouponCols = 'coupon_code' in order
+    && (error.code === 'PGRST204' || /coupon_code|discount_amount/.test(error.message || ''));
+  if (missingCouponCols) {
+    console.warn('[createOrder] Columnas de cupón no encontradas; ejecuta 20261025120000_coupons.sql');
+    const { coupon_code: _c, discount_amount: _d, ...rest } = order;
+    const retry = await supabase.from('orders').insert([rest]).select().single();
+    if (!retry.error) return retry.data;
+    console.error(retry.error);
+    return null;
+  }
+  console.error(error);
+  return null;
 };
 export const deleteUnpaidOrders = async (): Promise<boolean> => {
   const { error } = await supabase

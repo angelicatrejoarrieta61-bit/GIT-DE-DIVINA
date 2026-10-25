@@ -8,6 +8,7 @@ import type { Product } from '../types';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
+import { couponLabel } from '../lib/coupons';
 
 type CheckoutState = 'idle' | 'loading' | 'error';
 
@@ -31,9 +32,13 @@ export const CartDrawer: React.FC = () => {
     updateQty,
     total,
     couponCode,
-    discountPercentage,
+    couponType,
+    couponValue,
+    couponMin,
     applyCoupon,
+    revalidateCoupon,
     removeCoupon,
+    couponBelowMin,
     discountAmount,
     totalAfterDiscount
   } = useCartStore();
@@ -42,6 +47,7 @@ export const CartDrawer: React.FC = () => {
   const [checkoutState] = useState<CheckoutState>('idle');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+  const [couponBusy, setCouponBusy] = useState(false);
   const [reco, setReco] = useState<Product[] | null>(null); // null = cargando
   const catalogRef = useRef<Product[] | null>(null);
 
@@ -61,17 +67,27 @@ export const CartDrawer: React.FC = () => {
     return () => { alive = false; };
   }, [isOpen, isEmpty]);
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  // Al abrir el carrito se confirma que el cupón guardado siga vigente (pudo pausarse en el admin)
+  useEffect(() => {
+    if (!isOpen || !couponCode) return;
+    let alive = true;
+    revalidateCoupon().then((msg) => { if (alive && msg) setCouponError(msg); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError('');
-    if (!couponInput.trim()) return;
-    const success = applyCoupon(couponInput);
-    if (success) {
-      setCouponInput('');
-    } else {
-      setCouponError('Código no válido');
-    }
+    if (!couponInput.trim() || couponBusy) return;
+    setCouponBusy(true);
+    const err = await applyCoupon(couponInput);
+    setCouponBusy(false);
+    if (err) setCouponError(err);
+    else setCouponInput('');
   };
+  const couponText = couponLabel(couponType, couponValue);
+  const belowMin = couponBelowMin();
 
   const cartTotal = total();
   const productsTotal = couponCode ? totalAfterDiscount() : cartTotal;
@@ -224,7 +240,7 @@ export const CartDrawer: React.FC = () => {
             <div className="cart-drawer__coupon-container">
               {couponCode ? (
                 <div className="cart-drawer__coupon-applied">
-                  <span className="coupon-tag">🏷️ {couponCode} (-{discountPercentage}%)</span>
+                  <span className="coupon-tag">🏷️ {couponCode} (-{couponText})</span>
                   <button type="button" onClick={removeCoupon} className="coupon-remove-btn" aria-label="Eliminar cupón" title="Eliminar cupón"><X size={11} aria-hidden="true" /></button>
                 </div>
               ) : (
@@ -235,20 +251,31 @@ export const CartDrawer: React.FC = () => {
                     value={couponInput}
                     onChange={e => { setCouponInput(e.target.value); setCouponError(''); }}
                     className="cart-drawer__coupon-input"
+                    aria-label="Código de descuento"
+                    aria-invalid={!!couponError}
+                    autoCapitalize="characters"
+                    disabled={couponBusy}
                   />
-                  <button type="submit" className="cart-drawer__coupon-btn">Aplicar</button>
+                  <button type="submit" className="cart-drawer__coupon-btn" disabled={couponBusy || !couponInput.trim()} aria-busy={couponBusy}>
+                    {couponBusy ? '…' : 'Aplicar'}
+                  </button>
                 </form>
               )}
-              {couponError && <p className="cart-drawer__coupon-error">{couponError}</p>}
+              {couponError && <p className="cart-drawer__coupon-error" role="alert">{couponError}</p>}
+              {belowMin && (
+                <p className="cart-drawer__coupon-error" role="status">
+                  {couponCode} aplica en compras desde {formatCurrency(couponMin)}
+                </p>
+              )}
             </div>
 
             <div className="cart-drawer__row-item">
               <span>Subtotal:</span>
               <span>{formatCurrency(cartTotal)}</span>
             </div>
-            {couponCode && (
+            {couponCode && !belowMin && (
               <div className="cart-drawer__row-item discount">
-                <span>Descuento ({discountPercentage}%):</span>
+                <span>Descuento ({couponText}):</span>
                 <span>-{formatCurrency(discountAmount())}</span>
               </div>
             )}

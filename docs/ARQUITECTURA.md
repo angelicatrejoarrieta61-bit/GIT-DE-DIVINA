@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 14 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 25 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -56,7 +56,7 @@ src/
   pages/admin/          panel de administración
   pages/blog/           blog público
   lib/                  conexión y lógica compartida (ver sección 5)
-  store/cartStore.ts    carrito y cupón
+  store/cartStore.ts    carrito y cupón aplicado (valida contra la tabla coupons)
   styles/index.css      estilos globales y variables (éste es el que se carga)
 scripts/                sitemap y prerenderizado SEO (corren en el build)
 supabase/migrations/    SQL que se ejecuta a mano en Supabase
@@ -76,6 +76,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `blog-queries.ts` | Lecturas y escrituras del blog |
 | `promoterTracking.ts` | Guarda el código de promotora (`?ref=`) 30 días |
 | `analytics.ts` | Eventos de Google Analytics |
+| `coupons.ts` | Códigos de descuento: validación pública (`validateCoupon`), regla de cálculo (`couponDiscount`), CRUD del admin, usos y generador de códigos |
 | `seoRules.js` (+ `seoRules.d.ts`) | **Única fuente de SEO**: títulos, descripciones vendedoras, Product schema, URL de colección, schema de la tienda y montos de envío. JS puro porque también lo usa el build en Node |
 | `shipping.ts` | Regla de envío del carrito/checkout (reexporta los montos de `seoRules.js`) |
 
@@ -85,7 +86,8 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 |---|---|
 | `products` | Catálogo. Columnas clave: `name, slug, brand, price, compare_price, image_url, images, collection_id, in_stock, stock, tags, ean, cost_price, fulfillment`. **No existe `sku`.** |
 | `collections` | Categorías: `name, slug, image_url, description, sort_order` |
-| `orders` | Pedidos. `status`: `pending` (sin pagar), `paid` (por enviar), `shipped`, `delivered`, `cancelled`. Envío: `shipping_carrier`, `tracking_number`, `tracking_url`, `shipped_at`. Avisos: `admin_notified_at`, `customer_notified_at`, `shipping_notified_at`. `internal_note` (nota que no ve el cliente). Cobro Clip: `clip_payment_id, clip_status, clip_status_code, clip_receipt_no, clip_auth_code, clip_card, clip_amount, clip_approved_at, clip_verified_at, clip_raw` — **solo los escribe el servidor** (un trigger ignora cambios del navegador y de la sesión del admin) |
+| `orders` | Pedidos. `status`: `pending` (sin pagar), `paid` (por enviar), `shipped`, `delivered`, `cancelled`. Envío: `shipping_carrier`, `tracking_number`, `tracking_url`, `shipped_at`. Avisos: `admin_notified_at`, `customer_notified_at`, `shipping_notified_at`. `internal_note` (nota que no ve el cliente). Cobro Clip: `clip_payment_id, clip_status, clip_status_code, clip_receipt_no, clip_auth_code, clip_card, clip_amount, clip_approved_at, clip_verified_at, clip_raw` — **solo los escribe el servidor** (un trigger ignora cambios del navegador y de la sesión del admin). Cupón: `coupon_code`, `discount_amount` |
+| `coupons` | Códigos de descuento: `code` (único, mayúsculas), `description`, `discount_type` (`percent`/`fixed`), `discount_value`, `min_subtotal`, `max_uses`, `starts_at`, `ends_at`, `active`. Solo la lee y edita el admin; el público valida con la función `validate_coupon` |
 | `store_config` | Configuración llave–valor de toda la tienda (ver sección 8) |
 | `subscribers` | Correos del newsletter |
 | `contact_messages` | Mensajes de los formularios de contacto |
@@ -121,6 +123,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `/admin/reportes` | Pedidos y clientes: resumen, filtros, borrar, enviar con guía, etiqueta, campañas |
 | `/admin/productos` | Catálogo unificado: precio, marca, fotos, badge, Home |
 | `/admin/abastecimiento` | Buscador de proveedores |
+| `/admin/cupones` | **Códigos de descuento** (Ventas): crear, generar, editar, pausar y borrar cupones |
 | `/admin/reportes?pagos=clip` | Abre el modal **Pagos Clip** dentro de Pedidos (el antiguo `/admin/config?section=clip-payments` redirige aquí) |
 | `/admin/config?section=…` | Diseño de la tienda (General, Home, colecciones, páginas) |
 | `/admin/mensajes`, `/admin/newsletter`, `/admin/blog` | Clientes y contenido |
@@ -164,7 +167,21 @@ Flujo actual, en `CheckoutPage.tsx`:
 
 **Envío** (`src/lib/shipping.ts`, única fuente de la regla): **$120 MXN con IVA** por pedido si los productos (ya con cupón) suman menos de **$999**; desde $999 es gratis. Se suma al total que se cobra en Clip y que se guarda en `orders.total`. El carrito y el checkout muestran Subtotal, Descuento, Envío (o "Gratis") y una barra de "te faltan $X para envío gratis"; la ficha de producto dice "Envío $120 · gratis desde $999". No hay columna aparte para el envío en `orders`.
 
-**Cupón:** hay un solo código de descuento (10 %) escrito directamente en `src/store/cartStore.ts`. No se administra desde el panel.
+**Cupón:** se administra en `/admin/cupones` (ver sección 9 bis). El descuento se aplica a los productos **antes** del envío, así que puede cambiar si el pedido llega o no a envío gratis.
+
+## 9 bis. Códigos de descuento (`/admin/cupones`)
+
+Archivos: `src/pages/admin/AdminCoupons.tsx` + `AdminCoupons.css` (clases `.cpn-*`), `src/lib/coupons.ts`, `src/store/cartStore.ts`. Migración: `supabase/migrations/20261025120000_coupons.sql`.
+
+- **Tipos:** porcentaje (1–100 %) o monto fijo en pesos. El descuento nunca supera el subtotal de productos.
+- **Condiciones opcionales:** compra mínima, límite de usos, fecha de inicio y de fin. Interruptor Activo/Pausado.
+- **Usos:** se cuentan en `orders.coupon_code` **solo con pedidos pagados, enviados o entregados**. Si se cambia el código de un cupón ya usado, el conteo empieza en cero (el admin lo avisa).
+- **Estados en la lista:** Vigente, Programado, Pausado, Vencido, Agotado; fichas de vigentes, usos pagados, descuento otorgado y ventas con cupón; buscador, filtros, copiar código, editar, borrar con confirmación, "Generar código" (formato `DIVINA-XXXXXX`, sin 0/O/1/I).
+- **En la tienda:** carrito y checkout llaman a `validate_coupon(código, subtotal)` (función `security definer`; el público no puede listar la tabla). Mayúsculas/espacios no importan. Mensajes: no válido, pausado, aún no vigente, vencido, agotado, compra mínima.
+- **Revalidación:** el cupón guardado en el carrito se vuelve a validar al abrir el carrito, al entrar al checkout y **justo antes de cobrar**. Si ya no aplica, se quita y se avisa; el cobro no sigue hasta que la clienta vea el nuevo total. Si el carrito baja del mínimo, el cupón se conserva pero no descuenta y se muestra el aviso.
+- **Pedido:** se guardan `coupon_code` y `discount_amount`. Si la migración no se ha corrido, el pedido se guarda sin esas columnas (no se detiene la venta) y la tienda acepta solo `DESCUENTO202610` (10 %) como respaldo.
+- **Carritos viejos:** la versión anterior guardaba `discountPercentage` en `localStorage` (`divina-cart`); el store la convierte sola al formato nuevo (versión 1).
+- **Límite actual:** el servidor (`/api/charge-clip`) cobra el monto que manda el navegador y no recalcula precios ni cupón. Ver sección 18.
 
 ## 10. Buscador de proveedores (Abastecimiento)
 
@@ -283,7 +300,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Antes de usar una columna, confirmar que existe.** Ya pasó con `sku`: el catálogo dejó de cargar.
 - **No escribir en `store_config` a espaldas de `AdminConfig`** (sección 8).
 - **Ruta nueva con parámetro → agregarla en `vercel.json`.**
-- **Los estilos del admin van con prefijo** (`.adm-`, `.src-`, `.cat-`) y los del checkout con `.cv2__`, para no chocar con la tienda.
+- **Los estilos del admin van con prefijo** (`.adm-`, `.src-`, `.cat-`, `.ord-`, `.cpn-`) y los del checkout con `.cv2__`, para no chocar con la tienda.
 - **Los textos de la tienda son blancos.** Un fondo claro los vuelve ilegibles; el admin avisa.
 - **Probar en navegador real** a 1440, ~1180 y 390 px antes de publicar.
 
@@ -312,6 +329,17 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Search Console:** después del deploy, enviar `https://www.divinastore.com.mx/sitemap.xml` y pedir indexación de las 4 colecciones (cambiaron de URL canónica).
 - **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
+- **Migración `20261025120000_coupons.sql`:** crea `coupons`, `validate_coupon`, columnas `orders.coupon_code`/`discount_amount` y el primer cupón `DESCUENTO202610`. Hasta correrla, `/admin/cupones` muestra el aviso y la tienda solo acepta ese código.
+
+**Revisión del proceso de compra (25-oct-2026)** — hallazgos, sin cambios aplicados:
+- **Crítico — monto del cobro sin verificar:** `/api/charge-clip` cobra el `amount` que envía el navegador; `orders.total` también lo escribe el navegador. Alguien con conocimientos puede pagar menos (o aplicar un cupón inválido). Solución propuesta: que `charge-clip` lea el pedido con la llave de servicio, recalcule precios desde `products`, valide el cupón con `validate_coupon` y aplique la regla de envío antes de cobrar.
+- **Pedido marcado `paid` desde el navegador** (`updateOrderStatus` tras el cobro). El servidor ya lo marca; revisar en Supabase que la regla de `orders` no permita a la llave pública cambiar `status`.
+- **Al aplicar un cupón en el checkout se vuelve a montar el formulario de tarjeta de Clip** (el efecto depende de `finalTotal`) y se borra lo que la clienta ya había escrito.
+- **Enlaces rotos:** "Términos y Condiciones" (`/terminos`) y "Aviso de Privacidad" (`/privacidad`) no tienen ruta: dan 404.
+- **"Hasta 12 MSI según tu banco"** en el resumen, pero el cobro va con `installments: 1`.
+- **Teléfono, CP y colonia** no se validan antes de pagar (solo nombre, correo, calle y ciudad).
+- **El carrito se reabre solo** al recargar si estaba abierto (`isOpen` se guarda en `localStorage`).
+- `removeItem` quita por producto e ignora la variante.
 - **Guías automáticas:** la etiqueta es imprimible pero no genera guía; integrar una paquetería o agregador requiere su cuenta y su API.
 
 - Rotar la llave de Bright Data (se compartió por chat) y actualizarla en Vercel.
@@ -320,4 +348,3 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - La imagen de métodos de pago del checkout muestra PayPal, Discover, Diners y SPEI, pero solo se cobra con tarjeta; los sellos prometen "30-day money back" y "24/7 support".
 - El campo Referencia del checkout viene prellenado con "Casa".
 - Borrar el código antiguo de Clip y los archivos sueltos de la raíz, una vez confirmado que nada los usa.
-- Mover el cupón a la base de datos si se quieren más códigos.

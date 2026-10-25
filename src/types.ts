@@ -65,6 +65,9 @@ export interface Order {
   commission_amount?: number;
   commission_status?: 'not_applicable' | 'pending' | 'paid' | 'cancelled';
   commission_paid_at?: string;
+  /* Cupón usado y monto descontado (migración 20261025120000_coupons.sql) */
+  coupon_code?: string | null;
+  discount_amount?: number | null;
   shipping_carrier?: string | null;
   tracking_number?: string | null;
   tracking_url?: string | null;

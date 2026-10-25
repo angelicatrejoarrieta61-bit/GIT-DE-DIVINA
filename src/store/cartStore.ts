@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CartItem, Product } from '../types';
+import { validateCoupon, couponDiscount, type CouponType } from '../lib/coupons';
 
 interface CartStore {
   items: CartItem[];
@@ -13,23 +14,31 @@ interface CartStore {
   closeCart: () => void;
   total: () => number;
   itemCount: () => number;
-  
-  // Coupon state
+
+  // Cupón (se valida contra la tabla `coupons` de Supabase)
   couponCode: string | null;
-  discountPercentage: number;
-  applyCoupon: (code: string) => boolean;
+  couponType: CouponType;
+  couponValue: number;
+  couponMin: number;
+  /** Valida y aplica. Devuelve null si se aplicó o el mensaje de error. */
+  applyCoupon: (code: string) => Promise<string | null>;
+  /** Vuelve a validar el cupón guardado. Si ya no aplica lo quita y devuelve el motivo. */
+  revalidateCoupon: () => Promise<string | null>;
   removeCoupon: () => void;
+  /** true si el carrito bajó del mínimo de compra del cupón (el descuento queda en 0). */
+  couponBelowMin: () => boolean;
   discountAmount: () => number;
   totalAfterDiscount: () => number;
 }
+
+const NO_COUPON = { couponCode: null, couponType: 'percent' as CouponType, couponValue: 0, couponMin: 0 };
 
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
       isOpen: false,
-      couponCode: null,
-      discountPercentage: 0,
+      ...NO_COUPON,
 
       addItem: (product, variant) => {
         const items = get().items;
@@ -65,7 +74,7 @@ export const useCartStore = create<CartStore>()(
         });
       },
 
-      clearCart: () => set({ items: [], couponCode: null, discountPercentage: 0 }),
+      clearCart: () => set({ items: [], ...NO_COUPON }),
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
 
@@ -75,29 +84,69 @@ export const useCartStore = create<CartStore>()(
       itemCount: () =>
         get().items.reduce((sum, i) => sum + i.quantity, 0),
 
-      applyCoupon: (code: string) => {
-        const cleanCode = code.trim().toUpperCase();
-        if (cleanCode === 'DESCUENTO202610') {
-          set({ couponCode: cleanCode, discountPercentage: 10 });
-          return true;
-        }
-        return false;
+      applyCoupon: async (code: string) => {
+        const res = await validateCoupon(code, get().total());
+        if (!res.ok || !res.coupon) return res.message || 'Código no válido';
+        set({
+          couponCode: res.coupon.code,
+          couponType: res.coupon.type,
+          couponValue: res.coupon.value,
+          couponMin: res.coupon.minSubtotal,
+        });
+        return null;
       },
 
-      removeCoupon: () => {
-        set({ couponCode: null, discountPercentage: 0 });
+      revalidateCoupon: async () => {
+        const code = get().couponCode;
+        if (!code) return null;
+        // Sin subtotal: el mínimo de compra se maneja aparte (couponBelowMin) para no quitar el cupón
+        // solo porque la persona bajó una pieza.
+        const res = await validateCoupon(code);
+        if (res.ok && res.coupon) {
+          set({
+            couponCode: res.coupon.code,
+            couponType: res.coupon.type,
+            couponValue: res.coupon.value,
+            couponMin: res.coupon.minSubtotal,
+          });
+          return null;
+        }
+        if (res.reason === 'error') return null; // falla de red: se conserva y se vuelve a intentar al pagar
+        set({ ...NO_COUPON });
+        return `${code}: ${res.message || 'ya no es válido'}`;
+      },
+
+      removeCoupon: () => set({ ...NO_COUPON }),
+
+      couponBelowMin: () => {
+        const { couponCode, couponMin } = get();
+        return !!couponCode && couponMin > 0 && get().total() < couponMin;
       },
 
       discountAmount: () => {
-        const pct = get().discountPercentage;
-        if (pct <= 0) return 0;
-        return get().total() * (pct / 100);
+        const { couponCode, couponType, couponValue } = get();
+        if (!couponCode || get().couponBelowMin()) return 0;
+        return couponDiscount(couponType, couponValue, get().total());
       },
 
       totalAfterDiscount: () => {
-        return get().total() - get().discountAmount();
+        return Math.round((get().total() - get().discountAmount()) * 100) / 100;
       },
     }),
-    { name: 'divina-cart' }
+    {
+      name: 'divina-cart',
+      version: 1,
+      // v0 guardaba { couponCode, discountPercentage }; se convierte al formato nuevo.
+      migrate: (persisted: unknown, version: number) => {
+        const s = (persisted ?? {}) as Record<string, unknown>;
+        if (version < 1) {
+          const pct = Number(s.discountPercentage) || 0;
+          const code = typeof s.couponCode === 'string' && pct > 0 ? s.couponCode : null;
+          delete s.discountPercentage;
+          return { ...s, couponCode: code, couponType: 'percent', couponValue: code ? pct : 0, couponMin: 0 };
+        }
+        return s;
+      },
+    }
   )
 );

@@ -8,7 +8,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, CreditCard, HeartHandshake, Package, Search, Mail, Megaphone, PenLine,
   Settings, Home, LayoutTemplate, FileText, Users, ChevronDown, Plus, ExternalLink, LogOut, Save, Menu, X,
-  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, ShoppingCart, type LucideIcon,
+  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, ShoppingCart, TicketPercent, type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import './AdminLayout.css';
@@ -340,6 +340,7 @@ export const AdminLayout: React.FC = () => {
           <NavGroup id="ventas" title="Ventas" closed={!!closed.ventas} onToggle={toggleGroup}>
             <NavItem to="/admin/reportes" icon={ClipboardList} label="Pedidos" active={isPath('/admin/reportes') && !clipOpen} />
             <NavItem to="/admin/reportes?pagos=clip" icon={CreditCard} label="Pagos Clip" active={isPath('/admin/reportes') && clipOpen} />
+            <NavItem to="/admin/cupones" icon={TicketPercent} label="Códigos de descuento" active={isPath('/admin/cupones')} />
             <NavItem to="/admin/promotores" icon={HeartHandshake} label="Promotores y comisiones" active={isPath('/admin/promotores')} />
           </NavGroup>
 
