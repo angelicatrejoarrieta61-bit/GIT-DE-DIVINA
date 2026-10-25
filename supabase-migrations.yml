@@ -1,0 +1,49 @@
+# DIVINA · Aplica automáticamente en Supabase cada SQL nuevo de supabase/migrations/
+# Se ejecuta solo al hacer push a main. No hay que abrir Supabase.
+# Requiere 3 secretos en GitHub (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN · SUPABASE_DB_PASSWORD · SUPABASE_PROJECT_ID
+# Todas las migraciones del proyecto son idempotentes (se pueden correr más de una vez).
+name: Supabase · aplicar SQL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Revisar secretos
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Falta el secreto $v en GitHub"; exit 1; fi
+          done
+
+      - name: Conectar con el proyecto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Estado antes
+        run: supabase migration list --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Aplicar SQL nuevos
+        run: supabase db push --include-all --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Estado después
+        run: supabase migration list --password "$SUPABASE_DB_PASSWORD"
