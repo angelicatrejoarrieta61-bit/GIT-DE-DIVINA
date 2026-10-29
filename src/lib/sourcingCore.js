@@ -502,12 +502,43 @@ function median(nums) {
 }
 
 /**
+ * Precio que de verdad cobra la tienda hoy.
+ * Google a veces pone el precio de lista como principal y la oferta en el texto secundario:
+ *  "MXN 300.00 ahora" → $300 (oferta) · "ahorra MXN 300" → principal − 300 · precio anterior tachado → descuento.
+ * Las mensualidades del texto secundario no cuentan.
+ * Devuelve { price, original, discountPct }.
+ */
+export function effectivePrice(o) {
+  const main = o?.price_mxn != null ? Number(o.price_mxn) : null;
+  if (main === null || !(main > 0)) return { price: main, original: null, discountPct: null };
+  let best = null;
+  for (const part of String(o.alt_price_text ?? '').split(/\s*·\s*/).filter(Boolean)) {
+    if (looksLikeInstallment(part)) continue;
+    const amount = parseMxn(part);
+    if (amount === null || amount <= 0) continue;
+    const k = normalizeKey(part);
+    const cand = /\bahorr|\bdescuento de\b|\bsave\b/.test(k) ? round2(main - amount) : amount < main ? amount : null;
+    if (cand !== null && cand >= main * 0.2 && cand < main && (best === null || cand < best)) best = cand;
+  }
+  if (best !== null) return { price: best, original: main, discountPct: Math.round((1 - best / main) * 100) };
+  const old = o?.old_price_mxn != null ? Number(o.old_price_mxn) : null;
+  if (old && old > main) return { price: main, original: old, discountPct: Math.round((1 - main / old) * 100) };
+  return { price: main, original: null, discountPct: null };
+}
+
+/**
  * Evalúa todas las ofertas de una búsqueda contra el producto.
  * Devuelve cada oferta con coincidencia, elegibilidad del proveedor, costo y margen,
  * más el mejor proveedor elegible y el precio más bajo del mercado (mismo producto exacto).
  */
 export function evaluateAll(offers, spec, salePrice, settings, merchants = {}, maxDays = 1) {
-  const base = offers.map((o) => {
+  const base = offers.map((raw) => {
+    // Precio real de hoy (oferta incluida), por pieza
+    const eff = effectivePrice(raw);
+    const pack = Math.max(1, Number(raw.pack_qty) || 1);
+    const o = eff.price !== null && eff.price !== raw.price_mxn
+      ? { ...raw, price_mxn: eff.price, unit_price_mxn: round2(eff.price / pack), old_price_mxn: eff.original }
+      : { ...raw, old_price_mxn: eff.original ?? raw.old_price_mxn };
     const installment = Boolean(o.is_installment) || looksLikeInstallment(o.title);
     const { match: rawMatch, reasons } = classify(spec, o.title, o.alt_price_text);
     const match = installment && rawMatch === 'exacta' ? 'probable' : rawMatch;
@@ -532,6 +563,7 @@ export function evaluateAll(offers, spec, salePrice, settings, merchants = {}, m
       shipping: ship.shipping,
       shippingKnown: ship.known,
       shippingDays: ship.days,
+      discountPct: eff.discountPct,
     };
   });
 
