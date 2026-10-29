@@ -5,8 +5,8 @@
  * JS puro (ESM) para que las funciones de Vercel lo importen sin compilar. Solo corre en el servidor.
  */
 import {
-  normalizeKey, parsePrice, parseMxn, parsePackQty, splitSeller, buildSpec, evaluateAll,
-  floorPrice, targetPrice, computeMargin, round2, DEFAULT_MARGIN, DEFAULT_RULES,
+  normalizeKey, parsePrice, parseMxn, parsePackQty, splitSeller, buildSpec, evaluateAll, compactQuery,
+  floorPrice, targetPrice, computeMargin, round2, DEFAULT_MARGIN, DEFAULT_RULES, effectivePrice,
 } from './sourcingCore.js';
 
 const BRIGHTDATA_TIMEOUT_MS = 55_000;
@@ -151,17 +151,20 @@ export function normalizeItems(items, start = 0) {
       const pack = parsePackQty(it.title);
       const { seller } = splitSeller(it.shop);
       const thumb = typeof it.image === 'string' && it.image.startsWith('data:image/') && it.image.length <= MAX_THUMB_CHARS ? it.image : null;
+      const alt = altPriceText(it, price);
+      const eff = effectivePrice({ price_mxn: price, old_price_mxn: parseMxn(it.old_price) ?? parsed.high ?? null, alt_price_text: alt });
+      const now = eff.price ?? price;
       return {
         shop: it.shop.trim(),
         title: it.title.trim(),
         link: it.link && /^https:\/\//.test(it.link) ? it.link : null,
-        price_mxn: price,
-        old_price_mxn: parseMxn(it.old_price),
-        alt_price_text: altPriceText(it, price),
+        price_mxn: now,
+        old_price_mxn: eff.original ?? parseMxn(it.old_price) ?? parsed.high ?? null,
+        alt_price_text: alt,
         is_installment: parsed.installment,
         seller,
         pack_qty: pack,
-        unit_price_mxn: price !== null ? round2(price / pack) : null,
+        unit_price_mxn: now !== null ? round2(now / pack) : null,
         rating: typeof it.rating === 'number' ? it.rating : null,
         reviews: typeof it.reviews_cnt === 'number' ? it.reviews_cnt : null,
         thumbnail: thumb,
@@ -402,6 +405,8 @@ export async function checkProduct(db, product, cfg, { cacheMinutes = 30 } = {})
   const m = computeMargin(finalPrice, best.unit_price_mxn, cfg.margin, best.shipping);
 
   const productPatch = {
+    // Aprende: si no tenía búsqueda exacta, guarda la del anuncio que coincidió exacto
+    ...(!product.search_query ? { search_query: compactQuery(best.title) } : {}),
     sourcing_status: 'ok',
     sourcing_note: notes.join(' · ') || null,
     sourcing_checked_at: now,

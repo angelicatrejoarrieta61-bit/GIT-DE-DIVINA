@@ -9,10 +9,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase, uploadProductImage } from '../../lib/supabase';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import {
-  buildSpec, computeMargin, evaluateOffers, isBarcode, money, slugify, timeAgo, detectBrand, round2, norm, verifyUrl, domainOf,
+  buildSpec, computeMargin, evaluateOffers, evaluateAll, floorPrice, targetPrice, DEFAULT_RULES, isBarcode, queryFromUrl, compactQuery, money, slugify, timeAgo, detectBrand, round2, norm, verifyUrl, domainOf,
   DEFAULT_MARGIN, MATCH_RANK,
-  type EvaluatedOffer, type MarginSettings, type MatchLevel, type SourcingMerchant, type SourcingOffer, type Trust,
+  type EvaluatedOffer, type MarginSettings, type MatchLevel, type PriceRules, type SourcingMerchant, type SourcingOffer, type Trust,
 } from '../../lib/sourcing';
+import { loadAutoConfig } from '../../lib/autoApi';
 import './AdminSourcing.css';
 
 // ─── Tipos locales ────────────────────────────────────────────
@@ -84,13 +85,15 @@ export function AdminSourcing() {
   const [error, setError] = useState('');
 
   // Filtros
-  const [matchFilter, setMatchFilter] = useState<MatchFilter>('probables');
+  const [matchFilter, setMatchFilter] = useState<MatchFilter>('exactas');
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [shopFilter, setShopFilter] = useState<string>('');
   const [hideDiscarded, setHideDiscarded] = useState(true);
   const [onlyTrusted, setOnlyTrusted] = useState(false);
-  const [hideSuspicious, setHideSuspicious] = useState(false);
-  const [sort, setSort] = useState<SortKey>('margin');
+  const [hideSuspicious, setHideSuspicious] = useState(true);
+  const [sort, setSort] = useState<SortKey>('cost');
+  const [rules, setRules] = useState<PriceRules>(DEFAULT_RULES);
+  useEffect(() => { void loadAutoConfig().then((c) => setRules(c.rules)).catch(() => undefined); }, []);
 
   // UI
   const [scanOpen, setScanOpen] = useState(false);
@@ -226,7 +229,15 @@ export function AdminSourcing() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = query.trim();
+    let q = query.trim();
+    // Pegaste un enlace de tienda: se convierte en la búsqueda exacta del producto
+    if (/^https?:\/\//i.test(q)) {
+      const fromUrl = queryFromUrl(q);
+      if (!fromUrl) { setError('No reconocí el producto en ese enlace. Escribe el nombre.'); return; }
+      q = fromUrl.query;
+      setQuery(q);
+      notify({ kind: 'ok', text: `Buscando el producto del enlace de ${fromUrl.shop}${fromUrl.code ? ` (${fromUrl.code})` : ''}` });
+    }
     if (isBarcode(q) && !linked) {
       const p = catalog.find((x) => x.ean === q.replace(/\s/g, ''));
       if (p) linkProduct(p);
@@ -252,10 +263,21 @@ export function AdminSourcing() {
     : query;
   const effectiveSpec = useMemo(() => buildSpec(specSource, linked?.brand ?? null), [specSource, linked]);
 
-  const sale = toNum(salePrice);
+  // Precio sugerido (si no escribes uno): mercado típico − competencia, nunca debajo de tu ganancia mínima
+  const suggested = useMemo(() => {
+    const pre = evaluateAll(offers, effectiveSpec, null, settings, merchants, rules.maxDeliveryDays);
+    const base = pre.best ?? pre.offers
+      .filter((o) => o.match === 'exacta' && o.unit_price_mxn !== null && !o.installment && !o.own && o.priceFlag !== 'sospechoso')
+      .sort((a, b) => (a.unit_price_mxn as number) - (b.unit_price_mxn as number))[0];
+    if (!base || base.unit_price_mxn === null) return null;
+    const floor = floorPrice(base.unit_price_mxn, base.shipping, settings, rules);
+    return { price: targetPrice({ floor, market: pre.marketRef, current: pre.marketRef ?? floor, rules: { ...rules, maxChangePct: 0 } }).target, market: pre.marketRef, floor };
+  }, [offers, effectiveSpec, settings, merchants, rules]);
+  const typedSale = toNum(salePrice);
+  const sale = typedSale ?? suggested?.price ?? null;
   const evaluated = useMemo(
-    () => evaluateOffers(offers, effectiveSpec, sale, settings, merchants),
-    [offers, effectiveSpec, sale, settings, merchants],
+    () => evaluateOffers(offers, effectiveSpec, sale, settings, merchants, rules.maxDeliveryDays),
+    [offers, effectiveSpec, sale, settings, merchants, rules.maxDeliveryDays],
   );
 
   const brands = useMemo(() => {
@@ -366,6 +388,9 @@ export function AdminSourcing() {
       const product = data as CatalogProduct;
 
       if (best && best.unit_price_mxn !== null) {
+        if (best.match === 'exacta') {
+          await supabase.from('products').update({ search_query: compactQuery(best.title) }).eq('id', product.id).then(() => undefined, () => undefined);
+        }
         const m = computeMargin(price, best.unit_price_mxn, settings, best.shipping);
         await supabase.from('product_sources').insert({
           product_id: product.id, merchant_id: best.merchant_id, offer_id: best.id, shop: best.shop, offer_title: best.title,
@@ -391,6 +416,14 @@ export function AdminSourcing() {
       </span>
     )
     : <span className="src-step__hint">{sale ? 'Aún no hay oferta exacta para calcular tu margen; revisa las probables.' : 'Escribe tu precio y verás cuánto ganas en cada oferta.'}</span>;
+  const notCompetitive = !!suggested?.market && suggested.floor > suggested.market * 1.05;
+  const suggestNote = !typedSale && suggested
+    ? notCompetitive
+      ? <span className="src-alert src-alert--warn" role="status" style={{ display: 'block', marginTop: 6 }}>
+          <b>No conviene a precio de mercado:</b> las tiendas lo venden en {money(suggested.market)} y para ganar tu mínimo ({rules.minMarginPct}% y {money(rules.minMarginMxn)}) tendrías que venderlo en {money(suggested.floor)}. Ganancia calculada a {money(suggested.price)}.
+        </span>
+      : <span className="src-step__hint">Ganancia calculada a <b>{money(suggested.price)}</b> (sugerido: {suggested.market ? `mercado típico ${money(suggested.market)}, ` : ''}mínimo con tu ganancia {money(suggested.floor)}). Escribe otro precio si quieres.</span>
+    : null;
 
   const counts = useMemo(() => {
     const c: Record<MatchLevel, number> = { exacta: 0, probable: 0, no_confirmada: 0 };
@@ -462,7 +495,7 @@ export function AdminSourcing() {
                 id="src-q"
                 ref={queryRef}
                 className="src-input src-input--lg"
-                placeholder="Ej: ISDIN Fusion Water SPF 50 50 ml"
+                placeholder="Nombre, código de barras o pega el enlace de Amazon / Mercado Libre"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoComplete="off"
@@ -650,9 +683,10 @@ export function AdminSourcing() {
                 <div className="src-cat__actions src-cat__price">
                   <div className="src-field">
                     <label htmlFor="cat-sale">Mi precio de venta</label>
-                    <div className="src-money"><span>$</span><input id="cat-sale" className="src-input" inputMode="decimal" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /></div>
+                    <div className="src-money"><span>$</span><input id="cat-sale" className="src-input" inputMode="decimal" placeholder={suggested ? String(suggested.price) : '0.00'} value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /></div>
                   </div>
                   {marginNote}
+                  {suggestNote}
                 </div>
               )}
             </section>
@@ -678,8 +712,8 @@ export function AdminSourcing() {
               </select>
 
               <select className="src-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Ordenar">
-                <option value="margin">Mayor margen</option>
-                <option value="cost">Menor costo</option>
+                <option value="cost">Menor precio</option>
+                <option value="margin">Mayor ganancia</option>
                 <option value="trust">Tiendas confiables primero</option>
                 <option value="relevance">Orden de Google</option>
               </select>
@@ -714,7 +748,7 @@ export function AdminSourcing() {
                 <span role="columnheader">Tienda</span>
                 <span role="columnheader" className="num">Precio</span>
                 <span role="columnheader" className="num">Costo</span>
-                <span role="columnheader" className="num">Margen</span>
+                <span role="columnheader" className="num">Ganancia</span>
                 <span role="columnheader">Acciones</span>
               </div>
               {visible.map((o) => (
@@ -724,6 +758,7 @@ export function AdminSourcing() {
                     merchant={o.merchant_id ? merchants[o.merchant_id] : undefined}
                     onTrust={setTrust}
                     onStock={() => setStockOffer(o)}
+                    rules={rules}
                   />
                 </React.Fragment>
               ))}
@@ -802,7 +837,8 @@ function SpecChips({ spec }: { spec: ReturnType<typeof buildSpec> }) {
   );
 }
 
-function OfferRow({ o, merchant, onTrust, onStock }: {
+function OfferRow({ o, merchant, onTrust, onStock, rules }: {
+  rules: PriceRules;
   o: EvaluatedOffer;
   merchant?: SourcingMerchant;
   onTrust: (id: string | null, t: Trust) => void;
@@ -813,7 +849,7 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
   return (
     <div className={`src-row src-row--${o.match} ${trust === 'descartado' ? 'is-discarded' : ''}`} role="row">
       <div className="src-cell src-prod" role="cell">
-        {o.thumbnail ? <img src={o.thumbnail} alt="" loading="lazy" width={44} height={44} /> : <span className="src-thumb-ph" aria-hidden="true" />}
+        {o.thumbnail && <img src={o.thumbnail} alt="" loading="lazy" width={44} height={44} />}
         <div className="src-prod__txt">
           <span className="src-prod__title" title={o.title}>{o.title}</span>
           <span className="src-prod__meta">
@@ -832,20 +868,22 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
         <span className="src-shop__name">{o.shop}</span>
         {o.seller && <span className="src-shop__trust">Vendedor: {o.seller}</span>}
         <span className="src-shop__trust">{TRUST_LABEL[trust]}{o.rating ? ` · ★ ${o.rating}` : ''}</span>
-        <span className={`src-shop__ship ${o.shippingDays ? '' : 'is-missing'}`}>{o.shippingDays ? `Llega en ${o.shippingDays}` : 'Días de envío sin dato'}</span>
+        {o.shippingDays && <span className="src-shop__ship">Llega en {o.shippingDays}</span>}
       </div>
 
       <div className="src-cell num" role="cell">
         <span className="src-price">{money(o.price_mxn)}</span>
-        {o.old_price_mxn && o.old_price_mxn > (o.price_mxn ?? 0) && <s className="src-old">{money(o.old_price_mxn)}</s>}
+        {o.discountPct ? (
+          <span className="src-sub" title={`Precio de oferta (antes ${money(o.old_price_mxn)}). Puede terminar: se vuelve a revisar cada ${rules.checkHours} h y tu precio se ajusta solo.`}>
+            <b className="src-badge src-badge--warn">−{o.discountPct}%</b> <s className="src-old">{money(o.old_price_mxn)}</s>
+          </span>
+        ) : null}
         {o.pack_qty > 1 && <span className="src-sub">{money(o.unit_price_mxn)} c/u · {o.pack_qty} pzs</span>}
-        {o.alt_price_text && <span className="src-sub" title="Otro precio que muestra Google; confírmalo en la tienda">⚠ {o.alt_price_text}</span>}
       </div>
 
       <div className="src-cell num" role="cell">
         <span className="src-price">{money(o.costTotal)}</span>
-        <span className={`src-sub ${o.shippingKnown ? '' : 'is-missing'}`}>{o.shippingKnown ? (o.shipping > 0 ? `incluye envío ${money(o.shipping)}` : 'envío gratis') : 'envío sin dato'}</span>
-        <span className="src-sub">+ comisión {money(o.fee)}</span>
+        {o.shippingKnown && <span className="src-sub">{o.shipping > 0 ? `incluye envío ${money(o.shipping)}` : 'envío gratis'}</span>}
       </div>
 
       <div className="src-cell num" role="cell">
@@ -967,6 +1005,10 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
       }
 
       await supabase.from('product_sources').update({ is_primary: false }).eq('product_id', product.id);
+      // Aprende: la revisión automática buscará con el título que acabas de confirmar
+      if (offer.match === 'exacta') {
+        await supabase.from('products').update({ search_query: compactQuery(offer.title) }).eq('id', product.id).then(() => undefined, () => undefined);
+      }
       const { error: srcErr } = await supabase.from('product_sources').insert({
         product_id: product.id,
         merchant_id: offer.merchant_id,

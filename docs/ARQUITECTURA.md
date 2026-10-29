@@ -218,6 +218,9 @@ Archivos: `src/pages/admin/AdminCoupons.tsx` + `AdminCoupons.css` (clases `.cpn-
 - **Excluidos siempre:** usado, reacondicionado, réplica, imitación, genérico, tester, muestra, decant, sin caja, caducado. Tamaño mini/viaje es otra variante.
 - **Vendedor de marketplace** ("Amazon.com.mx - Vendedor X") se guarda en `sourcing_offers.seller`.
 - **Tu propia tienda** ("Divina") nunca cuenta como competencia ni proveedor.
+- **Dos precios juntos** ("$600.00 $300.00", lista tachada + oferta): se toma el más bajo y el otro queda como precio anterior (caso real: CeraVe Gel Limpiador 473 ml en Amazon salía a $600 en lugar de $300).
+- **Buscar por enlace:** en Abastecimiento se puede pegar el enlace de Amazon, Mercado Libre u otra tienda; se convierte en la búsqueda del producto (`queryFromUrl`).
+- **Aprende de lo que confirmas:** al elegir un proveedor exacto con **+ Mi stock** (o la primera vez que la revisión automática encuentra una coincidencia exacta) se guarda en `products.search_query` una búsqueda corta con el título real del anuncio (`compactQuery`). Las revisiones siguientes buscan con ella y encuentran el producto con más precisión.
 
 ## 10 bis. Abastecimiento automático (`/admin/automatizacion`, `/admin/oportunidades`)
 

@@ -177,7 +177,16 @@ export function parsePrice(raw) {
   const installment = looksLikeInstallment(text);
   const afterDollar = text.match(/\$\s*([\d.,]+)/);
   const amount = afterDollar ? num(afterDollar[1]) : num(text);
-  if (!installment) return { value: amount, installment: false };
+  if (!installment) {
+    // Google a veces manda dos precios juntos ("$600.00 $300.00": lista tachada + oferta): vale el más bajo
+    const all = [...text.matchAll(/\$\s*([\d.,]+)/g)].map((m) => num(m[1])).filter((n) => n !== null);
+    if (all.length >= 2) {
+      const low = Math.min(...all);
+      const high = Math.max(...all);
+      return { value: low, installment: false, high: high > low ? high : null };
+    }
+    return { value: amount, installment: false, high: null };
+  }
   const n = normalizeKey(text).match(/\b(\d{1,2})\s*(?:x\s*(?=\$)|meses\b|msi\b|pagos\b|quincenas\b|mensualidades\b)/);
   if (n && amount !== null && afterDollar) return { value: round2(amount * Number(n[1])), installment: true };
   return { value: null, installment: true };
@@ -220,6 +229,54 @@ export function splitSeller(shop) {
   const v = s.match(/^(.+?)\s*\(?\s*vendido por\s+(.+?)\)?$/i);
   if (v) return { shop: v[2].trim(), seller: v[1].trim() };
   return { shop: s, seller: null };
+}
+
+/**
+ * Búsqueda a partir del enlace de una tienda.
+ * Amazon: /Cerave-Gel-Limpiador-Espumoso-473/dp/B07C5XD33D → "Cerave Gel Limpiador Espumoso 473" (código B07C5XD33D)
+ * Mercado Libre: /MLM-123-cerave-gel-limpiador-473ml-_JM → "cerave gel limpiador 473ml"
+ * Otras: el tramo más descriptivo de la ruta.
+ */
+export function queryFromUrl(raw) {
+  let u;
+  try { u = new URL(String(raw ?? '').trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const host = u.hostname.replace(/^www\./, '');
+  const segs = u.pathname.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
+  let slug = null; let code = null; let shop = host;
+  if (/amazon\./.test(host)) {
+    shop = 'Amazon';
+    const i = segs.findIndex((s) => s === 'dp' || s === 'gp');
+    code = segs.find((s) => /^B0[0-9A-Z]{8}$/.test(s)) ?? null;
+    slug = i > 0 ? segs[i - 1] : null;
+  } else if (/mercadolibre\./.test(host)) {
+    shop = 'Mercado Libre';
+    const seg = segs.find((s) => /^MLM-?\d+/i.test(s)) ?? segs.find((s) => s.includes('-')) ?? '';
+    code = (seg.match(/^MLM-?\d+/i) ?? [null])[0];
+    slug = seg.replace(/^MLM-?\d+-?/i, '').replace(/-_J[MO].*$/i, '');
+  } else {
+    slug = [...segs].reverse().find((s) => (s.match(/-/g) ?? []).length >= 2) ?? segs[segs.length - 1] ?? null;
+    slug = slug ? slug.replace(/\.(html?|php|aspx?)$/i, '').replace(/[-_]?\d{5,}$/, '') : null;
+  }
+  const query = slug ? slug.replace(/[-_+]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  if (query.length < 4) return code ? { query: code, code, shop } : null;
+  return { query: query.slice(0, 160), code, shop };
+}
+
+/**
+ * Búsqueda corta y precisa a partir del título que confirmaste (lo "aprende" el sistema):
+ * primer tramo del título (antes de coma, guion o barra), máx. 10 palabras, + tamaño y SPF si quedaron fuera.
+ */
+export function compactQuery(title) {
+  const full = String(title ?? '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const first = full.split(/\s[-|–]\s|,|\|/)[0].trim();
+  let words = first.split(' ').filter(Boolean).slice(0, 10).join(' ');
+  const t = norm(full);
+  const size = t.match(/(\d+(?:\.\d+)?)\s(ml|g|oz|l)\b/);
+  const spf = t.match(/\bspf (\d{2,3})\b/);
+  if (size && !norm(words).includes(`${size[1]} ${size[2]}`)) words += ` ${size[1]} ${size[2]}`;
+  if (spf && !norm(words).includes(`spf ${spf[1]}`)) words += ` SPF ${spf[1]}`;
+  return words.slice(0, 160);
 }
 
 // ─── Especificación del producto buscado ─────────────────────

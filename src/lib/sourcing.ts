@@ -15,7 +15,7 @@ import {
 export {
   KNOWN_BRANDS, DEFAULT_MARGIN, DEFAULT_RULES,
   norm, normalizeKey, round2, detectBrand, isCombo, isBarcode, looksLikeInstallment, parsePrice, parseMxn, parsePackQty,
-  splitSeller, buildSpec, classify, merchantShipping, merchantEligibility, isOwnShop, clipFee, computeMargin,
+  splitSeller, queryFromUrl, compactQuery, effectivePrice, buildSpec, classify, merchantShipping, merchantEligibility, isOwnShop, clipFee, computeMargin,
   floorPrice, targetPrice, evaluateAll,
 } from './sourcingCore.js';
 export type { MatchLevel, Trust, MarginSettings, TargetSpec, PriceRules } from './sourcingCore.js';

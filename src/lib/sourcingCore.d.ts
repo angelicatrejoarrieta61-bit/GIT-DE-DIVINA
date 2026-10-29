@@ -71,6 +71,7 @@ export interface EvaluatedFields {
   shipping: number;
   shippingKnown: boolean;
   shippingDays: string | null;
+  discountPct: number | null;
 }
 
 export const KNOWN_BRANDS: Array<{ name: string; keys: string[] }>;
@@ -84,7 +85,12 @@ export function detectBrand(title: string): string | null;
 export function isCombo(title: string): boolean;
 export function isBarcode(q: string): boolean;
 export function looksLikeInstallment(text: string): boolean;
-export function parsePrice(raw?: string | null): { value: number | null; installment: boolean };
+export function parsePrice(raw?: string | null): { value: number | null; installment: boolean; high?: number | null };
+export function effectivePrice(o: { price_mxn: number | null; old_price_mxn?: number | null; alt_price_text?: string | null }): {
+  price: number | null; original: number | null; discountPct: number | null;
+};
+export function queryFromUrl(raw: string): { query: string; code: string | null; shop: string } | null;
+export function compactQuery(title: string): string;
 export function parseMxn(raw?: string | null): number | null;
 export function parsePackQty(title: string): number;
 export function splitSeller(shop: string): { shop: string; seller: string | null };
