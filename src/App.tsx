@@ -38,6 +38,8 @@ const AdminPromoters = lazy(() => import('./pages/admin/AdminPromoters').then((m
 const AdminSourcing = lazy(() => import('./pages/admin/AdminSourcing').then((m) => ({ default: m.AdminSourcing })));
 const AdminHome = lazy(() => import('./pages/admin/AdminHome').then((m) => ({ default: m.AdminHome })));
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons').then((m) => ({ default: m.AdminCoupons })));
+const AdminAuto = lazy(() => import('./pages/admin/AdminAuto').then((m) => ({ default: m.AdminAuto })));
+const AdminOpportunities = lazy(() => import('./pages/admin/AdminOpportunities').then((m) => ({ default: m.AdminOpportunities })));
 
 
 function RouteRedirector() {
@@ -94,6 +96,8 @@ export default function App() {
           <Route index element={<AdminHome />} />
           <Route path="productos"  element={<AdminProducts />} />
           <Route path="abastecimiento" element={<AdminSourcing />} />
+          <Route path="automatizacion" element={<AdminAuto />} />
+          <Route path="oportunidades" element={<AdminOpportunities />} />
           <Route path="import"     element={<AdminImport />} />
           <Route path="config"     element={<AdminConfig />} />
           <Route path="reportes"   element={<AdminOrderReports />} />

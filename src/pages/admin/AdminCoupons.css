@@ -86,7 +86,7 @@
 .cpn-chip em { font-style: normal; opacity: .65; font-variant-numeric: tabular-nums; }
 
 /* Tabla */
-.cpn-table-wrap { border: 1px solid var(--c-line); border-radius: var(--c-r); overflow-x: auto; background: rgba(255,255,255,.015); }
+.cpn-table-wrap { position: relative; border: 1px solid var(--c-line); border-radius: var(--c-r); overflow-x: auto; background: rgba(255,255,255,.015); }
 .cpn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .cpn-table thead th { padding: 7px 10px; text-align: left; white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-muted); background: #121213; border-bottom: 1px solid var(--c-line); }
 .cpn-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.045); vertical-align: middle; }

@@ -8,7 +8,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, CreditCard, HeartHandshake, Package, Search, Mail, Megaphone, PenLine,
   Settings, Home, LayoutTemplate, FileText, Users, ChevronDown, Plus, ExternalLink, LogOut, Save, Menu, X,
-  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, ShoppingCart, TicketPercent, type LucideIcon,
+  Trash2, ArrowUp, ArrowDown, Check, Info, Phone, ShoppingCart, TicketPercent, Bot, Lightbulb, type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import './AdminLayout.css';
@@ -347,6 +347,8 @@ export const AdminLayout: React.FC = () => {
           <NavGroup id="catalogo" title="Catálogo" closed={!!closed.catalogo} onToggle={toggleGroup}>
             <NavItem to="/admin/productos" icon={Package} label="Productos" active={isPath('/admin/productos') || isPath('/admin/import')} />
             <NavItem to="/admin/abastecimiento" icon={Search} label="Abastecimiento" active={isPath('/admin/abastecimiento')} />
+            <NavItem to="/admin/automatizacion" icon={Bot} label="Precios automáticos" active={isPath('/admin/automatizacion')} />
+            <NavItem to="/admin/oportunidades" icon={Lightbulb} label="Oportunidades y resultados" active={isPath('/admin/oportunidades')} />
           </NavGroup>
 
           <NavGroup id="clientes" title="Clientes y contenido" closed={!!closed.clientes} onToggle={toggleGroup}>

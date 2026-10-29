@@ -294,8 +294,9 @@ export function AdminSourcing() {
 
   const best = useMemo(() => {
     const trusted = (o: EvaluatedOffer) => !(o.merchant_id && merchants[o.merchant_id]?.trust === 'descartado');
-    const pool = evaluated.filter((o) => o.match === 'exacta' && o.costTotal !== null && o.priceFlag !== 'sospechoso' && trusted(o));
-    return pool.sort((a, b) => (a.costTotal as number) - (b.costTotal as number))[0] ?? null;
+    const pool = evaluated.filter((o) => o.match === 'exacta' && o.costTotal !== null && o.priceFlag !== 'sospechoso' && !o.installment && !o.own && trusted(o));
+    const byCost = (a: EvaluatedOffer, b: EvaluatedOffer) => (a.costTotal as number) - (b.costTotal as number);
+    return pool.filter((o) => o.eligible).sort(byCost)[0] ?? pool.sort(byCost)[0] ?? null;
   }, [evaluated, merchants]);
 
   // ── Agregar a mi configuración de productos ────────────────
@@ -494,9 +495,9 @@ export function AdminSourcing() {
                 <span className="src-stat__s">{counts.probable} probables · {counts.no_confirmada} otras</span>
               </div>
               <div className={`src-stat ${best ? 'src-stat--hl' : ''}`}>
-                <span className="src-stat__k">Mejor exacta</span>
+                <span className="src-stat__k">{best && !best.eligible ? 'Mejor exacta (no elegible)' : 'Mejor proveedor'}</span>
                 <span className="src-stat__v">{best ? money(best.costTotal) : '—'}</span>
-                <span className="src-stat__s">{best ? best.shop : 'Sin coincidencia exacta'}</span>
+                <span className="src-stat__s">{best ? (best.eligible ? best.shop : `${best.shop} · ${best.eligibility}`) : 'Sin coincidencia exacta'}</span>
               </div>
               <div className={`src-stat ${best?.margin !== null && best?.margin !== undefined ? (best.margin >= 0 ? 'src-stat--ok' : 'src-stat--bad') : ''}`}>
                 <span className="src-stat__k">Tu margen</span>
@@ -819,6 +820,8 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
             <span className={`src-badge src-badge--${o.match}`}>{MATCH_LABEL[o.match]}</span>
             {o.priceFlag === 'sospechoso' && <span className="src-badge src-badge--warn">Precio sospechoso</span>}
             {o.priceFlag === 'caro' && <span className="src-badge src-badge--muted">Muy caro</span>}
+            {o.installment && <span className="src-badge src-badge--warn">Mensualidad</span>}
+            <span className={`src-badge ${o.eligible ? 'src-badge--exacta' : 'src-badge--muted'}`} title={o.eligibility}>{o.eligible ? 'Proveedor válido' : o.eligibility}</span>
             <span className="src-reasons">{o.reasons.join(' · ')}</span>
           </span>
         </div>
@@ -827,6 +830,7 @@ function OfferRow({ o, merchant, onTrust, onStock }: {
       <div className="src-cell src-shop" role="cell">
         <span className={`src-dot src-dot--${trust}`} aria-hidden="true" />
         <span className="src-shop__name">{o.shop}</span>
+        {o.seller && <span className="src-shop__trust">Vendedor: {o.seller}</span>}
         <span className="src-shop__trust">{TRUST_LABEL[trust]}{o.rating ? ` · ★ ${o.rating}` : ''}</span>
         <span className={`src-shop__ship ${o.shippingDays ? '' : 'is-missing'}`}>{o.shippingDays ? `Llega en ${o.shippingDays}` : 'Días de envío sin dato'}</span>
       </div>
@@ -1143,7 +1147,10 @@ function SettingsModal({ value, onClose, onSaved }: { value: MarginSettings; onC
 }
 
 // ─── Pestaña: directorio de tiendas ──────────────────────────
-type MerchantDraft = { website: string; daysMin: string; daysMax: string; cost: string; freeFrom: string; notes: string; invoice: boolean };
+type MerchantDraft = {
+  website: string; daysMin: string; daysMax: string; cost: string; freeFrom: string; notes: string; invoice: boolean;
+  authorized: boolean; marketplace: boolean; conditions: string;
+};
 
 const draftOf = (r: SourcingMerchant): MerchantDraft => ({
   website: r.website ?? '',
@@ -1153,13 +1160,16 @@ const draftOf = (r: SourcingMerchant): MerchantDraft => ({
   freeFrom: r.free_shipping_from_mxn?.toString() ?? '',
   notes: r.notes ?? '',
   invoice: !!r.gives_invoice,
+  authorized: !!r.authorized,
+  marketplace: !!r.is_marketplace,
+  conditions: r.conditions ?? '',
 });
 
 function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
   const [rows, setRows] = useState<SourcingMerchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'todas' | Trust | 'sin_datos'>('todas');
+  const [filter, setFilter] = useState<'todas' | Trust | 'sin_datos' | 'autorizadas'>('autorizadas');
   const [text, setText] = useState('');
   const [drafts, setDrafts] = useState<Record<string, MerchantDraft>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1174,7 +1184,8 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
 
   const complete = (r: SourcingMerchant) => !!r.website && r.shipping_days_max != null && r.shipping_cost_mxn != null;
   const shown = rows.filter((r) =>
-    (filter === 'todas' || (filter === 'sin_datos' ? !complete(r) : r.trust === filter))
+    (filter === 'todas'
+      || (filter === 'sin_datos' ? !complete(r) : filter === 'autorizadas' ? !!r.authorized : r.trust === filter))
     && r.name.toLowerCase().includes(text.toLowerCase()));
 
   const edit = (r: SourcingMerchant, patch: Partial<MerchantDraft>) =>
@@ -1208,6 +1219,9 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
       free_shipping_from_mxn: num(d.freeFrom),
       notes: d.notes.trim() || null,
       gives_invoice: d.invoice,
+      authorized: d.authorized,
+      is_marketplace: d.marketplace,
+      conditions: d.conditions.trim() || null,
     };
     setSavingId(r.id);
     const { error: err } = await supabase.from('sourcing_merchants').update(patch).eq('id', r.id);
@@ -1218,8 +1232,9 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
     notify({ kind: 'ok', text: `Datos de ${r.name} guardados. Ya se usan en las ofertas.` });
   };
 
-  const counts = { todas: rows.length, confiable: 0, nuevo: 0, descartado: 0, sin_datos: 0 } as Record<'todas' | Trust | 'sin_datos', number>;
-  rows.forEach((r) => { counts[r.trust] += 1; if (!complete(r)) counts.sin_datos += 1; });
+  const counts = { todas: rows.length, confiable: 0, nuevo: 0, descartado: 0, sin_datos: 0, autorizadas: 0 } as Record<'todas' | Trust | 'sin_datos' | 'autorizadas', number>;
+  rows.forEach((r) => { counts[r.trust] += 1; if (!complete(r)) counts.sin_datos += 1; if (r.authorized) counts.autorizadas += 1; });
+  const missingDays = rows.filter((r) => r.authorized && r.shipping_days_max == null).length;
 
   if (loading) return <ResultsSkeleton />;
   if (error) return <div className="src-alert src-alert--error">{error}</div>;
@@ -1228,13 +1243,18 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
   return (
     <section>
       <p className="src-note">
-        Google me da el nombre de la tienda y el precio, pero <b>no los días ni el costo de envío</b>. Captúralos una vez por tienda (la primera vez que le compres) y se usarán en todas las ofertas.
+        Solo se compra a <b>proveedores autorizados</b> (empresas grandes) que <b>entreguen al día siguiente</b>. Google no da los días ni el costo de envío: captúralos una vez por tienda y se usan en todas las ofertas y en la revisión automática.
       </p>
+      {missingDays > 0 && (
+        <div className="src-alert src-alert--warn" role="status">
+          {missingDays} proveedor{missingDays === 1 ? '' : 'es'} autorizado{missingDays === 1 ? '' : 's'} sin días de entrega: mientras no los captures, la revisión automática no los usa.
+        </div>
+      )}
       <div className="src-filters">
         <div className="src-seg" role="radiogroup" aria-label="Filtrar tiendas">
-          {(['todas', 'confiable', 'nuevo', 'descartado', 'sin_datos'] as const).map((k) => (
+          {(['autorizadas', 'todas', 'confiable', 'nuevo', 'descartado', 'sin_datos'] as const).map((k) => (
             <button key={k} type="button" role="radio" aria-checked={filter === k} className={filter === k ? 'is-on' : ''} onClick={() => setFilter(k)}>
-              {k === 'todas' ? 'Todas' : k === 'sin_datos' ? 'Faltan datos' : `${TRUST_LABEL[k]}s`} {counts[k]}
+              {k === 'todas' ? 'Todas' : k === 'sin_datos' ? 'Faltan datos' : k === 'autorizadas' ? 'Autorizadas' : `${TRUST_LABEL[k]}s`} {counts[k]}
             </button>
           ))}
         </div>
@@ -1254,7 +1274,7 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
                 <div className="src-store__id">
                   <span className={`src-dot src-dot--${r.trust}`} aria-hidden="true" />
                   <div>
-                    <strong>{r.name}</strong>
+                    <strong>{r.name}{r.authorized && <span className="src-badge src-badge--exacta" style={{ marginLeft: 6 }}>Autorizada</span>}{r.is_marketplace && <span className="src-badge src-badge--muted" style={{ marginLeft: 4 }}>Marketplace</span>}</strong>
                     <span>
                       Vista {r.times_seen}×{r.last_seen_at ? ` · ${timeAgo(r.last_seen_at)}` : ''}{r.last_price ? ` · último precio ${money(r.last_price)}` : ''}
                     </span>
@@ -1297,6 +1317,12 @@ function MerchantsTab({ notify }: { notify: (t: Toast) => void }) {
                   <label htmlFor={`n-${r.id}`}>Notas</label>
                   <input id={`n-${r.id}`} className="src-input src-input--sm" placeholder="Ej: recoger en sucursal, pide factura al comprar" value={d.notes} onChange={(e) => edit(r, { notes: e.target.value })} />
                 </div>
+                <div className="src-field src-store__notes">
+                  <label htmlFor={`k-${r.id}`}>Condiciones</label>
+                  <input id={`k-${r.id}`} className="src-input src-input--sm" placeholder="Ej: mínimo de compra, solo Prime/Full, horario de corte" value={d.conditions} onChange={(e) => edit(r, { conditions: e.target.value })} />
+                </div>
+                <label className="src-check"><input type="checkbox" checked={d.authorized} onChange={(e) => edit(r, { authorized: e.target.checked })} /> Proveedor autorizado</label>
+                <label className="src-check"><input type="checkbox" checked={d.marketplace} onChange={(e) => edit(r, { marketplace: e.target.checked })} /> Es marketplace (revisar vendedor)</label>
                 <label className="src-check src-store__inv"><input type="checkbox" checked={d.invoice} onChange={(e) => edit(r, { invoice: e.target.checked })} /> Da factura</label>
                 <button type="button" className="src-btn src-btn--sm src-btn--lime src-store__save" disabled={!dirty || savingId === r.id} onClick={() => void save(r)}>
                   {savingId === r.id ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado'}

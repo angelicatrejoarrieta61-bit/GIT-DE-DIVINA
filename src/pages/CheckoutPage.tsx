@@ -61,8 +61,9 @@ export const CheckoutPage: React.FC = () => {
   const {
     items, total, clearCart,
     couponCode, couponType, couponValue, couponMin, applyCoupon, revalidateCoupon, removeCoupon,
-    couponBelowMin, discountAmount, totalAfterDiscount,
+    couponBelowMin, discountAmount, totalAfterDiscount, refreshPrices,
   } = useCartStore();
+  const [priceNotice, setPriceNotice] = useState('');
   const couponText = couponLabel(couponType, couponValue);
 
   // Vista previa del admin (iframe): con el carrito vacío se muestran productos de ejemplo
@@ -193,6 +194,21 @@ export const CheckoutPage: React.FC = () => {
     if (err) setCouponError(err); else setCouponInput('');
   };
 
+  // Precios y existencia actuales (cambian solos con la revisión automática de proveedores)
+  const syncCart = async (): Promise<boolean> => {
+    const { changed, removed } = await refreshPrices();
+    const parts: string[] = [];
+    if (removed.length) parts.push(`Ya no está disponible y se quitó: ${removed.join(', ')}.`);
+    if (changed.length) parts.push(`Se actualizó el precio de: ${changed.join(', ')}.`);
+    setPriceNotice(parts.join(' '));
+    return parts.length > 0;
+  };
+  useEffect(() => {
+    if (isDemo || !items.length) return;
+    void syncCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Al entrar al checkout se confirma que el cupón guardado siga vigente
   useEffect(() => {
     if (!couponCode || isDemo) return;
@@ -263,9 +279,14 @@ export const CheckoutPage: React.FC = () => {
           amount: finalTotal, orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
           cardTokenId, customerEmail: form.email, userAgent: navigator.userAgent,
+          couponCode: appliedCoupon ?? null,
         }),
       });
       const chargeData = await chargeRes.json();
+      if (chargeRes.status === 409 && (chargeData.code === 'price_changed' || chargeData.code === 'unavailable')) {
+        await syncCart();
+        throw new Error(chargeData.error ?? 'El total cambió. Revisa tu carrito y vuelve a pagar.');
+      }
       if (!chargeRes.ok) {
         throw new Error(chargeData.error ?? chargeData.message ?? 'Error al procesar el cobro.');
       }
@@ -463,7 +484,8 @@ export const CheckoutPage: React.FC = () => {
                   )}
                 </div>
 
-                {error && <div className="cv2__error"><span>⚠</span><span>{error}</span></div>}
+                {priceNotice && !error && <div className="cv2__error" role="status"><span>ℹ</span><span>{priceNotice}</span></div>}
+                {error && <div className="cv2__error" role="alert"><span>⚠</span><span>{error}</span></div>}
 
                 <button
                   type="button"

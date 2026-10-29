@@ -25,6 +25,7 @@ import type { Product } from '../types';
 import './ProductPage.css';
 import { analyticsItem, trackEvent, trackOnce } from '../lib/analytics';
 import { FREE_SHIPPING_FROM, SHIPPING_COST } from '../lib/shipping';
+import { trackProductEvent } from '../lib/productEvents';
 
 // ── Tipos extendidos ────────────────────────────────────────────────────────
 interface IngredientInfo { name: string; pct?: string; benefit: string; aka?: string }
@@ -156,6 +157,7 @@ export const ProductPage: React.FC = () => {
 
   useEffect(() => {
     if (product) trackOnce(`view_item:${product.id}`, 'view_item', { currency: 'MXN', value: product.price, items: [analyticsItem(product)] });
+    if (product) trackProductEvent(product.id, 'view');
   }, [product]);
 
   // Barra fija de compra (celular) cuando el bloque de compra sale de la pantalla

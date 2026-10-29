@@ -37,6 +37,7 @@ export const CartDrawer: React.FC = () => {
     couponMin,
     applyCoupon,
     revalidateCoupon,
+    refreshPrices,
     removeCoupon,
     couponBelowMin,
     discountAmount,
@@ -66,6 +67,22 @@ export const CartDrawer: React.FC = () => {
     void run();
     return () => { alive = false; };
   }, [isOpen, isEmpty]);
+
+  // Al abrir el carrito: precios y existencia actuales (cambian solos con la revisión de proveedores)
+  const [cartNotice, setCartNotice] = useState('');
+  useEffect(() => {
+    if (!isOpen || isEmpty) return;
+    let alive = true;
+    refreshPrices().then(({ changed, removed }) => {
+      if (!alive) return;
+      const parts: string[] = [];
+      if (removed.length) parts.push(`Se quitó (ya no disponible): ${removed.join(', ')}`);
+      if (changed.length) parts.push(`Precio actualizado: ${changed.join(', ')}`);
+      setCartNotice(parts.join(' · '));
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Al abrir el carrito se confirma que el cupón guardado siga vigente (pudo pausarse en el admin)
   useEffect(() => {
@@ -262,6 +279,7 @@ export const CartDrawer: React.FC = () => {
                 </form>
               )}
               {couponError && <p className="cart-drawer__coupon-error" role="alert">{couponError}</p>}
+              {cartNotice && <p className="cart-drawer__coupon-error" role="status">{cartNotice}</p>}
               {belowMin && (
                 <p className="cart-drawer__coupon-error" role="status">
                   {couponCode} aplica en compras desde {formatCurrency(couponMin)}

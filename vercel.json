@@ -10,24 +10,92 @@
     },
     "api/sourcing-search.ts": {
       "maxDuration": 60
+    },
+    "api/sourcing-auto.ts": {
+      "maxDuration": 60
+    },
+    "api/charge-clip.ts": {
+      "maxDuration": 30
     }
   },
   "headers": [
-    { "source": "/checkout", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
-    { "source": "/pago-(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
-    { "source": "/admin", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
-    { "source": "/admin/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+    {
+      "source": "/checkout",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/pago-(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/checkout", "destination": "/" },
-    { "source": "/pago-exitoso", "destination": "/" },
-    { "source": "/pago-error", "destination": "/" },
-    { "source": "/admin", "destination": "/" },
-    { "source": "/admin/:path*", "destination": "/" },
-    { "source": "/info/:slug", "destination": "/" },
-    { "source": "/producto/:slug", "destination": "/" },
-    { "source": "/coleccion/:slug", "destination": "/" },
-    { "source": "/blog/:slug", "destination": "/" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/checkout",
+      "destination": "/"
+    },
+    {
+      "source": "/pago-exitoso",
+      "destination": "/"
+    },
+    {
+      "source": "/pago-error",
+      "destination": "/"
+    },
+    {
+      "source": "/admin",
+      "destination": "/"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/info/:slug",
+      "destination": "/"
+    },
+    {
+      "source": "/producto/:slug",
+      "destination": "/"
+    },
+    {
+      "source": "/coleccion/:slug",
+      "destination": "/"
+    },
+    {
+      "source": "/blog/:slug",
+      "destination": "/"
+    }
   ]
 }

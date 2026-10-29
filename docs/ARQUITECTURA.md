@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 25 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 29 de octubre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -72,7 +72,11 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `supabase.ts` | Cliente de Supabase, URLs de imágenes con tamaño (`getImageUrl`, `getImageSrcSet`), subida de imágenes |
 | `queries.ts` | Lecturas y escrituras de productos, colecciones, pedidos y `store_config` |
 | `storeBoot.ts` | Copia local de la configuración (arranque sin brinco), fondo de página, loader inicial |
-| `sourcing.ts` | Lógica del buscador de proveedores: coincidencia exacta, margen, envío, comisión de Clip |
+| `sourcing.ts` | Tipos y utilidades del buscador de proveedores para el panel (reexporta `sourcingCore.js`) |
+| `sourcingCore.js` (+ `.d.ts`) | **Lógica única de abastecimiento** (panel y servidor): coincidencia exacta, mensualidades, paquetes, vendedor de marketplace, proveedores autorizados, margen, piso de ganancia y precio objetivo. JS puro para que lo importen las funciones de Vercel |
+| `sourcingServer.js` (+ `.d.ts`) | Solo servidor: Google Shopping vía Bright Data, directorio de tiendas, revisión de productos, verificación de pedidos, demanda y oportunidades |
+| `autoApi.ts` | Panel ↔ `/api/sourcing-auto` y reglas de la automatización en `store_config` |
+| `productEvents.ts` | Registra visitas y "agregar al carrito" por producto (`product_events`); no cuenta bots ni la vista previa del admin |
 | `blog-queries.ts` | Lecturas y escrituras del blog |
 | `promoterTracking.ts` | Guarda el código de promotora (`?ref=`) 30 días |
 | `analytics.ts` | Eventos de Google Analytics |
@@ -122,7 +126,9 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 | `/admin` | Resumen: ventas del mes, por surtir, sin foto, mensajes |
 | `/admin/reportes` | Pedidos y clientes: resumen, filtros, borrar, enviar con guía, etiqueta, campañas |
 | `/admin/productos` | Catálogo unificado: precio, marca, fotos, badge, Home |
-| `/admin/abastecimiento` | Buscador de proveedores |
+| `/admin/abastecimiento` | Buscador de proveedores · pestaña Tiendas (proveedores autorizados y días de entrega) |
+| `/admin/automatizacion` | **Precios automáticos** (Catálogo): productos vigilados, pedidos por comprar (verificación en vivo) y reglas |
+| `/admin/oportunidades` | **Oportunidades y resultados** (Catálogo): qué conviene vender y métricas por producto |
 | `/admin/cupones` | **Códigos de descuento** (Ventas): crear, generar, editar, pausar y borrar cupones |
 | `/admin/reportes?pagos=clip` | Abre el modal **Pagos Clip** dentro de Pedidos (el antiguo `/admin/config?section=clip-payments` redirige aquí) |
 | `/admin/config?section=…` | Diseño de la tienda (General, Home, colecciones, páginas) |
@@ -206,6 +212,50 @@ Archivos: `src/pages/admin/AdminCoupons.tsx` + `AdminCoupons.css` (clases `.cpn-
 
 **Costo:** cada búsqueda nueva consume saldo de Bright Data. El caché de 6 horas existe para no pagar dos veces lo mismo.
 
+**Comparador (desde 29-oct-2026, `sourcingCore.js`):** además de marca, línea, tamaño, SPF y forma:
+- **Mensualidades** ("12 x $45", "$45/mes", "3 MSI"): se detectan; si se conoce el número de pagos se calcula el total. Una oferta en mensualidades nunca cuenta como costo ni como precio de mercado.
+- **Paquetes** ("2 piezas", "pack de 3", "2 x 50 ml", "x2", "trío"): se compara por pieza. Un "kit de 2" del mismo producto es paquete, no otra variante.
+- **Excluidos siempre:** usado, reacondicionado, réplica, imitación, genérico, tester, muestra, decant, sin caja, caducado. Tamaño mini/viaje es otra variante.
+- **Vendedor de marketplace** ("Amazon.com.mx - Vendedor X") se guarda en `sourcing_offers.seller`.
+- **Tu propia tienda** ("Divina") nunca cuenta como competencia ni proveedor.
+
+## 10 bis. Abastecimiento automático (`/admin/automatizacion`, `/admin/oportunidades`)
+
+Migración: `supabase/migrations/20261029120000_sourcing_auto.sql` (se aplica sola con la Action de GitHub). Función: `api/sourcing-auto.ts` (60 s). Lógica: `src/lib/sourcingServer.js` + `sourcingCore.js`.
+
+**1. Proveedores válidos.** Solo se le compra a tiendas `authorized = true` (empresas grandes; se marcan solas Amazon MX, Mercado Libre, Liverpool, Palacio, Sephora, Sanborns, Walmart, Bodega Aurrera, Sam's, Costco, Chedraui, Soriana, Farmacias del Ahorro, San Pablo, Benavides, Guadalajara, Coppel e ISDIN), no descartadas y que **entreguen en `auto_max_delivery_days` días (1 = día siguiente)**. Los días de entrega y el costo de envío se capturan una vez por tienda en Abastecimiento → Tiendas; **sin días capturados la tienda no se usa**. Campos nuevos: `authorized`, `is_marketplace`, `conditions`.
+
+**2. Revisión cada 5 h.** Supabase `pg_cron` (job `divina-sourcing-tick`, cada 10 min) llama a `https://www.divinastore.com.mx/api/sourcing-auto?job=tick` con el header `x-cron-token` (secreto generado en la base, tabla `private.app_secrets`; solo la llave de servicio puede validarlo con `sourcing_cron_token_ok`). Cada llamada revisa hasta 3 productos **bajo pedido con proveedor principal** cuya última revisión tenga más de `auto_check_hours` horas. Usa la búsqueda guardada en `products.search_query` o "marca + nombre". Historial en `product_price_checks`; cambios de precio en `product_price_changes`.
+
+**3. Precio automático** (`products.auto_price`, encendido por defecto):
+- **Piso** = precio mínimo que deja ≥ `auto_min_margin_pct` % **y** ≥ `auto_min_margin_mxn` pesos, después de costo, envío del proveedor, envío que absorbes y comisión de Clip (con IVA si aplica).
+- **Mercado** = mediana del precio del mismo producto exacto en las demás tiendas (mínimo 2 tiendas). No se usa el más barato porque suele ser tu proveedor y quedarías siempre en el piso.
+- **Precio** = máx(piso, mercado − `auto_undercut_pct` %). Sin dato de mercado se conserva el precio actual (solo sube si el piso lo exige). Tope por revisión `auto_max_change_pct` %, salvo cuando el piso obliga a subir.
+- Si lo único que falta son los días de entrega de una tienda autorizada → "Faltan datos": no se oculta ni cambia de precio.
+- Sin proveedor válido → el producto se **oculta** (`in_stock = false`, `auto_hidden = true`) y vuelve solo cuando reaparece un proveedor. Los que ocultaste tú no se tocan.
+- Se actualizan `products.price`, `cost_price`, `sourcing_status/note/checked_at` y el proveedor principal en `product_sources`.
+
+**4. Protección de cada venta.**
+- `/api/charge-clip` **recalcula el total en el servidor** con los precios actuales de `products`, el cupón validado (`validate_coupon`) y la regla de envío; rechaza con 409 si algún producto ya no está disponible o si el total cambió, y **cobra el total del servidor**, nunca el del navegador.
+- El carrito y el checkout traen precio y existencia actuales al abrirse (`refreshPrices`) y avisan qué cambió.
+- **Pedidos por comprar** (Precios automáticos → pestaña 2): botón **Verificar proveedor** consulta en vivo y decide por pedido: *Comprar* (mismo proveedor, margen sano), *Cambiar de proveedor* (otro válido) o *Suspender* (sin proveedor o comprar deja pérdida). Se guarda en `order_supplier_checks`.
+- Cada pedido guarda `est_cost` y `est_profit` (trigger con el costo del proveedor principal al momento de la venta).
+
+**5. Demanda y oportunidades** (`sourcing_opportunities`, job `divina-opportunities` diario 07:20 CDMX):
+- Ideas nuevas desde tus **temas** (`auto_opportunity_seeds`) con el autocompletado público de Google.
+- Se evalúan hasta `auto_opportunities_per_day` al día (cada una = 1 búsqueda de Bright Data, caché 6 h).
+- **Demanda 0–100**: posición en el autocompletado, reseñas, **reseñas nuevas entre revisiones** (lo más cercano a ventas reales que da Google), calificación y competencia. Aparecer mucho no cuenta como vender.
+- **Verificado** = proveedor válido + precio sugerido competitivo (≤ mercado + 5 %) + ≥ 20 reseñas + demanda ≥ 35. Lo demás queda como **candidato**.
+- **Publicar** abre Abastecimiento con la búsqueda lista; desde ahí se da de alta con su proveedor y queda vigilado.
+
+**6. Resultados** (`product_events` + función `product_metrics(días)`): visitas y "agregar al carrito" por producto (sin datos personales), pedidos, unidades, ventas y ganancia estimada. Sugerencia por producto (Impulsar · Se queda en carrito · Revisar precio o retirar · Observar). **Destacar** agrega/quita la etiqueta `TOP_HOME` (sección "Más vendidos" del Home).
+
+**Reglas** en `store_config` (editables en Precios automáticos → Reglas): `auto_min_margin_pct` (25), `auto_min_margin_mxn` (100), `auto_undercut_pct` (2), `auto_max_change_pct` (35), `auto_max_delivery_days` (1), `auto_check_hours` (5), `auto_enabled` (true), `auto_opportunities_per_day` (6), `auto_opportunity_seeds`.
+
+**Costo en Bright Data:** ≈ productos vigilados × (24 / horas de revisión) búsquedas al día + oportunidades por día. Ej.: 40 productos cada 5 h ≈ 192/día.
+
+**Límites reales:** Google Shopping no confirma existencia exacta ni entrega a un CP; por eso la regla es "proveedor autorizado que entrega al día siguiente" y la verificación en vivo antes de comprar. Las funciones de Vercel van en **12**, el máximo del plan gratuito: una función nueva obliga a juntar o borrar otra (candidata: `api/test-clip.ts`).
+
 ## 11. Correo (Resend)
 
 Todo pasa por `/api/send-email`, según el campo `type`:
@@ -286,8 +336,8 @@ Nunca se guardan en el repositorio.
 
 ## 16. Cómo se publica un cambio
 
-1. Editar en la carpeta local del repo.
-2. Si el cambio trae un `.sql` nuevo, ejecutarlo en Supabase → SQL Editor.
+1. Editar en la carpeta local del repo (`C:\Proyectos\GIT-DIVINA`).
+2. Si el cambio trae un `.sql` nuevo, va en `supabase/migrations/`: la Action `.github/workflows/supabase-migrations.yml` lo aplica sola al hacer push (requiere los secretos `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_ID`). Resultado en la pestaña Actions de GitHub.
 3. GitHub Desktop → Commit → Push a `main`.
 4. Vercel publica solo en uno o dos minutos.
 
@@ -300,7 +350,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Antes de usar una columna, confirmar que existe.** Ya pasó con `sku`: el catálogo dejó de cargar.
 - **No escribir en `store_config` a espaldas de `AdminConfig`** (sección 8).
 - **Ruta nueva con parámetro → agregarla en `vercel.json`.**
-- **Los estilos del admin van con prefijo** (`.adm-`, `.src-`, `.cat-`, `.ord-`, `.cpn-`) y los del checkout con `.cv2__`, para no chocar con la tienda.
+- **Los estilos del admin van con prefijo** (`.adm-`, `.src-`, `.cat-`, `.ord-`, `.cpn-`, `.aut-`) y los del checkout con `.cv2__`, para no chocar con la tienda.
 - **Los textos de la tienda son blancos.** Un fondo claro los vuelve ilegibles; el admin avisa.
 - **Probar en navegador real** a 1440, ~1180 y 390 px antes de publicar.
 
@@ -325,14 +375,16 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Cálculo de margen (Abastecimiento):** valores acordados: comisión Clip 5 % total (sin IVA extra, sin cuota fija) y colchón de envío $20 por venta (`sourcing_customer_shipping`); el envío real se cobra aparte al cliente. Se guardan en `store_config` (`sourcing_*`).
 - **Coincidencia:** un anuncio que junta dos productos ("Lambdacaps + Lambdapil", "Loción + Champú"; no cuenta "SPF 50+") es **No confirmada** (combo). "Champú" = "shampoo". Se ignoran palabras de relleno de títulos de Amazon (ayuda, reducir, estimula, crecimiento, cabello, capilar…). Si el anuncio no trae la marca ni el nombre de la línea, es No confirmada.
 - **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.
-- **Seguridad:** `products.cost_price` (costo de proveedor) se puede leer con la llave pública. Falta ocultarlo al público.
+- **Seguridad:** `products.cost_price` (costo de proveedor) y ahora `sourcing_note`/`search_query` se pueden leer con la llave pública. Falta ocultarlos al público (vista pública de productos o permisos por columna).
+- **Migración `20261029120000_sourcing_auto.sql`:** abastecimiento automático (sección 10 bis). Antes de que se aplique, la tienda y el buscador siguen funcionando; las pantallas nuevas muestran el aviso.
+- **Días de entrega por tienda:** mientras una tienda autorizada no tenga días capturados (Abastecimiento → Tiendas), sus ofertas no se usan; si es lo único que falta, el producto queda en "Faltan datos" (no se oculta ni cambia de precio) y el admin dice qué tienda capturar.
 - **Search Console:** después del deploy, enviar `https://www.divinastore.com.mx/sitemap.xml` y pedir indexación de las 4 colecciones (cambiaron de URL canónica).
 - **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Migración `20261025120000_coupons.sql`:** crea `coupons`, `validate_coupon`, columnas `orders.coupon_code`/`discount_amount` y el primer cupón `DESCUENTO202610`. Hasta correrla, `/admin/cupones` muestra el aviso y la tienda solo acepta ese código.
 
 **Revisión del proceso de compra (25-oct-2026)** — hallazgos, sin cambios aplicados:
-- **Crítico — monto del cobro sin verificar:** `/api/charge-clip` cobra el `amount` que envía el navegador; `orders.total` también lo escribe el navegador. Alguien con conocimientos puede pagar menos (o aplicar un cupón inválido). Solución propuesta: que `charge-clip` lea el pedido con la llave de servicio, recalcule precios desde `products`, valide el cupón con `validate_coupon` y aplique la regla de envío antes de cobrar.
+- ~~Crítico — monto del cobro sin verificar~~ **Resuelto el 29-oct-2026:** `charge-clip` recalcula y cobra el total del servidor (sección 10 bis, punto 4).
 - **Pedido marcado `paid` desde el navegador** (`updateOrderStatus` tras el cobro). El servidor ya lo marca; revisar en Supabase que la regla de `orders` no permita a la llave pública cambiar `status`.
 - **Al aplicar un cupón en el checkout se vuelve a montar el formulario de tarjeta de Clip** (el efecto depende de `finalTotal`) y se borra lo que la clienta ya había escrito.
 - **Enlaces rotos:** "Términos y Condiciones" (`/terminos`) y "Aviso de Privacidad" (`/privacidad`) no tienen ruta: dan 404.

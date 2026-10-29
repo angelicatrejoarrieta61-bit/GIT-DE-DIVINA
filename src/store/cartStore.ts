@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CartItem, Product } from '../types';
 import { validateCoupon, couponDiscount, type CouponType } from '../lib/coupons';
+import { supabase } from '../lib/supabase';
+import { trackProductEvent } from '../lib/productEvents';
 
 interface CartStore {
   items: CartItem[];
@@ -10,6 +12,11 @@ interface CartStore {
   removeItem: (productId: string) => void;
   updateQty: (productId: string, qty: number) => void;
   clearCart: () => void;
+  /**
+   * Trae precio y existencia actuales de la base (los precios cambian solos con la revisión automática).
+   * Quita lo que ya no está disponible. Devuelve qué cambió para avisar a la clienta.
+   */
+  refreshPrices: () => Promise<{ changed: string[]; removed: string[] }>;
   openCart: () => void;
   closeCart: () => void;
   total: () => number;
@@ -41,6 +48,7 @@ export const useCartStore = create<CartStore>()(
       ...NO_COUPON,
 
       addItem: (product, variant) => {
+        trackProductEvent(product.id, 'add_to_cart');
         const items = get().items;
         const existing = items.find(
           i => i.product.id === product.id && i.variant === variant
@@ -75,6 +83,29 @@ export const useCartStore = create<CartStore>()(
       },
 
       clearCart: () => set({ items: [], ...NO_COUPON }),
+
+      refreshPrices: async () => {
+        const items = get().items;
+        const ids = [...new Set(items.map((i) => i.product.id))];
+        if (!ids.length) return { changed: [], removed: [] };
+        const { data, error } = await supabase.from('products').select('id, name, price, compare_price, in_stock').in('id', ids);
+        if (error || !data) return { changed: [], removed: [] };
+        const byId = new Map(data.map((p) => [p.id as string, p]));
+        const changed: string[] = [];
+        const removed: string[] = [];
+        const next = items.flatMap((i) => {
+          const p = byId.get(i.product.id);
+          if (!p || p.in_stock === false) { removed.push(i.product.name); return []; }
+          const price = Number(p.price);
+          if (Number.isFinite(price) && Math.abs(price - i.product.price) >= 0.01) {
+            changed.push(i.product.name);
+            return [{ ...i, product: { ...i.product, price, compare_price: p.compare_price ?? i.product.compare_price } }];
+          }
+          return [i];
+        });
+        if (changed.length || removed.length) set({ items: next });
+        return { changed, removed };
+      },
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
 
