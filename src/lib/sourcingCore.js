@@ -356,12 +356,21 @@ export function classify(spec, title, extraText) {
   }
 
   if (spec.core.length) {
-    const found = spec.core.filter((w) => has(t, w));
-    const missing = spec.core.filter((w) => !has(t, w));
-    const ratio = found.length / spec.core.length;
+    // Un número suelto de la búsqueda ("… Espumoso 473", típico de enlaces) es el tamaño:
+    // si el anuncio no dice tamaño, no se cuenta como palabra faltante.
+    const titleSize = parseSize(t);
+    const titleHasSize = titleSize.value !== null;
+    const bare = !spec.sizeValue ? spec.core.find((w) => /^\d{2,4}$/.test(w)) : null;
+    if (bare && titleHasSize && Math.abs(toBase(titleSize.value, titleSize.unit) - Number(bare)) > Number(bare) * 0.06) {
+      hard = true; reasons.push(`Tamaño ${titleSize.value} ${titleSize.unit} (buscas ${bare})`);
+    }
+    const core = titleHasSize ? spec.core.filter((w) => w !== bare) : spec.core.filter((w) => !/^\d+$/.test(w));
+    const found = core.filter((w) => has(t, w));
+    const missing = core.filter((w) => !has(t, w));
+    const ratio = core.length ? found.length / core.length : 1;
     const brandMissing = spec.brand ? reasons.includes('No menciona la marca') : false;
     if (ratio < 0.5) { hard = true; reasons.push(`Faltan: ${missing.join(', ')}`); }
-    else if (brandMissing && !has(t, spec.core[0])) { hard = true; reasons.push(`Sin marca ni línea (${spec.core[0]})`); }
+    else if (brandMissing && core.length && !has(t, core[0])) { hard = true; reasons.push(`Sin marca ni línea (${core[0]})`); }
     else if (missing.length) { soft = true; reasons.push(`No dice: ${missing.join(', ')}`); }
   }
 
@@ -492,7 +501,90 @@ export function targetPrice({ floor, market, current, rules }) {
 }
 
 export const DEFAULT_MARGIN = { clipFeePct: 3.6, clipFeeFixed: 0, ivaOnFee: true, supplierShipping: 0, customerShipping: 0 };
-export const DEFAULT_RULES = { minMarginPct: 25, minMarginMxn: 100, undercutPct: 2, maxChangePct: 35, maxDeliveryDays: 1, checkHours: 5 };
+export const DEFAULT_RULES = { minMarginPct: 25, maxMarginPct: 35, minMarginMxn: 100, undercutPct: 2, maxChangePct: 35, maxDeliveryDays: 1, checkHours: 5 };
+
+// ─── Precio automático por costo (banda de ganancia) ─────────
+const feeRateOf = (s) => (s.clipFeePct / 100) * (s.ivaOnFee ? 1.16 : 1);
+
+/** Precio de venta que deja exactamente `pct` % de ganancia (sobre la venta), ya con comisión de Clip y envío al cliente. */
+export function priceAtMargin(cost, s, pct) {
+  const base = cost + s.customerShipping + s.clipFeeFixed * (s.ivaOnFee ? 1.16 : 1);
+  return base / Math.max(0.05, 1 - feeRateOf(s) - pct / 100);
+}
+
+/**
+ * Precio de venta según el costo del proveedor, siempre con ganancia entre minMarginPct y maxMarginPct:
+ *  - sin precio o costo anterior: ganancia a la mitad de la banda (30 % con 25–35 %);
+ *  - con precio anterior: conserva tu ganancia en pesos (si el costo sube $100, la venta sube $100 + comisión;
+ *    si baja, baja lo mismo);
+ *  - si eso saca la ganancia de la banda, se ajusta al límite.
+ * Devuelve { target, lo, hi, mid, note }.
+ */
+export function bandPrice({ cost, prevCost, current, settings, rules }) {
+  const minPct = rules.minMarginPct;
+  const maxPct = Math.max(minPct, rules.maxMarginPct ?? minPct + 10);
+  const lo = Math.ceil(priceAtMargin(cost, settings, minPct));
+  const hi = Math.max(lo, Math.floor(priceAtMargin(cost, settings, maxPct)));
+  const mid = Math.min(hi, Math.max(lo, Math.round(priceAtMargin(cost, settings, (minPct + maxPct) / 2))));
+  let target;
+  let note = null;
+  if (!(Number(current) > 0) || !(Number(prevCost) > 0)) {
+    target = mid;
+    note = `Precio con ${round2((minPct + maxPct) / 2)}% de ganancia`;
+  } else {
+    target = Math.round(Number(current) + (cost - Number(prevCost)) / Math.max(0.05, 1 - feeRateOf(settings)));
+    if (Math.abs(cost - Number(prevCost)) >= 0.5) {
+      note = cost > prevCost ? `Costo subió ${round2(cost - prevCost)}` : `Costo bajó ${round2(prevCost - cost)}`;
+    }
+  }
+  if (target < lo) { target = lo; note = `Ganancia mínima ${minPct}%`; }
+  if (target > hi) { target = hi; note = `Ganancia máxima ${maxPct}%`; }
+  return { target, lo, hi, mid, note };
+}
+
+// ─── Seguimiento de la oferta elegida ────────────────────────
+/** Tienda sin vendedor ni dominio: "Amazon.com.mx - Vendedor X" → "amazon". */
+export function shopKey(shop) {
+  return normalizeKey(splitSeller(String(shop ?? '')).shop)
+    .replace(/\.com(\.mx)?$/, '')
+    .replace(/\s+(mx|mexico)$/, '')
+    .trim();
+}
+
+const titleWords = (title) => new Set(norm(title).split(' ').filter((w) => w.length > 1 && !STOPWORDS.has(w)));
+
+/**
+ * Busca en las ofertas la misma que elegiste al agregar el producto: misma tienda y mismo producto
+ * (mismo enlace, o título con ≥ 60 % de las mismas palabras y sin otro tamaño/variante; `query` = búsqueda original).
+ * `offers` deben venir de evaluateAll (precio de oferta ya aplicado). Devuelve la oferta o null.
+ */
+export function findTrackedOffer(offers, source, query = null) {
+  if (!source || !source.shop || !source.offer_title) return null;
+  const key = shopKey(source.shop);
+  const spec = buildSpec(source.offer_title, null);
+  // La búsqueda original aporta lo que el título no dice (p. ej. el tamaño "473" de la liga)
+  const querySpec = query ? buildSpec(query, spec.brand) : null;
+  const want = titleWords(source.offer_title);
+  let best = null;
+  for (const o of offers) {
+    if (o.unit_price_mxn === null || o.unit_price_mxn === undefined) continue;
+    if (shopKey(o.shop) !== key) continue;
+    if (o.installment || o.is_installment || looksLikeInstallment(o.title)) continue;
+    const sameLink = Boolean(source.link && o.link && source.link === o.link);
+    let score = 2;
+    if (!sameLink) {
+      if (classify(spec, o.title).match === 'no_confirmada') continue;
+      if (querySpec && classify(querySpec, o.title).match === 'no_confirmada') continue;
+      const got = titleWords(o.title);
+      const common = [...want].filter((w) => got.has(w)).length;
+      if (common / Math.max(1, want.size) < 0.6) continue;
+      score = common / new Set([...want, ...got]).size; // el título más parecido gana
+
+    }
+    if (!best || score > best.score || (score === best.score && o.unit_price_mxn < best.o.unit_price_mxn)) best = { o, score };
+  }
+  return best ? best.o : null;
+}
 
 function median(nums) {
   if (!nums.length) return null;

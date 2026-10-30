@@ -7,6 +7,7 @@
 import {
   normalizeKey, parsePrice, parseMxn, parsePackQty, splitSeller, buildSpec, evaluateAll, compactQuery,
   floorPrice, targetPrice, computeMargin, round2, DEFAULT_MARGIN, DEFAULT_RULES, effectivePrice,
+  bandPrice, findTrackedOffer, shopKey,
 } from './sourcingCore.js';
 
 const BRIGHTDATA_TIMEOUT_MS = 55_000;
@@ -296,7 +297,7 @@ export async function searchOffers(db, query, { productId = null, cacheMinutes =
 // ─── Configuración ────────────────────────────────────────────
 const CONFIG_KEYS = [
   'sourcing_clip_fee_pct', 'sourcing_clip_fee_fixed', 'sourcing_iva_on_fee', 'sourcing_supplier_shipping', 'sourcing_customer_shipping',
-  'auto_min_margin_pct', 'auto_min_margin_mxn', 'auto_undercut_pct', 'auto_max_change_pct', 'auto_max_delivery_days',
+  'auto_min_margin_pct', 'auto_max_margin_pct', 'auto_min_margin_mxn', 'auto_undercut_pct', 'auto_max_change_pct', 'auto_max_delivery_days',
   'auto_check_hours', 'auto_enabled', 'auto_opportunities_per_day', 'auto_opportunity_seeds',
 ];
 
@@ -317,6 +318,7 @@ export async function loadSettings(db) {
     },
     rules: {
       minMarginPct: num('auto_min_margin_pct', DEFAULT_RULES.minMarginPct),
+      maxMarginPct: num('auto_max_margin_pct', DEFAULT_RULES.maxMarginPct),
       minMarginMxn: num('auto_min_margin_mxn', DEFAULT_RULES.minMarginMxn),
       undercutPct: num('auto_undercut_pct', DEFAULT_RULES.undercutPct),
       maxChangePct: num('auto_max_change_pct', DEFAULT_RULES.maxChangePct),
@@ -338,116 +340,145 @@ export function productQuery(p) {
 }
 
 // ─── Revisión de un producto ──────────────────────────────────
+const SOURCE_COLS = 'id, product_id, merchant_id, offer_id, shop, offer_title, link, unit_cost_mxn, shipping_mxn, is_primary';
+
+/** Búsquedas con las que se revisa: la que hiciste al agregarlo, el título de la oferta elegida y marca + nombre. */
+export function checkQueries(product, source) {
+  const list = [product.search_query, source?.offer_title ? compactQuery(source.offer_title) : null, productQuery(product)]
+    .map((q) => (q ?? '').trim())
+    .filter((q) => q.length >= 3);
+  const seen = new Set();
+  return list.filter((q) => (seen.has(normalizeKey(q)) ? false : (seen.add(normalizeKey(q)), true))).slice(0, 2);
+}
+
+/** Otra tienda con el mismo producto exacto: autorizada o marcada confiable, la más barata. */
+function substituteOf(offers, merchants) {
+  return offers
+    .filter((o) => o.match === 'exacta' && o.unit_price_mxn !== null && !o.installment && !o.own)
+    .filter((o) => {
+      const m = o.merchant_id ? merchants[o.merchant_id] : null;
+      return m && m.trust !== 'descartado' && (m.authorized || m.trust === 'confiable');
+    })
+    .sort((x, y) => (x.unit_price_mxn + x.shipping) - (y.unit_price_mxn + y.shipping))[0] ?? null;
+}
+
 /**
- * Busca el producto, elige el mejor proveedor elegible, calcula el precio y lo aplica.
- * - Sin proveedor elegible: se oculta (in_stock = false, auto_hidden = true).
- * - Con proveedor: precio = máx(piso de ganancia, mercado − undercut), con tope de cambio.
- * Guarda todo en product_price_checks / product_price_changes.
+ * Revisa un producto vigilado:
+ *  1) vuelve a hacer la búsqueda con la que lo agregaste y localiza LA MISMA oferta (misma tienda y producto);
+ *  2) si ya no aparece, toma la tienda autorizada más barata con el mismo producto exacto (cambia de proveedor);
+ *  3) si no hay ninguna, lo retira de la venta (in_stock = false, auto_hidden = true) hasta que vuelva a aparecer.
+ * Precio: sigue al costo con ganancia entre la mínima y la máxima (bandPrice). Con "Automatizar" apagado
+ * solo registra el costo: no cambia precio ni lo oculta.
  */
 export async function checkProduct(db, product, cfg, { cacheMinutes = 30 } = {}) {
-  const query = productQuery(product);
   const now = new Date().toISOString();
   const current = Number(product.price) || 0;
-  let result;
-  try {
-    result = await searchOffers(db, query, { productId: product.id, cacheMinutes });
-  } catch (e) {
-    await db.from('products').update({ sourcing_status: 'error', sourcing_note: String(e?.message || e).slice(0, 200), sourcing_checked_at: now }).eq('id', product.id);
-    await db.from('product_price_checks').insert({ product_id: product.id, status: 'error', price_before: current, price_after: current, note: String(e?.message || e).slice(0, 300) });
-    return { productId: product.id, status: 'error', note: String(e?.message || e) };
-  }
+  const auto = product.auto_price !== false;
+  const { data: source } = await db.from('product_sources').select(SOURCE_COLS)
+    .eq('product_id', product.id).eq('is_primary', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
 
-  const spec = buildSpec(query, product.brand ?? null);
-  const ev = evaluateAll(result.offers, spec, current || null, cfg.margin, result.merchants, cfg.rules.maxDeliveryDays);
-  const reviewsTotal = ev.offers.filter((o) => o.match === 'exacta' && o.reviews).reduce((mx, o) => Math.max(mx, o.reviews), 0) || null;
-
-  if (!result.offers.length) {
-    await db.from('products').update({ sourcing_status: 'sin_datos', sourcing_note: 'Google no devolvió ofertas', sourcing_checked_at: now }).eq('id', product.id);
-    await db.from('product_price_checks').insert({ product_id: product.id, status: 'sin_datos', price_before: current, price_after: current, note: 'Google no devolvió ofertas' });
-    return { productId: product.id, status: 'sin_datos' };
-  }
-
-  if (!ev.best) {
-    // Si lo único que falta es capturar los días de entrega de una tienda autorizada, no se oculta:
-    // se avisa qué tienda capturar (evita ocultar todo el catálogo el primer día).
-    const missingDays = [...new Set(ev.offers
-      .filter((o) => o.match === 'exacta' && !o.installment && !o.own && o.eligibility === 'Falta capturar días de entrega')
-      .map((o) => o.shop))];
-    if (missingDays.length) {
-      const note = `Captura los días de entrega de: ${missingDays.slice(0, 4).join(', ')} (Abastecimiento → Tiendas)`;
-      await db.from('products').update({ sourcing_status: 'sin_datos', sourcing_note: note.slice(0, 300), sourcing_checked_at: now }).eq('id', product.id);
-      await db.from('product_price_checks').insert({
-        product_id: product.id, status: 'sin_datos', offers_total: result.offers.length, offers_exact: ev.exactCount,
-        market_low: ev.marketLow, market_ref: ev.marketRef, price_before: current, price_after: current, reviews_total: reviewsTotal, note: note.slice(0, 300),
-      });
-      return { productId: product.id, status: 'sin_datos', note };
+  const queries = checkQueries(product, source);
+  // Producto contra el que se buscan sustitutos: la búsqueda con la que lo encontraste (p. ej. "… Espumoso 473")
+  const spec = buildSpec(product.search_query || queries[0] || source?.offer_title || product.name, product.brand ?? null);
+  let tracked = null;
+  let lastError = null;
+  let total = 0;
+  const pool = [];
+  const merchants = {};
+  for (const q of queries) {
+    let r;
+    try {
+      r = await searchOffers(db, q, { productId: product.id, cacheMinutes });
+    } catch (e) {
+      lastError = String(e?.message || e);
+      continue;
     }
-    const exactNotEligible = ev.offers.filter((o) => o.match === 'exacta' && !o.eligible).map((o) => `${o.shop}: ${o.eligibility}`);
-    const note = ev.exactCount
-      ? `Hay ${ev.exactCount} oferta(s) exacta(s) pero ningún proveedor válido${exactNotEligible.length ? ` (${[...new Set(exactNotEligible)].slice(0, 3).join('; ')})` : ''}`
-      : 'Ninguna oferta coincide exacto con el producto';
-    const patch = { sourcing_status: 'sin_proveedor', sourcing_note: note.slice(0, 300), sourcing_checked_at: now };
-    if (product.in_stock) Object.assign(patch, { in_stock: false, auto_hidden: true });
+    Object.assign(merchants, r.merchants);
+    const ev = evaluateAll(r.offers, spec, current || null, cfg.margin, r.merchants, cfg.rules.maxDeliveryDays);
+    total += ev.offers.length;
+    pool.push(...ev.offers);
+    tracked = findTrackedOffer(ev.offers, source, product.search_query || null);
+    if (tracked) break;
+  }
+
+  const logCheck = (row) => db.from('product_price_checks').insert({ product_id: product.id, price_before: current, ...row });
+
+  // Google no respondió: no se toca nada, se reintenta en la próxima vuelta
+  if (!total) {
+    const note = lastError ? `No se pudo consultar: ${lastError}` : 'Google no devolvió ofertas';
+    const status = lastError ? 'error' : 'sin_datos';
+    await db.from('products').update({ sourcing_status: status, sourcing_note: note.slice(0, 300), sourcing_checked_at: now }).eq('id', product.id);
+    await logCheck({ status, price_after: current, note: note.slice(0, 300) });
+    return { productId: product.id, status, note };
+  }
+
+  const pick = tracked ?? substituteOf(pool, merchants);
+  const exactCount = pool.filter((o) => o.match === 'exacta').length;
+
+  // Sin la oferta ni sustituto: se retira de la venta
+  if (!pick) {
+    const note = source
+      ? `Ya no aparece la oferta de ${source.shop} ni otra tienda autorizada con el mismo producto`
+      : 'Ninguna tienda autorizada tiene el mismo producto';
+    const patch = { sourcing_status: 'sin_proveedor', sourcing_note: auto ? `${note} · retirado de la venta` : note, sourcing_checked_at: now };
+    if (auto && product.in_stock) Object.assign(patch, { in_stock: false, auto_hidden: true });
     await db.from('products').update(patch).eq('id', product.id);
-    await db.from('product_sources').update({ available: false, last_checked_at: now }).eq('product_id', product.id).eq('is_primary', true);
-    await db.from('product_price_checks').insert({
-      product_id: product.id, status: 'sin_proveedor', offers_total: result.offers.length, offers_exact: ev.exactCount,
-      market_low: ev.marketLow, price_before: current, price_after: current, reviews_total: reviewsTotal, note: note.slice(0, 300),
-    });
+    if (source) await db.from('product_sources').update({ available: false, last_checked_at: now }).eq('id', source.id);
+    await logCheck({ status: 'sin_proveedor', offers_total: total, offers_exact: exactCount, price_after: current, note: note.slice(0, 300) });
     return { productId: product.id, status: 'sin_proveedor', note };
   }
 
-  const best = ev.best;
-  const floor = floorPrice(best.unit_price_mxn, best.shipping, cfg.margin, cfg.rules);
-  const { target, notes } = targetPrice({ floor, market: ev.marketRef, current, rules: cfg.rules });
-  const apply = product.auto_price !== false && current > 0 && Math.abs(target - current) >= 1;
-  const finalPrice = apply ? target : current;
-  const m = computeMargin(finalPrice, best.unit_price_mxn, cfg.margin, best.shipping);
+  const cost = round2(pick.unit_price_mxn + pick.shipping);
+  const prevCost = source ? round2(Number(source.unit_cost_mxn || 0) + Number(source.shipping_mxn || 0)) : null;
+  const band = bandPrice({ cost, prevCost, current, settings: cfg.margin, rules: cfg.rules });
+  const apply = auto && Math.abs(band.target - current) >= 1;
+  const finalPrice = apply ? band.target : current;
+  const m = computeMargin(finalPrice, pick.unit_price_mxn, cfg.margin, pick.shipping);
+  const switched = !tracked && (!source || shopKey(source.shop) !== shopKey(pick.shop));
+  const offerTxt = `${pick.shop} a ${pick.unit_price_mxn}${pick.discountPct ? ` (−${pick.discountPct}%)` : ''}`;
+  const notes = [
+    switched ? `Cambió de proveedor: ${source?.shop ?? 'sin proveedor'} → ${offerTxt}` : offerTxt,
+    band.note,
+    !auto ? 'Automatizar apagado: precio sin cambio' : null,
+  ].filter(Boolean);
 
   const productPatch = {
-    // Aprende: si no tenía búsqueda exacta, guarda la del anuncio que coincidió exacto
-    ...(!product.search_query ? { search_query: compactQuery(best.title) } : {}),
+    ...(!product.search_query && queries[0] ? { search_query: queries[0] } : {}),
     sourcing_status: 'ok',
-    sourcing_note: notes.join(' · ') || null,
+    sourcing_note: notes.join(' · ').slice(0, 300),
     sourcing_checked_at: now,
-    cost_price: best.costTotal,
+    cost_price: cost,
   };
   if (apply) productPatch.price = finalPrice;
-  if (product.auto_hidden && !product.in_stock) Object.assign(productPatch, { in_stock: true, auto_hidden: false });
+  if (auto && product.auto_hidden && !product.in_stock) Object.assign(productPatch, { in_stock: true, auto_hidden: false });
   const { error: upErr } = await db.from('products').update(productPatch).eq('id', product.id);
   if (upErr) throw upErr;
 
   if (apply) {
-    const reason = finalPrice > current
-      ? (floor > current ? 'Subió el costo del proveedor' : 'El mercado subió')
-      : 'Mejor oferta en el mercado: se ajustó para competir';
     await db.from('product_price_changes').insert({
-      product_id: product.id, old_price: current, new_price: finalPrice, unit_cost: best.costTotal, market_low: ev.marketRef ?? ev.marketLow,
-      reason: notes.length ? `${reason} · ${notes.join(' · ')}` : reason, source: 'auto',
+      product_id: product.id, old_price: current, new_price: finalPrice, unit_cost: cost, market_low: null,
+      reason: notes.join(' · ').slice(0, 300), source: 'auto',
     });
   }
 
-  // Proveedor principal = el mejor elegible de esta revisión
   const sourceRow = {
-    merchant_id: best.merchant_id, offer_id: best.id, shop: best.shop, offer_title: best.title, link: best.link,
-    unit_cost_mxn: best.unit_price_mxn, shipping_mxn: best.shipping, sale_price_mxn: finalPrice,
-    margin_mxn: m.margin ?? 0, match_level: best.match, last_checked_at: now, available: true,
+    merchant_id: pick.merchant_id, offer_id: pick.id ?? null, shop: pick.shop, offer_title: pick.title, link: pick.link,
+    unit_cost_mxn: pick.unit_price_mxn, shipping_mxn: pick.shipping, sale_price_mxn: finalPrice,
+    margin_mxn: m.margin ?? 0, match_level: tracked ? 'exacta' : pick.match, last_checked_at: now, available: true,
   };
-  const { data: primary } = await db.from('product_sources').select('id').eq('product_id', product.id).eq('is_primary', true).limit(1).maybeSingle();
-  if (primary) await db.from('product_sources').update(sourceRow).eq('id', primary.id);
+  if (source) await db.from('product_sources').update(sourceRow).eq('id', source.id);
   else await db.from('product_sources').insert({ ...sourceRow, product_id: product.id, is_primary: true });
 
-  await db.from('product_price_checks').insert({
-    product_id: product.id, status: 'ok', offers_total: result.offers.length, offers_exact: ev.exactCount,
-    best_shop: best.shop, best_offer_title: best.title, best_link: best.link, best_unit_cost: best.unit_price_mxn,
-    best_shipping: best.shipping, market_low: ev.marketLow, market_ref: ev.marketRef, floor_price: floor, target_price: target,
-    price_before: current, price_after: finalPrice, margin_mxn: m.margin, margin_pct: m.marginPct,
-    reviews_total: reviewsTotal, note: notes.join(' · ') || null,
+  await logCheck({
+    status: 'ok', offers_total: total, offers_exact: exactCount,
+    best_shop: pick.shop, best_offer_title: pick.title, best_link: pick.link, best_unit_cost: pick.unit_price_mxn,
+    best_shipping: pick.shipping, floor_price: band.lo, target_price: band.target,
+    price_after: finalPrice, margin_mxn: m.margin, margin_pct: m.marginPct, note: notes.join(' · ').slice(0, 300),
   });
-  return { productId: product.id, status: 'ok', price: finalPrice, changed: apply, shop: best.shop, margin: m.margin };
+  return { productId: product.id, status: 'ok', price: finalPrice, changed: apply, shop: pick.shop, cost, switched, margin: m.margin, marginPct: m.marginPct };
 }
 
-/** Productos bajo pedido con proveedor principal (los que se revisan solos). */
+/** Productos vigilados con Automatizar encendido cuya última revisión ya venció. */
 export async function dueProducts(db, cfg, limit) {
   const { data: src } = await db.from('product_sources').select('product_id').eq('is_primary', true);
   const ids = [...new Set((src ?? []).map((r) => r.product_id))];
@@ -458,6 +489,7 @@ export async function dueProducts(db, cfg, limit) {
     .select('*')
     .in('id', ids)
     .eq('fulfillment', 'bajo_pedido')
+    .eq('auto_price', true)
     .or(`in_stock.eq.true,auto_hidden.eq.true`)
     .or(`sourcing_checked_at.is.null,sourcing_checked_at.lt.${before}`)
     .order('sourcing_checked_at', { ascending: true, nullsFirst: true })

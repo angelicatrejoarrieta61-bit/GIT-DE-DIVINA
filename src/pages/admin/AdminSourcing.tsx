@@ -9,7 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase, uploadProductImage } from '../../lib/supabase';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import {
-  buildSpec, computeMargin, evaluateOffers, evaluateAll, floorPrice, targetPrice, DEFAULT_RULES, isBarcode, queryFromUrl, compactQuery, money, slugify, timeAgo, detectBrand, round2, norm, verifyUrl, domainOf,
+  buildSpec, computeMargin, evaluateOffers, evaluateAll, bandPrice, DEFAULT_RULES, isBarcode, queryFromUrl, compactQuery, money, slugify, timeAgo, detectBrand, round2, norm, verifyUrl, domainOf,
   DEFAULT_MARGIN, MATCH_RANK,
   type EvaluatedOffer, type MarginSettings, type MatchLevel, type PriceRules, type SourcingMerchant, type SourcingOffer, type Trust,
 } from '../../lib/sourcing';
@@ -85,12 +85,12 @@ export function AdminSourcing() {
   const [error, setError] = useState('');
 
   // Filtros
-  const [matchFilter, setMatchFilter] = useState<MatchFilter>('exactas');
+  const [matchFilter, setMatchFilter] = useState<MatchFilter>('todas');
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [shopFilter, setShopFilter] = useState<string>('');
   const [hideDiscarded, setHideDiscarded] = useState(true);
   const [onlyTrusted, setOnlyTrusted] = useState(false);
-  const [hideSuspicious, setHideSuspicious] = useState(true);
+  const [hideSuspicious, setHideSuspicious] = useState(false);
   const [sort, setSort] = useState<SortKey>('cost');
   const [rules, setRules] = useState<PriceRules>(DEFAULT_RULES);
   useEffect(() => { void loadAutoConfig().then((c) => setRules(c.rules)).catch(() => undefined); }, []);
@@ -263,15 +263,15 @@ export function AdminSourcing() {
     : query;
   const effectiveSpec = useMemo(() => buildSpec(specSource, linked?.brand ?? null), [specSource, linked]);
 
-  // Precio sugerido (si no escribes uno): mercado típico − competencia, nunca debajo de tu ganancia mínima
+  // Precio sugerido (si no escribes uno): costo de la oferta exacta más barata con ganancia a media banda (25–35 % → 30 %)
   const suggested = useMemo(() => {
     const pre = evaluateAll(offers, effectiveSpec, null, settings, merchants, rules.maxDeliveryDays);
-    const base = pre.best ?? pre.offers
-      .filter((o) => o.match === 'exacta' && o.unit_price_mxn !== null && !o.installment && !o.own && o.priceFlag !== 'sospechoso')
-      .sort((a, b) => (a.unit_price_mxn as number) - (b.unit_price_mxn as number))[0];
+    const base = pre.offers
+      .filter((o) => o.match === 'exacta' && o.unit_price_mxn !== null && !o.installment && !o.own)
+      .sort((a, b) => ((a.unit_price_mxn as number) + a.shipping) - ((b.unit_price_mxn as number) + b.shipping))[0];
     if (!base || base.unit_price_mxn === null) return null;
-    const floor = floorPrice(base.unit_price_mxn, base.shipping, settings, rules);
-    return { price: targetPrice({ floor, market: pre.marketRef, current: pre.marketRef ?? floor, rules: { ...rules, maxChangePct: 0 } }).target, market: pre.marketRef, floor };
+    const band = bandPrice({ cost: round2(base.unit_price_mxn + base.shipping), settings, rules });
+    return { price: band.mid, lo: band.lo, hi: band.hi, shop: base.shop, cost: round2(base.unit_price_mxn + base.shipping) };
   }, [offers, effectiveSpec, settings, merchants, rules]);
   const typedSale = toNum(salePrice);
   const sale = typedSale ?? suggested?.price ?? null;
@@ -308,9 +308,11 @@ export function AdminSourcing() {
     return list.sort((a, b) => {
       if (sort === 'relevance') return a.position - b.position;
       if (sort === 'trust') return trustRank[trustOf(a)] - trustRank[trustOf(b)] || MATCH_RANK[a.match] - MATCH_RANK[b.match] || (a.costTotal ?? 9e9) - (b.costTotal ?? 9e9);
-      const byMatch = MATCH_RANK[a.match] - MATCH_RANK[b.match];
-      if (sort === 'cost') return byMatch || (a.costTotal ?? 9e9) - (b.costTotal ?? 9e9);
-      return byMatch || (b.margin ?? -9e9) - (a.margin ?? -9e9) || (a.costTotal ?? 9e9) - (b.costTotal ?? 9e9);
+      // Primero tu mismo producto (exactas y probables) por precio actual con la oferta aplicada;
+      // abajo, atenuados, otros tamaños/productos (se muestran, no se ocultan)
+      const other = Number(a.match === 'no_confirmada') - Number(b.match === 'no_confirmada');
+      if (sort === 'cost') return other || (a.costTotal ?? 9e9) - (b.costTotal ?? 9e9);
+      return other || (b.margin ?? -9e9) - (a.margin ?? -9e9) || (a.costTotal ?? 9e9) - (b.costTotal ?? 9e9);
     });
   }, [evaluated, merchants, matchFilter, brandFilter, shopFilter, hideDiscarded, onlyTrusted, hideSuspicious, sort]);
 
@@ -345,7 +347,7 @@ export function AdminSourcing() {
 
   const addToCatalog = async (e: React.FormEvent) => {
     e.preventDefault();
-    const price = toNum(salePrice);
+    const price = sale;
     if (!addName.trim()) { notify({ kind: 'error', text: 'Pon el título del producto.' }); return; }
     if (!price || price <= 0) { notify({ kind: 'error', text: 'Pon el precio de venta.' }); return; }
     if (addEan && !/^\d{8,14}$/.test(addEan)) { notify({ kind: 'error', text: 'El código de barras debe tener de 8 a 14 dígitos.' }); return; }
@@ -388,9 +390,9 @@ export function AdminSourcing() {
       const product = data as CatalogProduct;
 
       if (best && best.unit_price_mxn !== null) {
-        if (best.match === 'exacta') {
-          await supabase.from('products').update({ search_query: compactQuery(best.title) }).eq('id', product.id).then(() => undefined, () => undefined);
-        }
+        // La revisión automática repite esta misma búsqueda y sigue esta misma oferta
+        await supabase.from('products').update({ search_query: (meta?.query && !isBarcode(meta.query) ? meta.query : compactQuery(best.title)) })
+          .eq('id', product.id).then(() => undefined, () => undefined);
         const m = computeMargin(price, best.unit_price_mxn, settings, best.shipping);
         await supabase.from('product_sources').insert({
           product_id: product.id, merchant_id: best.merchant_id, offer_id: best.id, shop: best.shop, offer_title: best.title,
@@ -416,13 +418,9 @@ export function AdminSourcing() {
       </span>
     )
     : <span className="src-step__hint">{sale ? 'Aún no hay oferta exacta para calcular tu margen; revisa las probables.' : 'Escribe tu precio y verás cuánto ganas en cada oferta.'}</span>;
-  const notCompetitive = !!suggested?.market && suggested.floor > suggested.market * 1.05;
+  const midPct = round2((rules.minMarginPct + rules.maxMarginPct) / 2);
   const suggestNote = !typedSale && suggested
-    ? notCompetitive
-      ? <span className="src-alert src-alert--warn" role="status" style={{ display: 'block', marginTop: 6 }}>
-          <b>No conviene a precio de mercado:</b> las tiendas lo venden en {money(suggested.market)} y para ganar tu mínimo ({rules.minMarginPct}% y {money(rules.minMarginMxn)}) tendrías que venderlo en {money(suggested.floor)}. Ganancia calculada a {money(suggested.price)}.
-        </span>
-      : <span className="src-step__hint">Ganancia calculada a <b>{money(suggested.price)}</b> (sugerido: {suggested.market ? `mercado típico ${money(suggested.market)}, ` : ''}mínimo con tu ganancia {money(suggested.floor)}). Escribe otro precio si quieres.</span>
+    ? <span className="src-step__hint">Precio sugerido <b>{money(suggested.price)}</b> = {midPct}% de ganancia comprando en {suggested.shop} a {money(suggested.cost)} (rango {rules.minMarginPct}–{rules.maxMarginPct}%: {money(suggested.lo)}–{money(suggested.hi)}). Escribe otro si quieres.</span>
     : null;
 
   const counts = useMemo(() => {
@@ -625,7 +623,7 @@ export function AdminSourcing() {
                     </div>
                     <div className="src-field">
                       <label htmlFor="add-price">Precio de venta</label>
-                      <div className="src-money"><span>$</span><input id="add-price" className="src-input" inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} required /></div>
+                      <div className="src-money"><span>$</span><input id="add-price" className="src-input" inputMode="decimal" placeholder={suggested ? String(suggested.price) : '0.00'} value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /></div>
                     </div>
                     <div className="src-field">
                       <label htmlFor="add-brand">Marca</label>
@@ -793,7 +791,9 @@ export function AdminSourcing() {
           offer={stockOffer}
           linked={linked}
           spec={query}
-          salePrice={sale}
+          searchQuery={meta?.query ?? query}
+          salePrice={typedSale}
+          rules={rules}
           barcode={isBarcode(query) ? query.replace(/\s/g, '') : linked?.ean ?? ''}
           collections={collections}
           settings={settings}
@@ -845,7 +845,7 @@ function OfferRow({ o, merchant, onTrust, onStock, rules }: {
   onStock: () => void;
 }) {
   const trust: Trust = merchant?.trust ?? 'nuevo';
-  const canStock = o.match !== 'no_confirmada' && o.unit_price_mxn !== null;
+  const canStock = o.unit_price_mxn !== null;
   return (
     <div className={`src-row src-row--${o.match} ${trust === 'descartado' ? 'is-discarded' : ''}`} role="row">
       <div className="src-cell src-prod" role="cell">
@@ -903,7 +903,7 @@ function OfferRow({ o, merchant, onTrust, onStock, rules }: {
           onClick={() => onTrust(o.merchant_id, trust === 'descartado' ? 'nuevo' : 'descartado')}
           aria-pressed={trust === 'descartado'} title={trust === 'descartado' ? 'Volver a mostrar tienda' : 'Descartar tienda'}>⊘</button>
         <button type="button" className="src-btn src-btn--sm src-btn--lime" disabled={!canStock} onClick={onStock}
-          title={canStock ? 'Usar este proveedor y subir a mi stock' : 'Solo coincidencias exactas o probables'}>
+          title={canStock ? 'Usar esta oferta: se vigila su precio y el tuyo se ajusta solo' : 'Esta oferta no trae precio'}>
           + Mi stock
         </button>
       </div>
@@ -920,11 +920,13 @@ function ResultsSkeleton() {
 }
 
 // ─── Modal: subir a mi stock ─────────────────────────────────
-function StockModal({ offer, linked, spec, salePrice, barcode, collections, settings, onClose, onSaved }: {
+function StockModal({ offer, linked, spec, searchQuery, salePrice, rules, barcode, collections, settings, onClose, onSaved }: {
   offer: EvaluatedOffer;
   linked: CatalogProduct | null;
   spec: string;
+  searchQuery: string;
   salePrice: number | null;
+  rules: PriceRules;
   barcode: string;
   collections: CollectionLite[];
   settings: MarginSettings;
@@ -935,7 +937,8 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
   const [name, setName] = useState(linked?.name ?? (spec && !isBarcode(spec) ? spec : offer.title));
   const [brand, setBrand] = useState(linked?.brand ?? detectBrand(offer.title) ?? '');
   const [ean, setEan] = useState(linked?.ean ?? barcode);
-  const [price, setPrice] = useState(String(salePrice ?? linked?.price ?? ''));
+  const band = offer.unit_price_mxn !== null ? bandPrice({ cost: round2(offer.unit_price_mxn + offer.shipping), settings, rules }) : null;
+  const [price, setPrice] = useState(String(salePrice ?? band?.mid ?? linked?.price ?? ''));
   const [compare, setCompare] = useState('');
   const [collection, setCollection] = useState('');
   const [unitCost, setUnitCost] = useState(String(offer.unit_price_mxn ?? ''));
@@ -971,6 +974,13 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
         ean: ean.trim() || null,
         fulfillment: 'bajo_pedido',
         in_stock: true,
+        auto_price: true,
+        auto_hidden: false,
+        sourcing_status: null,
+        sourcing_note: null,
+        sourcing_checked_at: null,
+        // La revisión automática repite esta misma búsqueda y sigue esta misma oferta
+        search_query: (searchQuery && !isBarcode(searchQuery) ? searchQuery : compactQuery(offer.title)).slice(0, 160),
       };
       let product: CatalogProduct;
       let created = false;
@@ -1005,10 +1015,6 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
       }
 
       await supabase.from('product_sources').update({ is_primary: false }).eq('product_id', product.id);
-      // Aprende: la revisión automática buscará con el título que acabas de confirmar
-      if (offer.match === 'exacta') {
-        await supabase.from('products').update({ search_query: compactQuery(offer.title) }).eq('id', product.id).then(() => undefined, () => undefined);
-      }
       const { error: srcErr } = await supabase.from('product_sources').insert({
         product_id: product.id,
         merchant_id: offer.merchant_id,
@@ -1106,6 +1112,7 @@ function StockModal({ offer, linked, spec, salePrice, barcode, collections, sett
           <div className={m.margin !== null && m.margin < 0 ? 'is-neg' : 'is-pos'}><dt>Margen</dt><dd>{money(m.margin)}{m.marginPct !== null ? ` · ${m.marginPct}%` : ''}</dd></div>
         </dl>
 
+        {band && <p className="src-note">Ganancia {rules.minMarginPct}–{rules.maxMarginPct}%: entre <b>{money(band.lo)}</b> y <b>{money(band.hi)}</b>. Queda vigilado: si esta oferta sube o baja, tu precio se mueve igual y siempre dentro de ese rango.</p>}
         {m.margin !== null && m.margin < 0 && <div className="src-alert src-alert--warn">Con este precio pierdes dinero en cada venta.</div>}
         {mode === 'create' && <p className="src-note">Se crea como <b>bajo pedido</b> y queda en la fila de “Imágenes de productos” para que le subas foto.</p>}
         {err && <div className="src-alert src-alert--error" role="alert">{err}</div>}

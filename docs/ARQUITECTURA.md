@@ -219,8 +219,12 @@ Archivos: `src/pages/admin/AdminCoupons.tsx` + `AdminCoupons.css` (clases `.cpn-
 - **Vendedor de marketplace** ("Amazon.com.mx - Vendedor X") se guarda en `sourcing_offers.seller`.
 - **Tu propia tienda** ("Divina") nunca cuenta como competencia ni proveedor.
 - **Dos precios juntos** ("$600.00 $300.00", lista tachada + oferta): se toma el más bajo y el otro queda como precio anterior (caso real: CeraVe Gel Limpiador 473 ml en Amazon salía a $600 en lugar de $300).
+- **Precio real de hoy:** Google a veces pone el precio de lista como principal y la oferta aparte ("MXN 300.00 ahora"). `effectivePrice` toma la oferta ("ahora $X" = X; "ahorra $X" = principal − X; nunca mensualidades) y guarda el de lista como precio anterior. En la tabla se ve el precio de hoy con **−%** y el anterior tachado; el aviso indica que la oferta se revisa cada N horas y tu precio se ajusta solo.
+- **Resultados como en Google, sin ocultar nada (29-oct-2026):** se muestran **todas** las ofertas que devuelve Google Shopping. Primero el mismo producto (exactas y probables) del **precio actual más barato al más caro**; abajo, atenuados y con etiqueta, otros tamaños o productos. Nada se oculta por defecto (filtros opcionales). Sin recuadros de foto vacíos ni textos de "sin dato".
+- **Tamaño de la liga:** un número suelto de la búsqueda ("… Espumoso 473", típico de las ligas de Amazon) se toma como tamaño: un anuncio que no dice tamaño sigue siendo **Exacta**; uno con otro tamaño (88 ml, 236 ml) es **No confirmada**.
+- **Precio sugerido = costo + ganancia a media banda:** si no escribes precio, la **Ganancia** se calcula con el precio que deja la mitad de la banda (`auto_min_margin_pct`–`auto_max_margin_pct`, 25–35 % → 30 %) sobre la oferta exacta más barata. Ya no se usa el precio de mercado. **+ Mi stock** está disponible en cualquier oferta con precio y propone ese precio para la oferta elegida, con el rango mínimo–máximo.
 - **Buscar por enlace:** en Abastecimiento se puede pegar el enlace de Amazon, Mercado Libre u otra tienda; se convierte en la búsqueda del producto (`queryFromUrl`).
-- **Aprende de lo que confirmas:** al elegir un proveedor exacto con **+ Mi stock** (o la primera vez que la revisión automática encuentra una coincidencia exacta) se guarda en `products.search_query` una búsqueda corta con el título real del anuncio (`compactQuery`). Las revisiones siguientes buscan con ella y encuentran el producto con más precisión.
+- **Guarda lo que elegiste:** con **+ Mi stock** (o "Agregar a mis productos") se guarda en `products.search_query` **la misma búsqueda que hiciste** (si pegaste una liga, la búsqueda que salió de ella) y en `product_sources` la oferta elegida (tienda, título, liga, costo). La revisión automática repite esa búsqueda y sigue esa oferta. El producto queda con `auto_price = true` y se revisa en los siguientes 10 min.
 
 ## 10 bis. Abastecimiento automático (`/admin/automatizacion`, `/admin/oportunidades`)
 
@@ -228,15 +232,20 @@ Migración: `supabase/migrations/20261029120000_sourcing_auto.sql` (se aplica so
 
 **1. Proveedores válidos.** Solo se le compra a tiendas `authorized = true` (empresas grandes; se marcan solas Amazon MX, Mercado Libre, Liverpool, Palacio, Sephora, Sanborns, Walmart, Bodega Aurrera, Sam's, Costco, Chedraui, Soriana, Farmacias del Ahorro, San Pablo, Benavides, Guadalajara, Coppel e ISDIN), no descartadas y que **entreguen en `auto_max_delivery_days` días (1 = día siguiente)**. Los días de entrega y el costo de envío se capturan una vez por tienda en Abastecimiento → Tiendas; **sin días capturados la tienda no se usa**. Campos nuevos: `authorized`, `is_marketplace`, `conditions`.
 
-**2. Revisión cada 5 h.** Supabase `pg_cron` (job `divina-sourcing-tick`, cada 10 min) llama a `https://www.divinastore.com.mx/api/sourcing-auto?job=tick` con el header `x-cron-token` (secreto generado en la base, tabla `private.app_secrets`; solo la llave de servicio puede validarlo con `sourcing_cron_token_ok`). Cada llamada revisa hasta 3 productos **bajo pedido con proveedor principal** cuya última revisión tenga más de `auto_check_hours` horas. Usa la búsqueda guardada en `products.search_query` o "marca + nombre". Historial en `product_price_checks`; cambios de precio en `product_price_changes`.
+**2. Revisión cada 5 h de la misma oferta.** Supabase `pg_cron` (job `divina-sourcing-tick`, cada 10 min) llama a `https://www.divinastore.com.mx/api/sourcing-auto?job=tick` con el header `x-cron-token` (secreto generado en la base, tabla `private.app_secrets`; solo la llave de servicio puede validarlo con `sourcing_cron_token_ok`). Cada llamada revisa hasta 3 productos **bajo pedido, con oferta elegida y Automatizar encendido** cuya última revisión tenga más de `auto_check_hours` horas. Por producto (`checkProduct`):
+1. Repite la búsqueda guardada (`search_query`; si no hay, el título de la oferta elegida y luego marca + nombre; máx. 2 búsquedas) y localiza **la misma oferta** (`findTrackedOffer`: misma tienda —Amazon MX = Amazon.com.mx— y mismo producto: misma liga o título con ≥ 60 % de las mismas palabras, sin otro tamaño/variante; gana el título más parecido). El precio es el de hoy, con la oferta aplicada.
+2. Si ya no aparece: **otra tienda autorizada (o marcada confiable)** con el mismo producto exacto, la más barata → se cambia el proveedor ("Cambió de proveedor: A → B").
+3. Si no hay ninguna: se **retira de la venta** (`in_stock = false`, `auto_hidden = true`) y vuelve sola cuando la oferta reaparece. Si Google no responde, no se toca nada y se reintenta.
+Ya **no** se exigen días de entrega capturados para revisar. Historial en `product_price_checks`; cambios de precio en `product_price_changes`.
 
-**3. Precio automático** (`products.auto_price`, encendido por defecto):
-- **Piso** = precio mínimo que deja ≥ `auto_min_margin_pct` % **y** ≥ `auto_min_margin_mxn` pesos, después de costo, envío del proveedor, envío que absorbes y comisión de Clip (con IVA si aplica).
-- **Mercado** = mediana del precio del mismo producto exacto en las demás tiendas (mínimo 2 tiendas). No se usa el más barato porque suele ser tu proveedor y quedarías siempre en el piso.
-- **Precio** = máx(piso, mercado − `auto_undercut_pct` %). Sin dato de mercado se conserva el precio actual (solo sube si el piso lo exige). Tope por revisión `auto_max_change_pct` %, salvo cuando el piso obliga a subir.
-- Si lo único que falta son los días de entrega de una tienda autorizada → "Faltan datos": no se oculta ni cambia de precio.
-- Sin proveedor válido → el producto se **oculta** (`in_stock = false`, `auto_hidden = true`) y vuelve solo cuando reaparece un proveedor. Los que ocultaste tú no se tocan.
-- Se actualizan `products.price`, `cost_price`, `sourcing_status/note/checked_at` y el proveedor principal en `product_sources`.
+**3. Precio automático por costo** (`bandPrice`; `products.auto_price` = **Automatizar**, encendido por defecto):
+- La venta **sigue al costo** conservando tu ganancia en pesos: si la oferta sube $100, tu venta sube $100 + la comisión de Clip; si baja, baja igual.
+- Siempre con ganancia **entre `auto_min_margin_pct` y `auto_max_margin_pct`** (25–35 %, sobre la venta, ya con costo, envío del proveedor, colchón de envío y comisión de Clip). Si el movimiento la saca de ese rango, se ajusta al límite. Producto nuevo: mitad de la banda (30 %).
+- Con **Automatizar apagado** no se revisa en automático; "Revisar" solo actualiza el costo: no cambia el precio ni lo retira.
+- Se actualizan `products.price`, `cost_price`, `sourcing_status/note/checked_at` y la oferta en `product_sources`.
+- Ejemplo con tus márgenes (Clip 5 %, colchón $20): CeraVe Gel Espumoso 473 ml en Amazon a **$300** → rango **$458–$533**, sugerido **$492**.
+
+**Pantalla Precios automáticos → Productos vigilados:** columnas **Venta · Costo · Ganancia ($ y %) · Proveedor (tienda y título de la oferta) · Vínculo (Ver oferta) · Estado (Al día / Sin oferta · retirado / Google no respondió / Por revisar, hace cuánto y próxima revisión) · Automatizar** (interruptor). Acciones por fila: **Revisar** (ahora), **Editar** (precio de venta con el rango de la banda, búsqueda con la que se revisa, historial de revisiones y cambios, *Cambiar oferta en Abastecimiento*, *Dejar de vigilar*) y **Eliminar** (con confirmación). Botón **Agregar desde Abastecimiento**. Reglas: ganancia mínima, ganancia máxima y cada cuántas horas.
 
 **4. Protección de cada venta.**
 - `/api/charge-clip` **recalcula el total en el servidor** con los precios actuales de `products`, el cupón validado (`validate_coupon`) y la regla de envío; rechaza con 409 si algún producto ya no está disponible o si el total cambió, y **cobra el total del servidor**, nunca el del navegador.
@@ -253,9 +262,9 @@ Migración: `supabase/migrations/20261029120000_sourcing_auto.sql` (se aplica so
 
 **6. Resultados** (`product_events` + función `product_metrics(días)`): visitas y "agregar al carrito" por producto (sin datos personales), pedidos, unidades, ventas y ganancia estimada. Sugerencia por producto (Impulsar · Se queda en carrito · Revisar precio o retirar · Observar). **Destacar** agrega/quita la etiqueta `TOP_HOME` (sección "Más vendidos" del Home).
 
-**Reglas** en `store_config` (editables en Precios automáticos → Reglas): `auto_min_margin_pct` (25), `auto_min_margin_mxn` (100), `auto_undercut_pct` (2), `auto_max_change_pct` (35), `auto_max_delivery_days` (1), `auto_check_hours` (5), `auto_enabled` (true), `auto_opportunities_per_day` (6), `auto_opportunity_seeds`.
+**Reglas** en `store_config` (editables en Precios automáticos → Reglas): `auto_min_margin_pct` (25), `auto_max_margin_pct` (35; clave nueva, se crea sola al guardar Reglas, sin SQL), `auto_check_hours` (5), `auto_enabled` (true), `auto_opportunities_per_day` (6), `auto_opportunity_seeds`. Siguen existiendo para Oportunidades y Pedidos por comprar: `auto_min_margin_mxn` (100), `auto_undercut_pct` (2), `auto_max_change_pct` (35), `auto_max_delivery_days` (1).
 
-**Costo en Bright Data:** ≈ productos vigilados × (24 / horas de revisión) búsquedas al día + oportunidades por día. Ej.: 40 productos cada 5 h ≈ 192/día.
+**Costo en Bright Data:** ≈ productos automatizados × (24 / horas de revisión) × 1–2 búsquedas al día + oportunidades por día. Ej.: 40 productos cada 5 h ≈ 192–384/día.
 
 **Límites reales:** Google Shopping no confirma existencia exacta ni entrega a un CP; por eso la regla es "proveedor autorizado que entrega al día siguiente" y la verificación en vivo antes de comprar. Las funciones de Vercel van en **12**, el máximo del plan gratuito: una función nueva obliga a juntar o borrar otra (candidata: `api/test-clip.ts`).
 
@@ -380,7 +389,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.
 - **Seguridad:** `products.cost_price` (costo de proveedor) y ahora `sourcing_note`/`search_query` se pueden leer con la llave pública. Falta ocultarlos al público (vista pública de productos o permisos por columna).
 - **Migración `20261029120000_sourcing_auto.sql`:** abastecimiento automático (sección 10 bis). Antes de que se aplique, la tienda y el buscador siguen funcionando; las pantallas nuevas muestran el aviso.
-- **Días de entrega por tienda:** mientras una tienda autorizada no tenga días capturados (Abastecimiento → Tiendas), sus ofertas no se usan; si es lo único que falta, el producto queda en "Faltan datos" (no se oculta ni cambia de precio) y el admin dice qué tienda capturar.
+- **Días de entrega por tienda:** ya no bloquean la revisión automática (29-oct-2026). Siguen usándose en Oportunidades y en "Pedidos por comprar" (Verificar proveedor), que aún usan la regla anterior.
 - **Search Console:** después del deploy, enviar `https://www.divinastore.com.mx/sitemap.xml` y pedir indexación de las 4 colecciones (cambiaron de URL canónica).
 - **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.

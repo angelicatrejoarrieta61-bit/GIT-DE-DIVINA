@@ -24,6 +24,7 @@ export async function callAuto<T = unknown>(job: AutoJob, body: Record<string, u
 
 export const AUTO_KEYS = {
   minMarginPct: 'auto_min_margin_pct',
+  maxMarginPct: 'auto_max_margin_pct',
   minMarginMxn: 'auto_min_margin_mxn',
   undercutPct: 'auto_undercut_pct',
   maxChangePct: 'auto_max_change_pct',

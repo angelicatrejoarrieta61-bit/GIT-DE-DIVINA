@@ -31,6 +31,7 @@ export function searchOffers(db: SupabaseClient, query: string, opts?: { product
 }>;
 export function loadSettings(db: SupabaseClient): Promise<SourcingConfig>;
 export function productQuery(p: Row): string;
+export function checkQueries(product: Row, source: Row | null): string[];
 export function checkProduct(db: SupabaseClient, product: Row, cfg: SourcingConfig, opts?: { cacheMinutes?: number }): Promise<Row>;
 export function dueProducts(db: SupabaseClient, cfg: SourcingConfig, limit: number): Promise<Row[]>;
 export function verifyOrder(db: SupabaseClient, order: Row, cfg: SourcingConfig): Promise<{

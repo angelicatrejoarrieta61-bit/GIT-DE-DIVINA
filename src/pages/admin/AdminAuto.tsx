@@ -1,17 +1,18 @@
 /**
  * AdminAuto.tsx — Catálogo → Precios automáticos (/admin/automatizacion)
- * 1) Productos vigilados: proveedor, costo, margen, estado y precio; revisión cada N horas (pg_cron → /api/sourcing-auto).
+ * 1) Productos vigilados: venta, costo, ganancia, proveedor, vínculo, estado y Automatizar; editar, eliminar, dejar de vigilar.
+ *    Cada N horas (pg_cron → /api/sourcing-auto) se revisa la misma oferta elegida y la venta sigue al costo (banda de ganancia).
  * 2) Pedidos por comprar: verificación en vivo del proveedor antes de comprarle (comprar · cambiar · suspender).
- * 3) Reglas: ganancia mínima, competencia, tope de cambio, días de entrega, frecuencia.
+ * 3) Reglas: ganancia mínima y máxima, frecuencia.
  * Migración: supabase/migrations/20261029120000_sourcing_auto.sql
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bot, RefreshCw, Search, X, ChevronDown, ChevronRight, ExternalLink, AlertTriangle, ShieldCheck, Save, PackageCheck,
+  Bot, RefreshCw, Search, X, ExternalLink, AlertTriangle, ShieldCheck, Save, PackageCheck, Plus, Pencil, Trash2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { computeMargin, timeAgo } from '../../lib/sourcing';
+import { bandPrice, computeMargin, round2, timeAgo } from '../../lib/sourcing';
 import {
   callAuto, loadAutoConfig, saveConfig, isMissingSchema, moneyMx, shortDateTime, AUTO_KEYS, type AutoConfig,
 } from '../../lib/autoApi';
@@ -24,7 +25,10 @@ interface WatchedProduct {
   sourcing_status: 'ok' | 'sin_proveedor' | 'sin_datos' | 'error' | null; sourcing_note: string | null;
   sourcing_checked_at: string | null; search_query: string | null;
 }
-interface PrimarySource { product_id: string; shop: string; link: string | null; unit_cost_mxn: number; shipping_mxn: number; last_checked_at: string | null }
+interface PrimarySource {
+  id: string; product_id: string; shop: string; offer_title: string | null; link: string | null;
+  unit_cost_mxn: number; shipping_mxn: number; last_checked_at: string | null; available: boolean | null;
+}
 interface PriceCheck {
   id: string; checked_at: string; status: string; best_shop: string | null; best_unit_cost: number | null; market_low: number | null; market_ref?: number | null;
   floor_price: number | null; price_before: number | null; price_after: number | null; margin_mxn: number | null; margin_pct: number | null;
@@ -45,11 +49,11 @@ type Filter = 'todos' | 'ok' | 'sin_proveedor' | 'pendiente' | 'error';
 type Toast = { kind: 'ok' | 'error'; text: string } | null;
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
-  ok: { label: 'Con proveedor', tone: 't-ok' },
-  sin_proveedor: { label: 'Sin proveedor · oculto', tone: 't-bad' },
-  sin_datos: { label: 'Faltan datos', tone: 't-warn' },
+  ok: { label: 'Al día', tone: 't-ok' },
+  sin_proveedor: { label: 'Sin oferta · retirado', tone: 't-bad' },
+  sin_datos: { label: 'Google no respondió', tone: 't-warn' },
   error: { label: 'Error al revisar', tone: 't-bad' },
-  pendiente: { label: 'Pendiente de revisar', tone: 't-info' },
+  pendiente: { label: 'Por revisar', tone: 't-info' },
 };
 const DECISION_META: Record<VerifyResult['decision'], { label: string; tone: string }> = {
   comprar: { label: 'Comprar', tone: 't-ok' },
@@ -85,9 +89,9 @@ export const AdminAuto: React.FC = () => {
         <div>
           <h1 className="aut-title"><Bot size={20} aria-hidden="true" /> Precios automáticos</h1>
           <p className="aut-sub">
-            Cada {cfg?.rules.checkHours ?? 5} h se revisan los productos <b>bajo pedido</b> con proveedor: precio y existencia en tiendas autorizadas
-            que entregan al día siguiente. El precio sube si sube el costo y baja para competir, sin bajar de tu ganancia mínima
-            ({cfg?.rules.minMarginPct ?? 25}% y al menos {moneyMx(cfg?.rules.minMarginMxn ?? 100)}).
+            Cada {cfg?.rules.checkHours ?? 5} h se revisa <b>la misma oferta</b> de la que sacaste cada producto. Si el costo sube o baja, tu venta se mueve igual,
+            siempre con ganancia de {cfg?.rules.minMarginPct ?? 25}–{cfg?.rules.maxMarginPct ?? 35}%. Si la oferta desaparece se usa otra tienda autorizada
+            con el mismo producto; si no hay, se retira de la venta hasta que vuelva.
             {cfg && !cfg.enabled && <b className="aut-warn"> La automatización está apagada.</b>}
           </p>
         </div>
@@ -129,6 +133,7 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
   const [filter, setFilter] = useState<Filter>('todos');
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,12 +141,12 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
       supabase.from('products')
         .select('id,name,slug,brand,price,cost_price,in_stock,fulfillment,auto_price,auto_hidden,sourcing_status,sourcing_note,sourcing_checked_at,search_query')
         .eq('fulfillment', 'bajo_pedido').order('name').limit(1000),
-      supabase.from('product_sources').select('product_id,shop,link,unit_cost_mxn,shipping_mxn,last_checked_at').eq('is_primary', true),
+      supabase.from('product_sources').select('id,product_id,shop,offer_title,link,unit_cost_mxn,shipping_mxn,last_checked_at,available').eq('is_primary', true),
       supabase.from('product_price_changes').select('id', { count: 'exact', head: true }).gte('changed_at', new Date(Date.now() - 86400_000).toISOString()),
     ]);
     if (prods.error) { onSchemaError(isMissingSchema(prods.error.message) ? prods.error.message : ''); if (!isMissingSchema(prods.error.message)) notify({ kind: 'error', text: prods.error.message }); }
     setRows((prods.data ?? []) as WatchedProduct[]);
-    setSources(Object.fromEntries(((srcs.data ?? []) as PrimarySource[]).map((s) => [s.product_id, s])));
+    setSources(Object.fromEntries(((srcs.data ?? []) as PrimarySource[]).map((x) => [x.product_id, x])));
     setChanges24(ch.count ?? 0);
     setLoading(false);
   }, [notify, onSchemaError]);
@@ -152,15 +157,15 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { todos: watched.length, ok: 0, sin_proveedor: 0, pendiente: 0, error: 0 };
     watched.forEach((p) => {
-      const s = statusOf(p);
-      if (s === 'ok') c.ok += 1; else if (s === 'sin_proveedor') c.sin_proveedor += 1; else if (s === 'pendiente') c.pendiente += 1; else c.error += 1;
+      const st = statusOf(p);
+      if (st === 'ok') c.ok += 1; else if (st === 'sin_proveedor') c.sin_proveedor += 1; else if (st === 'pendiente') c.pendiente += 1; else c.error += 1;
     });
     return c;
   }, [watched]);
 
   const shown = watched.filter((p) => {
-    const s = statusOf(p);
-    if (filter !== 'todos' && (filter === 'error' ? !['error', 'sin_datos'].includes(s) : s !== filter)) return false;
+    const st = statusOf(p);
+    if (filter !== 'todos' && (filter === 'error' ? !['error', 'sin_datos'].includes(st) : st !== filter)) return false;
     const q = query.trim().toLowerCase();
     return !q || p.name.toLowerCase().includes(q) || (p.brand ?? '').toLowerCase().includes(q) || (sources[p.id]?.shop ?? '').toLowerCase().includes(q);
   });
@@ -168,12 +173,12 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
   const checkNow = async (p: WatchedProduct) => {
     setBusy(p.id);
     try {
-      const r = await callAuto<{ result: { status: string; price?: number; changed?: boolean; shop?: string; note?: string } }>('check', { productId: p.id });
+      const r = await callAuto<{ result: { status: string; price?: number; changed?: boolean; shop?: string; cost?: number; switched?: boolean; note?: string } }>('check', { productId: p.id });
       const x = r.result;
       notify({
         kind: x.status === 'ok' ? 'ok' : 'error',
         text: x.status === 'ok'
-          ? `${p.name}: ${x.changed ? `precio ajustado a ${moneyMx(x.price)}` : 'precio sin cambio'} · proveedor ${x.shop}`
+          ? `${p.name}: ${x.switched ? 'nuevo proveedor ' : ''}${x.shop} a ${moneyMx(x.cost)} · ${x.changed ? `venta ajustada a ${moneyMx(x.price)}` : `venta sin cambio (${moneyMx(x.price)})`}`
           : `${p.name}: ${STATUS_META[x.status]?.label ?? x.status}${x.note ? ` — ${x.note}` : ''}`,
       });
       await load();
@@ -186,20 +191,44 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
 
   const toggleAuto = async (p: WatchedProduct) => {
     setBusy(p.id);
-    const { error } = await supabase.from('products').update({ auto_price: !p.auto_price }).eq('id', p.id);
+    // Al encender se revisa en la siguiente vuelta (cada 10 min)
+    const patch = p.auto_price ? { auto_price: false } : { auto_price: true, sourcing_checked_at: null };
+    const { error } = await supabase.from('products').update(patch).eq('id', p.id);
     setBusy(null);
     if (error) { notify({ kind: 'error', text: error.message }); return; }
-    setRows((list) => list.map((x) => (x.id === p.id ? { ...x, auto_price: !p.auto_price } : x)));
+    setRows((list) => list.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
+    notify({ kind: 'ok', text: p.auto_price ? `${p.name}: automatización apagada, el precio queda fijo.` : `${p.name}: automatizado, se revisa en los próximos minutos.` });
   };
 
-  const due = watched.filter((p) => !p.sourcing_checked_at || Date.now() - new Date(p.sourcing_checked_at).getTime() > cfg.rules.checkHours * 3600_000).length;
+  const removeProduct = async (p: WatchedProduct) => {
+    setBusy(p.id);
+    const { error } = await supabase.from('products').delete().eq('id', p.id);
+    setBusy(null);
+    setConfirm(null);
+    if (error) { notify({ kind: 'error', text: `No se pudo eliminar: ${error.message}` }); return; }
+    setRows((list) => list.filter((x) => x.id !== p.id));
+    notify({ kind: 'ok', text: `"${p.name}" eliminado.` });
+  };
+
+  const unwatch = async (p: WatchedProduct) => {
+    setBusy(p.id);
+    const { error } = await supabase.from('product_sources').delete().eq('product_id', p.id);
+    setBusy(null);
+    if (error) { notify({ kind: 'error', text: error.message }); return; }
+    setOpen(null);
+    setSources((m) => { const n = { ...m }; delete n[p.id]; return n; });
+    notify({ kind: 'ok', text: `"${p.name}" ya no se vigila. Sigue en Productos.` });
+  };
+
+  const due = watched.filter((p) => p.auto_price && (!p.sourcing_checked_at || Date.now() - new Date(p.sourcing_checked_at).getTime() > cfg.rules.checkHours * 3600_000)).length;
+  const autoCount = watched.filter((p) => p.auto_price).length;
 
   return (
     <>
       <div className="aut-kpis">
-        <div className="aut-kpi"><span className="aut-kpi__label">Vigilados</span><span className="aut-kpi__value">{watched.length}</span><span className="aut-kpi__hint">bajo pedido con proveedor</span></div>
-        <div className="aut-kpi"><span className="aut-kpi__label">Con proveedor</span><span className="aut-kpi__value aut-ok">{counts.ok}</span></div>
-        <div className="aut-kpi"><span className="aut-kpi__label">Ocultos sin proveedor</span><span className={`aut-kpi__value ${counts.sin_proveedor ? 'aut-bad' : ''}`}>{counts.sin_proveedor}</span></div>
+        <div className="aut-kpi"><span className="aut-kpi__label">Vigilados</span><span className="aut-kpi__value">{watched.length}</span><span className="aut-kpi__hint">{autoCount} automatizados</span></div>
+        <div className="aut-kpi"><span className="aut-kpi__label">Al día</span><span className="aut-kpi__value aut-ok">{counts.ok}</span></div>
+        <div className="aut-kpi"><span className="aut-kpi__label">Retirados sin oferta</span><span className={`aut-kpi__value ${counts.sin_proveedor ? 'aut-bad' : ''}`}>{counts.sin_proveedor}</span></div>
         <div className="aut-kpi"><span className="aut-kpi__label">Cambios de precio 24 h</span><span className="aut-kpi__value">{changes24}</span></div>
         <div className="aut-kpi"><span className="aut-kpi__label">Por revisar</span><span className="aut-kpi__value">{due}</span><span className="aut-kpi__hint">se procesan cada 10 min</span></div>
       </div>
@@ -208,7 +237,7 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
         <div className="aut-alert aut-alert--warn" role="status">
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
-            {unassigned.length} producto{unassigned.length === 1 ? '' : 's'} bajo pedido sin proveedor elegido: no se vigilan. Elígeles proveedor en Abastecimiento:{' '}
+            {unassigned.length} producto{unassigned.length === 1 ? '' : 's'} bajo pedido sin oferta elegida: no se vigila{unassigned.length === 1 ? '' : 'n'}. Búscalo en Abastecimiento y usa <b>+ Mi stock</b> en la oferta:{' '}
             {unassigned.slice(0, 4).map((p, i) => (
               <React.Fragment key={p.id}>{i > 0 && ', '}<Link className="aut-link" to={`/admin/abastecimiento?product=${p.id}`}>{p.name}</Link></React.Fragment>
             ))}{unassigned.length > 4 ? '…' : ''}
@@ -224,11 +253,12 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
           {query && <button type="button" className="aut-rowbtn" onClick={() => setQuery('')} aria-label="Limpiar"><X size={13} /></button>}
         </label>
         <div className="aut-chips" role="group" aria-label="Filtrar por estado">
-          {([['todos', 'Todos'], ['ok', 'Con proveedor'], ['sin_proveedor', 'Sin proveedor'], ['pendiente', 'Pendientes'], ['error', 'Con error']] as Array<[Filter, string]>).map(([k, l]) => (
+          {([['todos', 'Todos'], ['ok', 'Al día'], ['sin_proveedor', 'Retirados'], ['pendiente', 'Por revisar'], ['error', 'Con error']] as Array<[Filter, string]>).map(([k, l]) => (
             <button key={k} type="button" className={`aut-chip ${filter === k ? 'is-on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{l} <em>{counts[k]}</em></button>
           ))}
         </div>
         <button type="button" className="aut-btn" onClick={() => void load()} disabled={loading}><RefreshCw size={13} className={loading ? 'aut-spin' : ''} aria-hidden="true" /> Actualizar</button>
+        <Link className="aut-btn aut-btn--primary" to="/admin/abastecimiento"><Plus size={13} aria-hidden="true" /> Agregar desde Abastecimiento</Link>
       </div>
 
       {loading ? (
@@ -236,7 +266,7 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
       ) : watched.length === 0 ? (
         <div className="aut-empty">
           <PackageCheck size={28} aria-hidden="true" />
-          <p>Aún no hay productos vigilados. En <Link className="aut-link" to="/admin/abastecimiento">Abastecimiento</Link> busca un producto y usa <b>+ Mi stock</b> con un proveedor: desde ahí se revisa solo.</p>
+          <p>Aún no hay productos vigilados. En <Link className="aut-link" to="/admin/abastecimiento">Abastecimiento</Link> busca (o pega la liga de Amazon / Mercado Libre) y usa <b>+ Mi stock</b> en la oferta: desde ahí se vigila sola.</p>
         </div>
       ) : shown.length === 0 ? (
         <div className="aut-empty"><p>Ningún producto con este filtro.</p><button type="button" className="aut-btn aut-btn--xs" onClick={() => { setFilter('todos'); setQuery(''); }}>Quitar filtros</button></div>
@@ -246,77 +276,113 @@ function ProductsTab({ cfg, notify, onSchemaError }: { cfg: AutoConfig; notify: 
             <thead>
               <tr>
                 <th scope="col">Producto</th>
-                <th scope="col" className="c-num">Precio</th>
-                <th scope="col" className="c-num c-hide-sm">Costo</th>
+                <th scope="col" className="c-num">Venta</th>
+                <th scope="col" className="c-num">Costo</th>
                 <th scope="col" className="c-num">Ganancia</th>
                 <th scope="col" className="c-hide-sm">Proveedor</th>
+                <th scope="col" className="c-hide-sm">Vínculo</th>
                 <th scope="col" className="c-hide-sm">Estado</th>
-                <th scope="col" className="c-hide-sm">Auto</th>
+                <th scope="col">Automatizar</th>
                 <th scope="col" className="c-act"><span className="aut-vh">Acciones</span></th>
               </tr>
             </thead>
             <tbody>
               {shown.map((p) => {
                 const src = sources[p.id];
-                const cost = src ? Number(src.unit_cost_mxn) : null;
-                const m = computeMargin(Number(p.price), cost, cfg.margin, src ? Number(src.shipping_mxn) : 0);
-                const s = statusOf(p);
-                const meta = STATUS_META[s];
+                const m = computeMargin(Number(p.price), Number(src.unit_cost_mxn), cfg.margin, Number(src.shipping_mxn) || 0);
+                const st = statusOf(p);
+                const meta = STATUS_META[st];
                 const isOpen = open === p.id;
-                const low = m.margin !== null && (m.margin < cfg.rules.minMarginMxn || (m.marginPct ?? 0) < cfg.rules.minMarginPct);
+                const pct = m.marginPct;
+                const tone = m.margin === null ? '' : m.margin < 0 || (pct ?? 0) < cfg.rules.minMarginPct - 0.5 ? 'aut-bad' : (pct ?? 0) > cfg.rules.maxMarginPct + 0.5 ? 'aut-warn' : 'aut-ok';
+                const nextIn = p.auto_price && p.sourcing_checked_at
+                  ? Math.max(0, cfg.rules.checkHours - (Date.now() - new Date(p.sourcing_checked_at).getTime()) / 3600_000)
+                  : null;
                 return (
                   <React.Fragment key={p.id}>
                     <tr className={`${isOpen ? 'is-open' : ''} ${busy === p.id ? 'is-busy' : ''}`}>
                       <td>
-                        <button type="button" className="aut-rowbtn" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
-                          {isOpen ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
-                          <span className="aut-name"><strong title={p.name}>{p.name}</strong><span>{p.brand ?? '—'}</span><span className="aut-show-sm"><span className={`aut-tag ${meta.tone}`}>{meta.label}</span></span></span>
-                        </button>
+                        <span className="aut-name">
+                          <strong title={p.name}>{p.name}</strong>
+                          <span>{p.brand ?? '—'}{!p.in_stock && <> · <b className="aut-bad">fuera de venta</b></>}</span>
+                          <span className="aut-show-sm"><span className={`aut-tag ${meta.tone}`}>{meta.label}</span> {src.shop}</span>
+                        </span>
                       </td>
                       <td className="c-num"><b>{moneyMx(p.price)}</b></td>
-                      <td className="c-num c-hide-sm">{moneyMx(m.costTotal)}</td>
+                      <td className="c-num">{moneyMx(m.costTotal)}</td>
                       <td className="c-num">
-                        <span className={m.margin === null ? '' : m.margin < 0 ? 'aut-bad' : low ? 'aut-warn' : 'aut-ok'}>{moneyMx(m.margin)}</span>
-                        {m.marginPct !== null && <span className="aut-cell-sub">{m.marginPct}%</span>}
+                        <span className={tone} title={`Banda: ${cfg.rules.minMarginPct}–${cfg.rules.maxMarginPct}%`}>{moneyMx(m.margin)}</span>
+                        {pct !== null && <span className="aut-cell-sub">{pct}%</span>}
                       </td>
-                      <td className="c-hide-sm">
-                        {src ? <span className="aut-name"><strong>{src.shop}</strong>{src.link ? <a className="aut-link" href={src.link} target="_blank" rel="noopener noreferrer">Ver oferta ↗</a> : <span>sin enlace</span>}</span> : '—'}
+                      <td className="c-hide-sm"><span className="aut-name aut-name--src"><strong>{src.shop}</strong><span title={src.offer_title ?? undefined}>{src.offer_title ?? '—'}</span></span></td>
+                      <td className="c-hide-sm c-nowrap">
+                        {src.link
+                          ? <a className="aut-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} href={src.link} target="_blank" rel="noopener noreferrer" title={src.offer_title ?? undefined}>Ver oferta <ExternalLink size={11} aria-hidden="true" /></a>
+                          : <span className="aut-muted">sin enlace</span>}
                       </td>
-                      <td className="c-hide-sm">
+                      <td className="c-hide-sm c-state">
                         <span className={`aut-tag ${meta.tone}`} title={p.sourcing_note ?? undefined}>{meta.label}</span>
-                        <span className="aut-cell-sub">{p.sourcing_checked_at ? timeAgo(p.sourcing_checked_at) : 'nunca'}</span>
-                        {p.sourcing_note && s !== 'ok' && <span className="aut-cell-sub aut-warn" style={{ maxWidth: 220, whiteSpace: 'normal' }}>{p.sourcing_note}</span>}
+                        <span className="aut-cell-sub" title={p.sourcing_checked_at ? shortDateTime(p.sourcing_checked_at) : undefined}>
+                          {p.sourcing_checked_at ? timeAgo(p.sourcing_checked_at) : 'sin revisar'}
+                          {nextIn !== null ? ` · próxima ${nextIn < 1 ? 'en minutos' : `en ${Math.round(nextIn)} h`}` : ''}
+                        </span>
+                        {p.sourcing_note && st !== 'ok' && <span className="aut-cell-sub aut-warn aut-note" title={p.sourcing_note}>{p.sourcing_note}</span>}
                       </td>
-                      <td className="c-hide-sm">
-                        <button type="button" role="switch" aria-checked={p.auto_price} aria-label={`Precio automático de ${p.name}`}
+                      <td>
+                        <button type="button" role="switch" aria-checked={p.auto_price} aria-label={`Automatizar ${p.name}`}
+                          title={p.auto_price ? `Se revisa cada ${cfg.rules.checkHours} h y el precio sigue al costo. Clic para dejarlo fijo.` : 'Precio fijo. Clic para automatizar.'}
                           className={`aut-switch ${p.auto_price ? 'is-on' : ''}`} onClick={() => void toggleAuto(p)} disabled={busy === p.id}><span /></button>
                       </td>
                       <td className="c-act">
-                        <button type="button" className="aut-btn aut-btn--xs" onClick={() => void checkNow(p)} disabled={busy === p.id}>
-                          {busy === p.id ? <><RefreshCw size={12} className="aut-spin" aria-hidden="true" /> Revisando…</> : <>Revisar<span className="aut-hide-sm"> ahora</span></>}
-                        </button>
+                        {confirm === p.id ? (
+                          <span className="aut-inline">
+                            <span className="aut-bad">¿Eliminar producto?</span>
+                            <button type="button" className="aut-btn aut-btn--xs aut-btn--danger" onClick={() => void removeProduct(p)} disabled={busy === p.id}>Sí</button>
+                            <button type="button" className="aut-btn aut-btn--xs" onClick={() => setConfirm(null)}>No</button>
+                          </span>
+                        ) : (
+                          <span className="aut-inline">
+                            <button type="button" className="aut-btn aut-btn--xs" onClick={() => void checkNow(p)} disabled={busy === p.id}>
+                              {busy === p.id ? <><RefreshCw size={12} className="aut-spin" aria-hidden="true" /> Revisando…</> : 'Revisar'}
+                            </button>
+                            <button type="button" className={`aut-btn aut-btn--xs ${isOpen ? 'aut-btn--primary' : ''}`} onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen} aria-label={`Editar ${p.name}`} title="Editar precio, búsqueda e historial">
+                              <Pencil size={12} aria-hidden="true" />
+                            </button>
+                            <button type="button" className="aut-btn aut-btn--xs aut-btn--danger" onClick={() => setConfirm(p.id)} aria-label={`Eliminar ${p.name}`} title="Eliminar producto">
+                              <Trash2 size={12} aria-hidden="true" />
+                            </button>
+                          </span>
+                        )}
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="aut-detail"><td colSpan={8}><ProductDetail product={p} notify={notify} onSaved={load} /></td></tr>
+                      <tr className="aut-detail"><td colSpan={9}><ProductDetail product={p} source={src} cfg={cfg} notify={notify} onSaved={load} onUnwatch={() => void unwatch(p)} /></td></tr>
                     )}
                   </React.Fragment>
                 );
               })}
             </tbody>
           </table>
-          <p className="aut-foot">{shown.length} de {watched.length} · el precio se cambia solo en los que tienen <b>Auto</b> encendido</p>
+          <p className="aut-foot">{shown.length} de {watched.length} · con <b>Automatizar</b> encendido se revisa la misma oferta cada {cfg.rules.checkHours} h y la venta sigue al costo con ganancia de {cfg.rules.minMarginPct}–{cfg.rules.maxMarginPct}%</p>
         </div>
       )}
     </>
   );
 }
 
-function ProductDetail({ product, notify, onSaved }: { product: WatchedProduct; notify: (t: Toast) => void; onSaved: () => void }) {
+function ProductDetail({ product, source, cfg, notify, onSaved, onUnwatch }: {
+  product: WatchedProduct; source: PrimarySource; cfg: AutoConfig; notify: (t: Toast) => void; onSaved: () => void; onUnwatch: () => void;
+}) {
   const [checks, setChecks] = useState<PriceCheck[] | null>(null);
   const [changes, setChanges] = useState<PriceChange[]>([]);
   const [q, setQ] = useState(product.search_query ?? '');
+  const [price, setPrice] = useState(String(product.price ?? ''));
   const [saving, setSaving] = useState(false);
+  const cost = round2(Number(source.unit_cost_mxn) + (Number(source.shipping_mxn) || 0));
+  const band = bandPrice({ cost, settings: cfg.margin, rules: cfg.rules });
+  const priceNum = Number(price);
+  const priceErr = price.trim() === '' || !Number.isFinite(priceNum) || priceNum <= 0 ? 'Pon un precio válido' : '';
+  const dirty = q.trim() !== (product.search_query ?? '') || (!priceErr && priceNum !== Number(product.price));
 
   useEffect(() => {
     void (async () => {
@@ -329,17 +395,45 @@ function ProductDetail({ product, notify, onSaved }: { product: WatchedProduct; 
     })();
   }, [product.id]);
 
-  const saveQuery = async (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (priceErr) return;
     setSaving(true);
-    const { error } = await supabase.from('products').update({ search_query: q.trim() || null }).eq('id', product.id);
+    const patch: Record<string, unknown> = { search_query: q.trim() || null };
+    if (priceNum !== Number(product.price)) patch.price = priceNum;
+    const { error } = await supabase.from('products').update(patch).eq('id', product.id);
+    if (!error && patch.price !== undefined) {
+      await supabase.from('product_price_changes').insert({
+        product_id: product.id, old_price: Number(product.price), new_price: priceNum, unit_cost: cost, reason: 'Cambio manual', source: 'manual',
+      }).then(() => undefined, () => undefined);
+    }
     setSaving(false);
     if (error) notify({ kind: 'error', text: error.message });
-    else { notify({ kind: 'ok', text: 'Búsqueda guardada: se usa desde la próxima revisión.' }); onSaved(); }
+    else { notify({ kind: 'ok', text: 'Guardado.' }); onSaved(); }
   };
 
   return (
     <div className="aut-detail__grid">
+      <form onSubmit={save} noValidate>
+        <h4>Editar</h4>
+        <div className="aut-field">
+          <label htmlFor={`pv-${product.id}`}>Precio de venta</label>
+          <input id={`pv-${product.id}`} type="number" inputMode="decimal" min={1} step={1} value={price} onChange={(e) => setPrice(e.target.value)} aria-invalid={!!priceErr} />
+          <small className={priceErr ? 'aut-bad' : ''}>
+            {priceErr || `Con costo ${moneyMx(cost)}: ${cfg.rules.minMarginPct}% = ${moneyMx(band.lo)} · ${cfg.rules.maxMarginPct}% = ${moneyMx(band.hi)}${product.auto_price ? '. Con Automatizar encendido, la siguiente revisión lo regresa a ese rango.' : ''}`}
+          </small>
+        </div>
+        <div className="aut-field" style={{ marginTop: 8 }}>
+          <label htmlFor={`sq-${product.id}`}>Búsqueda con la que se revisa</label>
+          <input id={`sq-${product.id}`} value={q} onChange={(e) => setQ(e.target.value)} placeholder={source.offer_title ?? `${product.brand ?? ''} ${product.name}`.trim()} maxLength={160} />
+          <small className="aut-muted">La misma con la que lo encontraste. En ella se localiza la oferta de <b>{source.shop}</b>; si desaparece, se usa la tienda autorizada más barata con el mismo producto, y si no hay, se retira de la venta.</small>
+        </div>
+        <div className="aut-inline" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="aut-btn aut-btn--primary" disabled={saving || !dirty || !!priceErr}><Save size={13} aria-hidden="true" /> {saving ? 'Guardando…' : 'Guardar'}</button>
+          <Link className="aut-btn" to={`/admin/abastecimiento?product=${product.id}`}>Cambiar oferta en Abastecimiento <ExternalLink size={11} aria-hidden="true" /></Link>
+          <button type="button" className="aut-btn" onClick={onUnwatch}>Dejar de vigilar</button>
+        </div>
+      </form>
       <div>
         <h4>Últimas revisiones</h4>
         {checks === null ? <div className="aut-skel" /> : checks.length === 0 ? <p className="aut-muted">Sin revisiones todavía.</p> : (
@@ -349,16 +443,14 @@ function ProductDetail({ product, notify, onSaved }: { product: WatchedProduct; 
                 <span>
                   <span className={`aut-tag ${STATUS_META[c.status]?.tone ?? ''}`}>{STATUS_META[c.status]?.label ?? c.status}</span>{' '}
                   {c.best_shop ? <>{c.best_shop} a {moneyMx(c.best_unit_cost)}</> : c.note}
-                  {c.market_low !== null && <span className="aut-cell-sub">Mercado {c.market_ref ? `típico ${moneyMx(c.market_ref)} · ` : ''}desde {moneyMx(c.market_low)} · piso {moneyMx(c.floor_price)} · {c.offers_exact} exactas</span>}
+                  {c.best_shop && c.note && <span className="aut-cell-sub">{c.note}</span>}
                 </span>
                 <span>{shortDateTime(c.checked_at)}{c.price_before !== c.price_after && c.price_after !== null ? <><br />{moneyMx(c.price_before)} → <b>{moneyMx(c.price_after)}</b></> : null}</span>
               </li>
             ))}
           </ul>
         )}
-      </div>
-      <div>
-        <h4>Cambios de precio</h4>
+        <h4 style={{ marginTop: 12 }}>Cambios de precio</h4>
         {changes.length === 0 ? <p className="aut-muted">Sin cambios todavía.</p> : (
           <ul className="aut-list">
             {changes.map((c) => (
@@ -366,17 +458,6 @@ function ProductDetail({ product, notify, onSaved }: { product: WatchedProduct; 
             ))}
           </ul>
         )}
-        <form onSubmit={saveQuery} style={{ marginTop: 14 }}>
-          <h4>Búsqueda exacta para revisar</h4>
-          <div className="aut-inline">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${product.brand ?? ''} ${product.name}`.trim()} aria-label="Búsqueda exacta" maxLength={160} />
-            <button type="submit" className="aut-btn" disabled={saving || q.trim() === (product.search_query ?? '')}><Save size={13} aria-hidden="true" /> {saving ? 'Guardando…' : 'Guardar'}</button>
-          </div>
-          <small className="aut-muted">Incluye marca, línea, tamaño y SPF (ej. “ISDIN Fusion Water Magic SPF 50 50 ml”). Vacío = marca + nombre.</small>
-        </form>
-        <p style={{ marginTop: 10 }}>
-          <Link className="aut-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} to={`/admin/abastecimiento?product=${product.id}`}>Ver todas las ofertas en Abastecimiento <ExternalLink size={11} aria-hidden="true" /></Link>
-        </p>
       </div>
     </div>
   );
@@ -499,13 +580,10 @@ function OrdersTab({ notify, onSchemaError }: { notify: (t: Toast) => void; onSc
 }
 
 // ─── Reglas ───────────────────────────────────────────────────
-const RULE_FIELDS: Array<{ key: keyof AutoConfig['rules']; label: string; hint: string; suffix: string; min: number; max: number; step: number }> = [
-  { key: 'minMarginPct', label: 'Ganancia mínima (%)', hint: 'Del precio de venta, ya con costo, envíos y comisión de Clip.', suffix: '%', min: 0, max: 80, step: 0.5 },
-  { key: 'minMarginMxn', label: 'Ganancia mínima ($ por pieza)', hint: 'Se usa lo mayor entre el % y estos pesos.', suffix: '$', min: 0, max: 5000, step: 1 },
-  { key: 'undercutPct', label: 'Competir: por debajo del mercado (%)', hint: 'Cuánto debajo del precio más bajo del mismo producto exacto.', suffix: '%', min: 0, max: 30, step: 0.5 },
-  { key: 'maxChangePct', label: 'Tope de cambio por revisión (%)', hint: 'Protege de datos raros. Si el costo obliga a subir más, sube igual.', suffix: '%', min: 0, max: 100, step: 1 },
-  { key: 'maxDeliveryDays', label: 'Entrega del proveedor (días máx.)', hint: '1 = al día siguiente.', suffix: 'días', min: 0, max: 15, step: 1 },
-  { key: 'checkHours', label: 'Revisar cada (horas)', hint: 'Cada revisión consume una búsqueda de Bright Data por producto.', suffix: 'h', min: 1, max: 72, step: 1 },
+const RULE_FIELDS: Array<{ key: 'minMarginPct' | 'maxMarginPct' | 'checkHours'; label: string; hint: string; suffix: string; min: number; max: number; step: number }> = [
+  { key: 'minMarginPct', label: 'Ganancia mínima (%)', hint: 'Del precio de venta, ya con costo, envíos y comisión de Clip. Nunca se vende por debajo.', suffix: '%', min: 0, max: 80, step: 0.5 },
+  { key: 'maxMarginPct', label: 'Ganancia máxima (%)', hint: 'Si el costo baja, tu precio baja hasta quedar en este máximo.', suffix: '%', min: 0, max: 90, step: 0.5 },
+  { key: 'checkHours', label: 'Revisar cada (horas)', hint: 'Cada revisión consume 1–2 búsquedas de Bright Data por producto.', suffix: 'h', min: 1, max: 72, step: 1 },
 ];
 
 function RulesTab({ cfg, onSaved, notify }: { cfg: AutoConfig; onSaved: (c: AutoConfig) => void; notify: (t: Toast) => void }) {
@@ -516,7 +594,8 @@ function RulesTab({ cfg, onSaved, notify }: { cfg: AutoConfig; onSaved: (c: Auto
 
   const errors = Object.fromEntries(RULE_FIELDS.map((f) => {
     const n = Number(v[f.key]);
-    return [f.key, v[f.key] === '' || !Number.isFinite(n) || n < f.min || n > f.max ? `Entre ${f.min} y ${f.max}` : ''];
+    return [f.key, v[f.key] === '' || !Number.isFinite(n) || n < f.min || n > f.max ? `Entre ${f.min} y ${f.max}`
+      : f.key === 'maxMarginPct' && n < Number(v.minMarginPct) ? 'Debe ser mayor o igual a la mínima' : ''];
   }));
   const hasErrors = Object.values(errors).some(Boolean);
   const dirty = enabled !== cfg.enabled || RULE_FIELDS.some((f) => Number(v[f.key]) !== cfg.rules[f.key]);
@@ -531,7 +610,7 @@ function RulesTab({ cfg, onSaved, notify }: { cfg: AutoConfig; onSaved: (c: Auto
     const err = await saveConfig(values);
     setSaving(false);
     if (err) { notify({ kind: 'error', text: err }); return; }
-    onSaved({ ...cfg, enabled, rules: Object.fromEntries(RULE_FIELDS.map((f) => [f.key, Number(v[f.key])])) as unknown as AutoConfig['rules'] });
+    onSaved({ ...cfg, enabled, rules: { ...cfg.rules, ...Object.fromEntries(RULE_FIELDS.map((f) => [f.key, Number(v[f.key])])) } });
   };
 
   return (

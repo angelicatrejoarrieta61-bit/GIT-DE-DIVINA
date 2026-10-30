@@ -16,7 +16,7 @@ export {
   KNOWN_BRANDS, DEFAULT_MARGIN, DEFAULT_RULES,
   norm, normalizeKey, round2, detectBrand, isCombo, isBarcode, looksLikeInstallment, parsePrice, parseMxn, parsePackQty,
   splitSeller, queryFromUrl, compactQuery, effectivePrice, buildSpec, classify, merchantShipping, merchantEligibility, isOwnShop, clipFee, computeMargin,
-  floorPrice, targetPrice, evaluateAll,
+  floorPrice, targetPrice, evaluateAll, priceAtMargin, bandPrice, shopKey, findTrackedOffer,
 } from './sourcingCore.js';
 export type { MatchLevel, Trust, MarginSettings, TargetSpec, PriceRules } from './sourcingCore.js';
 

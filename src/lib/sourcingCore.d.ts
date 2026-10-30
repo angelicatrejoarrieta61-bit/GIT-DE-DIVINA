@@ -35,6 +35,7 @@ export interface MarginSettings {
 
 export interface PriceRules {
   minMarginPct: number;
+  maxMarginPct: number;
   minMarginMxn: number;
   undercutPct: number;
   maxChangePct: number;
@@ -109,6 +110,14 @@ export function floorPrice(unitCost: number, shipping: number, s: MarginSettings
 export function targetPrice(args: { floor: number; market: number | null; current: number; rules: PriceRules }): {
   target: number; competitive: number | null; notes: string[];
 };
+export function priceAtMargin(cost: number, s: MarginSettings, pct: number): number;
+export function bandPrice(args: { cost: number; prevCost?: number | null; current?: number | null; settings: MarginSettings; rules: PriceRules }): {
+  target: number; lo: number; hi: number; mid: number; note: string | null;
+};
+export function shopKey(shop: string): string;
+export function findTrackedOffer<O extends { shop: string; title: string; link?: string | null; unit_price_mxn: number | null; installment?: boolean; is_installment?: boolean }>(
+  offers: O[], source: { shop: string; offer_title: string | null; link?: string | null } | null, query?: string | null,
+): O | null;
 export function evaluateAll<O extends CoreOffer>(
   offers: O[], spec: TargetSpec, salePrice: number | null, settings: MarginSettings,
   merchants?: Record<string, CoreMerchant>, maxDays?: number,
