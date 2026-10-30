@@ -49,6 +49,7 @@ export const CHECKOUT_DEFAULTS: Record<string, string> = {
   checkout_font: '',
 };
 const imgSrc = (v: string) => (!v ? '' : v.startsWith('/') ? v : getImageUrl(v));
+const FAILED_MSG = 'Tu compra no fue satisfactoria. Intenta con otra tarjeta.';
 const isHex = (v?: string) => !!v && /^#[0-9a-f]{6}$/i.test(v);
 
 const IconLock = () => (
@@ -255,7 +256,7 @@ export const CheckoutPage: React.FC = () => {
         cardToken = await sdkCardRef.current.cardToken();
       } catch (sdkErr: any) {
         console.error('[Clip] cardToken:', sdkErr);
-        throw new Error('Datos de tarjeta inválidos. Verifica los campos.');
+        throw new Error('Revisa los datos de tu tarjeta: número, vencimiento y código.');
       }
       const cardTokenId = cardToken?.id;
       if (!cardTokenId) throw new Error('No se obtuvo token de tarjeta.');
@@ -282,17 +283,19 @@ export const CheckoutPage: React.FC = () => {
           couponCode: appliedCoupon ?? null,
         }),
       });
-      const chargeData = await chargeRes.json();
+      const chargeData = await chargeRes.json().catch(() => ({} as Record<string, any>));
       if (chargeRes.status === 409 && (chargeData.code === 'price_changed' || chargeData.code === 'unavailable')) {
         await syncCart();
         throw new Error(chargeData.error ?? 'El total cambió. Revisa tu carrito y vuelve a pagar.');
       }
-      if (!chargeRes.ok) {
-        throw new Error(chargeData.error ?? chargeData.message ?? 'Error al procesar el cobro.');
-      }
-      if (chargeData.requires_action && chargeData.redirect_url) {
-        window.location.href = chargeData.redirect_url;
+      if (chargeRes.status === 409 && chargeData.code === 'already_paid') {
+        clearCart();
+        navigate(`/pago-exitoso?order=${order.id}`);
         return;
+      }
+      if (!chargeRes.ok || !chargeData.success) {
+        // Rechazo, verificación del banco (3-D Secure, no se usa) o error: no se cobró
+        throw new Error(FAILED_MSG);
       }
       await updateOrderStatus(order.id, 'paid');
       // Aviso de pedido nuevo + confirmación al cliente (el servidor evita duplicados)

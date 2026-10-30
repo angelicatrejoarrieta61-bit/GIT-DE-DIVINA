@@ -29,6 +29,15 @@
       ]
     },
     {
+      "source": "/mi-pedido",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
       "source": "/pago-(.*)",
       "headers": [
         {

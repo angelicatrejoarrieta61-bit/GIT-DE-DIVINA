@@ -117,7 +117,7 @@ public/                 imágenes fijas (checkout, favicon, og-image)
 
 ## 7. Rutas
 
-**Públicas:** `/`, `/catalogo`, `/coleccion/:slug`, `/producto/:slug`, `/blog`, `/blog/:slug`, `/quienes-somos`, `/contacto`, `/programa-promocion`, `/info/:slug` (páginas creadas desde el admin), `/checkout`, `/pago-exitoso`, `/pago-error`.
+**Públicas:** `/`, `/catalogo`, `/coleccion/:slug`, `/producto/:slug`, `/blog`, `/blog/:slug`, `/quienes-somos`, `/contacto`, `/programa-promocion`, `/info/:slug` (páginas creadas desde el admin), `/checkout`, `/pago-exitoso`, `/pago-error`, `/mi-pedido` (estado y seguimiento del pedido; ícono junto al carrito).
 
 **Admin** (requiere sesión de Supabase; entrada en `/admin/login`):
 
@@ -163,9 +163,10 @@ Flujo actual, en `CheckoutPage.tsx`:
 3. Se crea el pedido en `orders` con estado `pending`.
 4. Se llama a `/api/charge-clip`, que cobra en `api.payclip.com/payments` con las llaves secretas.
 5. `charge-clip` guarda en el pedido lo que respondió Clip (aprobado, pendiente o rechazado) en las columnas `clip_*`: id del pago, estado, `status_detail.code`, `receipt_no`, tarjeta (marca, últimos 4, banco), monto y fecha. Si Clip aprueba, **marca el pedido como `paid` desde el servidor**. El navegador también lo marca, como respaldo, pero eso no habilita el envío.
-6. Si Clip responde `pending` con verificación del banco (3-D Secure), al cliente se le pide intentar con otra tarjeta y el pedido queda "En proceso". (El flujo 3-D Secure completo, con la ventana del banco, sigue pendiente.)
+6. **Pago no aprobado** (rechazo, error o `pending` con verificación del banco 3-D Secure): `charge-clip` responde 402 `payment_failed` y **cancela ese pedido** (`status = cancelled`, motivo en `internal_note`) para que no quede "En proceso". La clienta ve solo: **"Tu compra no fue satisfactoria. Intenta con otra tarjeta."** Decisión (29-oct-2026): **3-D Secure no se implementa.**
 7. El checkout y `/pago-exitoso` piden a `/api/send-email` el aviso `order-paid` (ver sección 11).
 8. **Confirmación con Clip** (`/api/clip-verify`, requiere sesión del admin): consulta `GET https://api.payclip.com/payments/{id}` y actualiza las columnas `clip_*`. Si Clip aprueba un pedido que seguía "Sin pagar", lo pasa a pagado y manda los avisos. Pedidos la llama sola al abrir (para los cobros sin estado final) y desde los botones "Consultar a Clip" / "Verificar todo con Clip".
+9. **Después de pagar** (`/pago-exitoso?order=<id>`): agradecimiento y, al final, el **resumen completo** (número copiable, avance Pagado → Preparando → En camino → Entregado, productos con foto, subtotal, descuento, envío, total y dirección). El pedido queda guardado en el navegador para verlo en **Mi pedido**. Si alguien abre la página con un pedido no pagado, dice "Tu compra no fue satisfactoria".
 
 **Número de autorización:** la documentación pública de Clip no lista un campo de código de autorización; se guarda `receipt_no` (recibo de Clip) y, si Clip llega a mandar `authorization_code`, también. La respuesta completa (sin el token) queda en `clip_raw` para revisar qué campos manda Clip en realidad.
 
@@ -279,7 +280,12 @@ Todo pasa por `/api/send-email`, según el campo `type`:
 | `promoter-welcome` | Alta de promotora | No |
 | `test`, `campaign` | Envíos desde el admin | Sí |
 | `order-paid` | Pedido pagado: aviso a ti + confirmación al cliente. Solo si el pedido está `paid` en la base y una sola vez (usa `admin_notified_at` / `customer_notified_at`) | No |
-| `order-shipped` | Aviso de envío al cliente con paquetería, guía y enlace de rastreo | Sí |
+| `order-shipped` | Aviso de envío al cliente según la forma de entrega (paquetería con guía · entrega personal · directo del proveedor). 2 intentos | Sí |
+| `order-lookup` | Consulta pública del pedido para `/pago-exitoso` y `/mi-pedido`: por `orderId`, o por `number` (8 caracteres) + `email`. Devuelve solo lo que ve el cliente (sin teléfono, pago ni notas) | No |
+| `order-mail-check` | ¿Llegó la confirmación? Consulta en Resend (`emails.get`) los pedidos de los últimos 7 días: *entregado* → listo · *error al enviar* → reintenta (hasta 6) · *rebotó* → 1 reintento si es el primer envío y después te avisa por correo. Lo llama el cron cada 10 min (`sourcing-auto?job=tick`) y Pedidos al abrir | Token del cron o sesión |
+| `order-resend` | Reenviar la confirmación al cliente; opcional corregir su correo | Sí |
+
+**Confirmación al cliente** (`order-paid`): 3 intentos; guarda `customer_email_id` (id de Resend), `customer_email_status` (`sent` · `delivered` · `delayed` · `bounced` · `error`) y `customer_email_tries`. Si no se puede enviar o rebota, te llega **un** aviso "El cliente no recibió la confirmación" (`customer_email_alerted_at`). Columnas en `supabase/migrations/20261029200000_orders_followup.sql`; sin la migración todo funciona igual, solo no se guarda el estado del correo. Los correos al cliente traen el botón **Ver mi pedido** (`/mi-pedido?id=<id>`). Nota: hay 12 funciones (límite de Vercel Hobby), por eso la consulta del pedido vive en `send-email`.
 
 Remitente: `admin@divinastore.com.mx`. Los avisos de contacto llegan a `info@divinastore.com.mx`. Los avisos de **pedido nuevo** llegan al correo (o correos separados por coma) guardado en `store_config.orders_notify_email`, que se edita en Pedidos → Ajustes.
 
@@ -290,9 +296,15 @@ Archivo: `src/pages/admin/AdminOrderReports.tsx` + `AdminOrders.css` (clases `.o
 - **Resumen en fichas:** ventas pagadas, ticket promedio, por enviar, sin pagar, clientes; con selector de periodo (hoy, 7 días, 30 días, este mes, todo). Las fichas "Por enviar" y "Sin pagar" filtran la tabla.
 - **Buscador:** cliente, correo, teléfono, # de pedido, guía o producto.
 - **Selección múltiple** y **Borrar** (individual o en lote, con confirmación). Borrar es permanente.
-- **Enviar pedido** (camión): paquetería, número de guía, enlace de rastreo opcional y casilla para avisar al cliente por correo. Pasa el pedido a `shipped`.
+- **Enviar pedido** (botón con texto en cada pedido pagado; "Envío" para editar): elige la **forma de entrega**:
+  - **Paquetería**: paquetería (u "Otra" con nombre), guía obligatoria y enlace de rastreo opcional.
+  - **Entrega personal**: sin guía; casilla "Ya lo entregué" para pasarlo directo a Entregado.
+  - **Directo del proveedor** (la marca o tienda se lo envía al cliente): proveedor sugerido desde Precios automáticos (`product_sources`), guía y rastreo opcionales. Al cliente se le dice que sale del almacén de la marca/distribuidor y que puede llegar con su empaque.
+  Se guarda en `shipping_carrier` ("Entrega personal" / "Directo de: Amazon MX" / paquetería), pasa a `shipped` (o `delivered`) y, con la casilla, avisa al cliente por correo.
 - **Etiqueta** (etiqueta 4×6" imprimible en ventana nueva): remitente desde Pedidos → Ajustes (`ship_from_*` en `store_config`) y destinatario del pedido. No es una guía de paquetería: la guía se compra en la paquetería y su número se captura en "Enviar pedido".
-- **Detalle del pedido:** productos con foto, dirección (copiar), correo, WhatsApp, registro de avisos enviados, "reenviarme el aviso" y nota interna.
+- **Detalle del pedido:** productos con foto, dirección (copiar), correo, WhatsApp, registro de avisos con el **estado del correo al cliente** (Le llegó · Enviado, esperando entrega · Entrega retrasada · No le llegó (rebotó) · No se pudo enviar), **Reenviar confirmación** y **Corregir correo** (guarda el correo nuevo y reenvía), "reenviarme el aviso" y nota interna.
+
+**Mi pedido (`/mi-pedido`, `src/pages/MyOrderPage.tsx`):** ícono de caja junto al carrito (todas las páginas). Muestra los pedidos comprados en ese navegador (`localStorage` `divina-my-orders`, máx. 10) y permite buscar cualquiera con **número de pedido + correo**. Con `?id=` abre ese pedido (liga de los correos). Componente compartido `src/components/OrderView.tsx` + `src/pages/OrderPages.css` (prefijo `op-`), lógica en `src/lib/orderPublic.ts`.
 - **Pago Clip (columna):** Aprobado / En proceso / Rechazado / Cancelado / Reembolsado / Sin verificar / Sin cobro / Monto distinto, con el número de autorización o recibo. Clic = consultar a Clip.
 - **Candado de envío:** "Enviar pedido" y los estados Enviado/Entregado solo se habilitan si Clip reporta **Aprobado** y el monto cobrado coincide con el total. En el detalle hay "Enviar de todos modos" (con confirmación) por si ya se revisó en el panel de Clip; solo dura mientras la página esté abierta.
 - **Pagos Clip (botón y modal):** cobrado en Clip, en proceso, con problema (rechazados, reembolsados, monto distinto o "pagado sin cobro"), sin verificar; tabla con tarjeta, autorización/recibo, monto, estado y última consulta; "Verificar todo con Clip". Fichas del resumen "Cobrado en Clip" y "Por confirmar" lo abren.
@@ -383,7 +395,8 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 ## 18. Pendientes conocidos
 
 - **SMS de pedido nuevo:** no está. SMS real cuesta por mensaje (Twilio, etc.). Opciones gratis evaluadas: notificación push de Gmail con un filtro para el correo de aviso, bot de Telegram o ntfy.sh (push al celular). Hoy el aviso llega por correo.
-- **Pagos con verificación del banco (3-D Secure):** Clip pide abrir `pending_action.url` en un iFrame y luego consultar el pago desde el servidor. No está implementado: el cliente ve "intenta con otra tarjeta" y el pedido queda "En proceso".
+- **Pagos con verificación del banco (3-D Secure):** decidido no implementarlo (29-oct-2026). El pago no aprobado cancela el pedido y la clienta ve "Tu compra no fue satisfactoria. Intenta con otra tarjeta."
+- **Migración `20261029200000_orders_followup.sql`:** columnas del estado del correo al cliente. Se aplica sola con la Action de GitHub si tiene sus 3 secretos.
 - **Cálculo de margen (Abastecimiento):** valores acordados: comisión Clip 5 % total (sin IVA extra, sin cuota fija) y colchón de envío $20 por venta (`sourcing_customer_shipping`); el envío real se cobra aparte al cliente. Se guardan en `store_config` (`sourcing_*`).
 - **Coincidencia:** un anuncio que junta dos productos ("Lambdacaps + Lambdapil", "Loción + Champú"; no cuenta "SPF 50+") es **No confirmada** (combo). "Champú" = "shampoo". Se ignoran palabras de relleno de títulos de Amazon (ayuda, reducir, estimula, crecimiento, cabello, capilar…). Si el anuncio no trae la marca ni el nombre de la línea, es No confirmada.
 - **Mejor costo** solo toma ofertas *exactas*, no sospechosas (< 45 % de la mediana) y de tiendas no descartadas; una *probable* se ve en la lista pero no cuenta.

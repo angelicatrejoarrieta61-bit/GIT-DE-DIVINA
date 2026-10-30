@@ -76,6 +76,12 @@ export interface Order {
   admin_notified_at?: string | null;
   customer_notified_at?: string | null;
   shipping_notified_at?: string | null;
+  /* Correo de confirmación al cliente (migración 20261029200000_orders_followup.sql) */
+  customer_email_id?: string | null;
+  customer_email_status?: 'sent' | 'delivered' | 'delayed' | 'bounced' | 'error' | null;
+  customer_email_tries?: number | null;
+  customer_email_checked_at?: string | null;
+  customer_email_alerted_at?: string | null;
   /* Cobro confirmado con la API de Clip (solo lo escribe el servidor) */
   clip_payment_id?: string | null;
   clip_status?: string | null;

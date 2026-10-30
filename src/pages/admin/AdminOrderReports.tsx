@@ -1,7 +1,7 @@
 /**
  * AdminOrderReports.tsx — Pedidos y clientes (/admin/reportes)
  * Resumen en fichas, búsqueda, filtros por estado y periodo, selección múltiple,
- * borrar, marcar como enviado (paquetería + guía + aviso por correo), etiqueta
+ * borrar, enviar pedido (paquetería con guía · entrega personal · directo del proveedor + aviso por correo), etiqueta
  * imprimible, avisos de pedido nuevo y acceso a campañas desde Clientes.
  * Pago Clip: cada cobro se confirma con la API de Clip (/api/clip-verify). Un pedido
  * solo se puede enviar cuando Clip lo reporta aprobado y el monto coincide.
@@ -29,7 +29,30 @@ const STATUS: Record<Status, { label: string; tone: string }> = {
   cancelled: { label: 'Cancelado',  tone: 'bad' },
 };
 const PAID: Status[] = ['paid', 'shipped', 'delivered'];
-const CARRIERS = ['Estafeta', 'DHL', 'FedEx', 'Paquetexpress', 'Redpack', '99 Minutos', 'Correos de México', 'Entrega local', 'Otra'];
+const CARRIERS = ['Estafeta', 'DHL', 'FedEx', 'Paquetexpress', 'Redpack', '99 Minutos', 'Correos de México', 'Otra'];
+
+/** Forma de entrega guardada en shipping_carrier: "Entrega personal", "Directo de: <proveedor>" o la paquetería. */
+type ShipKind = 'paqueteria' | 'personal' | 'proveedor';
+function shipKindOf(carrier?: string | null): { kind: ShipKind; carrier: string; supplier: string } {
+  const c = String(carrier || '').trim();
+  if (/^entrega (personal|local)$/i.test(c)) return { kind: 'personal', carrier: '', supplier: '' };
+  const m = c.match(/^directo de:?\s*(.+)$/i);
+  if (m) return { kind: 'proveedor', carrier: '', supplier: m[1].trim() };
+  return { kind: 'paqueteria', carrier: c, supplier: '' };
+}
+const shipLabel = (carrier?: string | null) => {
+  const k = shipKindOf(carrier);
+  return k.kind === 'personal' ? 'Entrega personal' : k.kind === 'proveedor' ? `Directo de ${k.supplier}` : k.carrier;
+};
+
+/** Estado del correo de confirmación al cliente. */
+const MAIL: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'info' }> = {
+  delivered: { label: 'Le llegó', tone: 'ok' },
+  sent: { label: 'Enviado, esperando entrega', tone: 'info' },
+  delayed: { label: 'Entrega retrasada', tone: 'warn' },
+  bounced: { label: 'No le llegó (rebotó)', tone: 'bad' },
+  error: { label: 'No se pudo enviar · reintentando', tone: 'bad' },
+};
 const PERIODS: Record<Period, string> = { all: 'Todo', today: 'Hoy', '7d': '7 días', '30d': '30 días', month: 'Este mes' };
 
 const CFG_KEYS = ['orders_notify_email', 'ship_from_name', 'ship_from_phone', 'ship_from_address', 'ship_from_city', 'ship_from_state', 'ship_from_zip'] as const;
@@ -175,6 +198,25 @@ export const AdminOrderReports: React.FC = () => {
     setLoading(false);
   }, []);
 
+  /** Pregunta a Resend si llegaron las confirmaciones (y reenvía las que fallaron). Silencioso. */
+  const mailChecked = useRef(false);
+  const checkMails = useCallback(async (ids?: string[]) => {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` },
+        body: JSON.stringify({ type: 'order-mail-check', ...(ids ? { orderIds: ids } : {}) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      const results: Array<{ id: string; status: Order['customer_email_status'] }> = Array.isArray(d.results) ? d.results : [];
+      if (results.length) {
+        const by = new Map(results.map((x) => [x.id, x.status]));
+        setOrders(prev => prev.map(o => (by.has(o.id) ? { ...o, customer_email_status: by.get(o.id) ?? o.customer_email_status } : o)));
+      }
+    } catch { /* sin conexión: se revisa en la siguiente vuelta del cron */ }
+  }, []);
+
   useEffect(() => {
     void load();
     getStoreConfig().then(c => setCfg(prev => {
@@ -230,6 +272,12 @@ export const AdminOrderReports: React.FC = () => {
       setVerifying(null);
     }
   }, [notify]);
+
+  useEffect(() => {
+    if (loading || mailChecked.current) return;
+    mailChecked.current = true;
+    if (orders.some(o => o.customer_email_status && o.customer_email_status !== 'delivered')) void checkMails();
+  }, [loading, orders, checkMails]);
 
   // Al abrir: confirmar en segundo plano los cobros que aún no tienen estado final
   useEffect(() => {
@@ -328,6 +376,27 @@ export const AdminOrderReports: React.FC = () => {
     if (!r.ok) return notify('err', d.error || 'No se pudo enviar el aviso.');
     notify('ok', 'Aviso de pedido reenviado a tu correo.');
     void load();
+  };
+
+  /** Reenvía la confirmación al cliente; con `email` corrige primero su correo. */
+  const resendConfirmation = async (o: Order, email?: string) => {
+    setBusy(o.id);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` },
+        body: JSON.stringify({ type: 'order-resend', orderId: o.id, ...(email ? { email } : {}) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return notify('err', d.error || 'No se pudo reenviar.');
+      setOrders(prev => prev.map(x => x.id === o.id ? { ...x, customer_email: d.email ?? x.customer_email, customer_email_status: 'sent', customer_notified_at: new Date().toISOString() } : x));
+      notify('ok', `Confirmación reenviada a ${d.email}. Se revisa si llegó en unos minutos.`);
+    } catch {
+      notify('err', 'No se pudo conectar con el servidor.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const copy = async (key: string, text: string) => {
@@ -478,7 +547,7 @@ export const AdminOrderReports: React.FC = () => {
                               ))}
                             </select>
                           </td>
-                          <td className="c-ship c-hide-sm">{o.tracking_number ? <><strong>{o.shipping_carrier || 'Guía'}</strong><span>{o.tracking_number}</span></> : <span className="ord-muted">—</span>}</td>
+                          <td className="c-ship c-hide-sm">{o.shipping_carrier || o.tracking_number ? <><strong>{shipLabel(o.shipping_carrier) || 'Guía'}</strong>{o.tracking_number && <span>{o.tracking_number}</span>}</> : <span className="ord-muted">—</span>}</td>
                           <td className="c-act">
                             {confirmDel === o.id ? (
                               <span className="ord-confirm ord-confirm--row">
@@ -488,7 +557,12 @@ export const AdminOrderReports: React.FC = () => {
                               </span>
                             ) : (
                               <>
-                                <button type="button" className="ord-icon ord-icon--primary" onClick={() => setShipFor(o)} disabled={!canShip(o)} title={!PAID.includes(st) ? 'Solo pedidos pagados' : !canShip(o) ? 'Primero confirma el cobro con Clip' : o.tracking_number ? 'Editar envío' : 'Enviar pedido'} aria-label="Enviar pedido"><Truck size={15} /></button>
+                                {PAID.includes(st) && (
+                                  <button type="button" className={`ord-btn ord-btn--sm ${st === 'paid' ? 'ord-btn--primary' : ''}`} onClick={() => setShipFor(o)} disabled={!canShip(o)}
+                                    title={!canShip(o) ? 'Primero confirma el cobro con Clip (columna Pago Clip)' : st === 'paid' ? 'Paquetería, entrega personal o directo del proveedor' : 'Editar forma de entrega o guía'}>
+                                    <Truck size={13} aria-hidden="true" /> {st === 'paid' ? 'Enviar pedido' : 'Envío'}
+                                  </button>
+                                )}
                                 <button type="button" className="ord-icon" onClick={() => printLabel(o, cfg)} title="Crear etiqueta" aria-label="Crear etiqueta"><Tag size={15} /></button>
                                 <button type="button" className="ord-icon ord-icon--danger" onClick={() => setConfirmDel(o.id)} title="Borrar pedido" aria-label="Borrar pedido"><Trash2 size={15} /></button>
                               </>
@@ -543,11 +617,17 @@ export const AdminOrderReports: React.FC = () => {
                                 </div>
                                 <ul className="ord-log">
                                   <li className={o.admin_notified_at ? 'is-ok' : ''}>Aviso a ti: {o.admin_notified_at ? fmtDate(o.admin_notified_at) : 'no enviado'}</li>
-                                  <li className={o.customer_notified_at ? 'is-ok' : ''}>Confirmación al cliente: {o.customer_notified_at ? fmtDate(o.customer_notified_at) : 'no enviada'}</li>
+                                  <li className={o.customer_email_status === 'delivered' || (!o.customer_email_status && o.customer_notified_at) ? 'is-ok' : ''}>
+                                    Confirmación al cliente: {o.customer_notified_at ? fmtDate(o.customer_notified_at) : 'no enviada'}
+                                    {o.customer_email_status && <> · <span className={`ord-tag t-${MAIL[o.customer_email_status]?.tone ?? 'info'}`}>{MAIL[o.customer_email_status]?.label ?? o.customer_email_status}</span></>}
+                                  </li>
                                   <li className={o.shipping_notified_at ? 'is-ok' : ''}>Aviso de envío: {o.shipping_notified_at ? fmtDate(o.shipping_notified_at) : 'no enviado'}</li>
                                 </ul>
                                 {PAID.includes(st) && (
-                                  <button type="button" className="ord-link" disabled={busy === o.id} onClick={() => void resendPaidNotice(o)}>Reenviarme el aviso de este pedido</button>
+                                  <>
+                                    <MailFix order={o} busy={busy === o.id} onResend={(email) => void resendConfirmation(o, email)} />
+                                    <button type="button" className="ord-link" disabled={busy === o.id} onClick={() => void resendPaidNotice(o)}>Reenviarme el aviso de este pedido</button>
+                                  </>
                                 )}
                                 <NoteField order={o} onSaved={(note) => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, internal_note: note } : x))} onError={(m) => notify('err', m)} />
                               </section>
@@ -640,6 +720,31 @@ const Kpi: React.FC<{ label: string; value: string; hint?: string; tone?: string
     : <div role="listitem" className={`ord-kpi ${tone ? `t-${tone}` : ''}`}>{inner}</div>;
 };
 
+/* ── Reenviar confirmación al cliente (con corrección de correo) ── */
+const MailFix: React.FC<{ order: Order; busy: boolean; onResend: (email?: string) => void }> = ({ order, busy, onResend }) => {
+  const failed = order.customer_email_status === 'bounced' || order.customer_email_status === 'error' || !order.customer_notified_at;
+  const [editing, setEditing] = useState(failed && order.customer_email_status === 'bounced');
+  const [v, setV] = useState(order.customer_email || '');
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  if (!editing) {
+    return (
+      <div className="ord-inline" style={{ marginBottom: 6 }}>
+        <button type="button" className={`ord-btn ord-btn--sm ${failed ? 'ord-btn--primary' : ''}`} disabled={busy || !order.customer_email} onClick={() => onResend()}>
+          <Send size={12} aria-hidden="true" /> {busy ? 'Enviando…' : 'Reenviar confirmación'}
+        </button>
+        <button type="button" className="ord-link" onClick={() => setEditing(true)}>Corregir correo</button>
+      </div>
+    );
+  }
+  return (
+    <form className="ord-inline ord-mailfix" style={{ marginBottom: 6 }} onSubmit={(e) => { e.preventDefault(); if (ok) onResend(v.trim()); }}>
+      <input type="email" value={v} onChange={(e) => setV(e.target.value)} aria-label="Correo del cliente" aria-invalid={!ok} placeholder="correo@cliente.com" />
+      <button type="submit" className="ord-btn ord-btn--sm ord-btn--primary" disabled={busy || !ok}><Send size={12} aria-hidden="true" /> {busy ? 'Enviando…' : 'Guardar y reenviar'}</button>
+      <button type="button" className="ord-link" onClick={() => setEditing(false)}>Cancelar</button>
+    </form>
+  );
+};
+
 /* ── Nota interna ── */
 const NoteField: React.FC<{ order: Order; onSaved: (n: string) => void; onError: (m: string) => void }> = ({ order, onSaved, onError }) => {
   const [v, setV] = useState(order.internal_note || '');
@@ -659,35 +764,68 @@ const NoteField: React.FC<{ order: Order; onSaved: (n: string) => void; onError:
   );
 };
 
-/* ── Modal: enviar pedido ── */
+/* ── Modal: enviar pedido (paquetería · entrega personal · directo del proveedor) ── */
+const SHIP_KINDS: Array<{ k: ShipKind; icon: React.ReactNode; title: string; hint: string }> = [
+  { k: 'paqueteria', icon: <Truck size={13} aria-hidden="true" />, title: 'Paquetería', hint: 'Tú lo envías con guía' },
+  { k: 'personal', icon: <Users size={13} aria-hidden="true" />, title: 'Entrega personal', hint: 'Lo llevas o lo recogen' },
+  { k: 'proveedor', icon: <Package size={13} aria-hidden="true" />, title: 'Directo del proveedor', hint: 'La marca o tienda se lo envía' },
+];
+
 const ShipModal: React.FC<{
   order: Order; onClose: () => void; onLabel: (o: Order) => void;
   onDone: (patch: Partial<Order>, msg: { kind: 'ok' | 'err'; text: string }) => void;
 }> = ({ order, onClose, onDone, onLabel }) => {
-  const [carrier, setCarrier] = useState(order.shipping_carrier || 'Estafeta');
+  const initial = shipKindOf(order.shipping_carrier);
+  const [kind, setKind] = useState<ShipKind>(order.shipping_carrier ? initial.kind : 'paqueteria');
+  const [carrier, setCarrier] = useState(initial.carrier && CARRIERS.includes(initial.carrier) ? initial.carrier : initial.carrier ? 'Otra' : 'Estafeta');
+  const [otherCarrier, setOtherCarrier] = useState(initial.carrier && !CARRIERS.includes(initial.carrier) ? initial.carrier : '');
+  const [supplier, setSupplier] = useState(initial.supplier);
+  const [suppliers, setSuppliers] = useState<string[]>([]);
   const [tracking, setTracking] = useState(order.tracking_number || '');
   const [url, setUrl] = useState(order.tracking_url || '');
+  const [delivered, setDelivered] = useState(false);
   const [notifyCustomer, setNotifyCustomer] = useState(Boolean(order.customer_email) && !order.shipping_notified_at);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const firstRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    firstRef.current?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, saving]);
 
+  // Proveedor sugerido: el principal de los productos del pedido (Precios automáticos)
+  useEffect(() => {
+    const ids = itemsOf(order).map(i => i.product?.id).filter(Boolean) as string[];
+    if (!ids.length) return;
+    void supabase.from('product_sources').select('shop').in('product_id', ids).eq('is_primary', true).then(({ data }) => {
+      const list = [...new Set((data ?? []).map((r: { shop: string }) => r.shop).filter(Boolean))];
+      setSuppliers(list);
+      if (list.length && !initial.supplier) setSupplier(list[0]);
+    }, () => undefined);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
+
+  const carrierName = carrier === 'Otra' ? otherCarrier.trim() : carrier;
   const urlOk = !url || /^https?:\/\//i.test(url.trim());
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tracking.trim() && carrier !== 'Entrega local') return setError('Escribe el número de guía.');
+    if (kind === 'paqueteria' && !carrierName) return setError('Escribe el nombre de la paquetería.');
+    if (kind === 'paqueteria' && !tracking.trim()) return setError('Escribe el número de guía.');
+    if (kind === 'proveedor' && !supplier.trim()) return setError('Escribe quién lo envía (marca o tienda).');
     if (!urlOk) return setError('El enlace de rastreo debe empezar con https://');
     setSaving(true); setError('');
-    const patch: Partial<Order> = { status: 'shipped', shipping_carrier: carrier, tracking_number: tracking.trim() || null, tracking_url: url.trim() || null, shipped_at: order.shipped_at || new Date().toISOString() };
+    const label = kind === 'personal' ? 'Entrega personal' : kind === 'proveedor' ? `Directo de: ${supplier.trim()}` : carrierName;
+    const patch: Partial<Order> = {
+      status: kind === 'personal' && delivered ? 'delivered' : 'shipped',
+      shipping_carrier: label,
+      tracking_number: kind === 'personal' ? null : tracking.trim() || null,
+      tracking_url: kind === 'personal' ? null : url.trim() || null,
+      shipped_at: order.shipped_at || new Date().toISOString(),
+    };
     const err = await updateOrder(order.id, patch);
-    if (err) { setSaving(false); return setError(`No se guardó: ${err}. ¿Ejecutaste la migración de pedidos v2?`); }
+    if (err) { setSaving(false); return setError(`No se guardó: ${err}`); }
+    const done = patch.status === 'delivered' ? 'Pedido marcado como entregado' : 'Pedido marcado como enviado';
     if (notifyCustomer) {
       const { data } = await supabase.auth.getSession();
       const r = await fetch('/api/send-email', {
@@ -697,42 +835,77 @@ const ShipModal: React.FC<{
       });
       const d = await r.json().catch(() => ({}));
       setSaving(false);
-      if (!r.ok) return onDone(patch, { kind: 'err', text: `Pedido marcado como enviado, pero el correo falló: ${d.error || r.status}` });
-      return onDone({ ...patch, shipping_notified_at: new Date().toISOString() }, { kind: 'ok', text: 'Pedido enviado y cliente avisado por correo.' });
+      if (!r.ok) return onDone(patch, { kind: 'err', text: `${done}, pero el correo falló: ${d.error || r.status}` });
+      return onDone({ ...patch, shipping_notified_at: new Date().toISOString() }, { kind: 'ok', text: `${done} y cliente avisado por correo.` });
     }
     setSaving(false);
-    onDone(patch, { kind: 'ok', text: 'Pedido marcado como enviado.' });
+    onDone(patch, { kind: 'ok', text: `${done}.` });
   };
 
   return (
     <div className="ord-modal" role="dialog" aria-modal="true" aria-labelledby="ship-title" onClick={() => !saving && onClose()}>
-      <form className="ord-modal__panel" onClick={e => e.stopPropagation()} onSubmit={submit}>
+      <form className="ord-modal__panel" onClick={e => e.stopPropagation()} onSubmit={submit} noValidate>
         <header>
           <h2 id="ship-title"><Truck size={16} aria-hidden="true" /> Enviar pedido #{shortId(order.id)}</h2>
           <button type="button" className="ord-icon" onClick={onClose} disabled={saving} aria-label="Cerrar"><X size={15} /></button>
         </header>
         <p className="ord-modal__to"><strong>{order.customer_name}</strong> · {[order.customer_city, order.customer_state].filter(Boolean).join(', ')}</p>
-        <div className="ord-grid2">
-          <label className="ord-field">Paquetería
-            <select ref={firstRef} value={carrier} onChange={e => setCarrier(e.target.value)}>{CARRIERS.map(c => <option key={c}>{c}</option>)}</select>
-          </label>
-          <label className="ord-field">Número de guía
-            <input value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Ej. 1234567890" autoComplete="off" />
-          </label>
+
+        <div className="ord-seg" role="radiogroup" aria-label="Forma de entrega">
+          {SHIP_KINDS.map(x => (
+            <button key={x.k} type="button" role="radio" aria-checked={kind === x.k} onClick={() => { setKind(x.k); setError(''); }} autoFocus={kind === x.k}>
+              <strong>{x.icon} {x.title}</strong><span>{x.hint}</span>
+            </button>
+          ))}
         </div>
-        <label className="ord-field">Enlace de rastreo (opcional)
-          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://… (pégalo desde la paquetería)" inputMode="url" aria-invalid={!urlOk} />
-        </label>
+
+        {kind === 'paqueteria' && (
+          <div className="ord-grid2">
+            <label className="ord-field">Paquetería
+              <select value={carrier} onChange={e => setCarrier(e.target.value)}>{CARRIERS.map(c => <option key={c}>{c}</option>)}</select>
+            </label>
+            {carrier === 'Otra'
+              ? <label className="ord-field">Nombre de la paquetería<input value={otherCarrier} onChange={e => setOtherCarrier(e.target.value)} placeholder="Ej. JT Express" /></label>
+              : <span />}
+          </div>
+        )}
+        {kind === 'proveedor' && (
+          <label className="ord-field">Quién lo envía (marca o tienda)
+            <input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Ej. Amazon, ISDIN, Liverpool" list="ship-suppliers" />
+            <datalist id="ship-suppliers">{suppliers.map(x => <option key={x} value={x} />)}</datalist>
+          </label>
+        )}
+        {kind !== 'personal' ? (
+          <>
+            <div className="ord-grid2">
+              <label className="ord-field">Número de guía{kind === 'proveedor' ? ' (si te la dieron)' : ''}
+                <input value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Ej. 1234567890" autoComplete="off" />
+              </label>
+              <label className="ord-field">Enlace de rastreo (opcional)
+                <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" inputMode="url" aria-invalid={!urlOk} />
+              </label>
+            </div>
+            {kind === 'proveedor' && <p className="ord-muted" style={{ margin: 0, fontSize: 12 }}>Al cliente le decimos que sale directo del almacén de la marca o distribuidor y que puede llegar con su empaque.</p>}
+          </>
+        ) : (
+          <label className="ord-check">
+            <input type="checkbox" checked={delivered} onChange={e => setDelivered(e.target.checked)} />
+            Ya lo entregué (marcar como Entregado)
+          </label>
+        )}
+
         <label className="ord-check">
           <input type="checkbox" checked={notifyCustomer} disabled={!order.customer_email} onChange={e => setNotifyCustomer(e.target.checked)} />
           Avisar al cliente por correo{order.customer_email ? ` (${order.customer_email})` : ' (sin correo)'}{order.shipping_notified_at ? ' — ya se le avisó una vez' : ''}
         </label>
         {error && <p className="ord-error" role="alert">{error}</p>}
         <footer>
-          <button type="button" className="ord-btn" onClick={() => onLabel({ ...order, shipping_carrier: carrier, tracking_number: tracking })}><Tag size={13} /> Etiqueta</button>
+          <button type="button" className="ord-btn" onClick={() => onLabel({ ...order, shipping_carrier: kind === 'paqueteria' ? carrierName : order.shipping_carrier, tracking_number: tracking })}><Tag size={13} /> Etiqueta</button>
           <span className="ord-spacer" />
           <button type="button" className="ord-btn" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button type="submit" className="ord-btn ord-btn--primary" disabled={saving}>{saving ? 'Guardando…' : 'Marcar como enviado'}</button>
+          <button type="submit" className="ord-btn ord-btn--primary" disabled={saving}>
+            {saving ? 'Guardando…' : kind === 'personal' && delivered ? 'Marcar como entregado' : 'Marcar como enviado'}
+          </button>
         </footer>
       </form>
     </div>

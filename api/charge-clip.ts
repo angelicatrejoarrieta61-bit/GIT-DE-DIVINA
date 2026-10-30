@@ -57,6 +57,19 @@ async function saveClipResult(orderId: string, data: any) {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+const FAILED_MSG = 'Tu compra no fue satisfactoria. Intenta con otra tarjeta.';
+
+/** Cancela un pedido que no se pudo cobrar (solo si sigue sin pagar). */
+async function cancelUnpaid(orderId: string, note: string) {
+    try {
+        const db = serviceDb();
+        if (!db || !UUID_RE.test(orderId)) return;
+        await db.from('orders').update({ status: 'cancelled', internal_note: note }).eq('id', orderId).eq('status', 'pending');
+    } catch (e: any) {
+        console.error('[charge-clip] cancelUnpaid:', e?.message);
+    }
+}
+
 type CheckoutCheck =
     | { ok: true; amount: number; skipped?: boolean }
     | { ok: false; status: number; body: Record<string, unknown> };
@@ -204,23 +217,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
-        if (status === 'pending' && data?.pending_action?.url) {
-            console.warn('[charge-clip] 3DS requerido:', data?.status_detail?.code);
-            return res.status(400).json({
-                error: 'Tu banco pidió una verificación adicional (3D Secure). Intenta con otra tarjeta o escríbenos por WhatsApp.',
-                status,
-                requires_3ds: true,
-            });
-        }
-
-        console.error('[charge-clip] Clip declined/error:', response.status, JSON.stringify(data));
-        return res.status(400).json({
-            error: data.decline_reason || data.status_detail?.message || data.message || data.error_description || data.description || data.error || 'Pago declinado por el banco.',
-            status: data.status,
+        // Rechazado o con verificación del banco (3-D Secure, no se usa): no se cobró.
+        // El pedido se cancela para que no quede "En proceso"; la clienta puede pagar con otra tarjeta.
+        const reason = data?.decline_reason || data?.status_detail?.message || data?.message || data?.error_description || data?.description || data?.error || null;
+        console.error('[charge-clip] No aprobado:', response.status, status, data?.status_detail?.code, reason);
+        await cancelUnpaid(String(orderId), status === 'pending' ? 'Banco pidió 3-D Secure (no disponible)' : `Pago rechazado${reason ? `: ${String(reason).slice(0, 160)}` : ''}`);
+        return res.status(402).json({
+            error: FAILED_MSG,
+            code: 'payment_failed',
+            status: data?.status ?? null,
+            reason,
         });
 
     } catch (err: any) {
         console.error('[charge-clip] Server error:', err.message);
-        return res.status(500).json({ error: `Error interno: ${err.message}` });
+        await cancelUnpaid(String(orderId), `Error al cobrar: ${String(err?.message || '').slice(0, 160)}`);
+        return res.status(500).json({ error: FAILED_MSG, code: 'payment_failed' });
     }
 }

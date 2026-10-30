@@ -215,6 +215,14 @@ export const Header: React.FC = () => {
                 {infoLinks.map((l, i) => renderNavLink(l, i, true))}
               </nav>
             )}
+            <Link to="/mi-pedido" className="header__cart-btn header__order-btn" aria-label="Mi pedido: estado y seguimiento" title="Mi pedido">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 8l-9-5-9 5 9 5 9-5z" />
+                <path d="M3 8v8l9 5 9-5V8" />
+                <path d="M12 13v8" />
+                <path d="M7.5 5.5l9 5" />
+              </svg>
+            </Link>
             <button
               className="header__cart-btn"
               onClick={openCart}

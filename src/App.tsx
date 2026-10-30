@@ -11,6 +11,7 @@ import { QuienesSomosPage } from './pages/QuienesSomosPage';
 import { ContactPage } from './pages/ContactPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { MyOrderPage } from './pages/MyOrderPage';
 import { PaymentErrorPage } from './pages/PaymentErrorPage';
 import { StoreThemeProvider } from './components/StoreThemeProvider';
 import { FloatingContactBubble } from './components/FloatingContactBubble';
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/info/:slug"        element={<PublicLayout><InfoPage /></PublicLayout>} />
         <Route path="/checkout"          element={<NoIndex><PublicLayout><CheckoutPage /></PublicLayout></NoIndex>} />
         <Route path="/pago-exitoso"      element={<NoIndex><PublicLayout><PaymentSuccessPage /></PublicLayout></NoIndex>} />
+        <Route path="/mi-pedido"         element={<NoIndex><PublicLayout><MyOrderPage /></PublicLayout></NoIndex>} />
         <Route path="/pago-error"        element={<NoIndex><PublicLayout><PaymentErrorPage /></PublicLayout></NoIndex>} />
 
         {/* ── Blog ── */}
