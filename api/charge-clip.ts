@@ -3,8 +3,9 @@
  *
  * POST { amount, orderId, cardTokenId, ... }   Cobra el pedido. El total lo recalcula el servidor.
  *   200 { success: true }                          Clip aprobó → pedido pagado.
- *   202 { pending: true, action_url? }             El banco pide autorizar (3-D Secure): la clienta va a action_url
- *                                                  y regresa a /pago-exitoso?order=<id>. El pedido NO se cancela.
+ *   202 { pending: true, action_url? }             El banco pide autorizar (3-D Secure): el checkout abre action_url en un
+ *                                                  iframe (así lo pide Clip), escucha su postMessage y consulta 'status'.
+ *                                                  El pedido NO se cancela.
  *   402 { code: 'payment_failed' }                 Rechazado: no se cobró; el pedido se cancela.
  * POST { action: 'status', orderId }             Consulta a Clip el cobro de ese pedido (público; solo devuelve el estado).
  *                                                  Si Clip ya lo aprobó → pagado + avisos. Si Clip lo rechazó/canceló → cancelado.
@@ -355,6 +356,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             prevention_data: {
                 user_agent: userAgent || 'unknown',
                 ...(sessionId && { session_id: sessionId }),
+                // CLIP_REQUEST_3DS (Vercel): "false" = pedir a Clip que omita 3-D Secure; "true" = pedirlo siempre;
+                // sin definir = Clip decide según su antifraude.
+                ...(['true', 'false'].includes(String(process.env.CLIP_REQUEST_3DS || '').toLowerCase())
+                    && { request_3ds: String(process.env.CLIP_REQUEST_3DS).toLowerCase() === 'true' }),
             },
         };
 

@@ -88,6 +88,9 @@ export const CheckoutPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Autorización del banco (3-D Secure): Clip pide abrir su liga DENTRO de un iframe y escuchar su postMessage
+  const [bankAuth, setBankAuth] = useState<{ url: string; orderId: string } | null>(null);
+  const bankAuthBusyRef = useRef(false);
   const [config, setConfig] = useState<Record<string, string>>({});
   const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [couponInput, setCouponInput] = useState('');
@@ -220,6 +223,65 @@ export const CheckoutPage: React.FC = () => {
   }, []);
   const belowMin = couponBelowMin();
 
+  /** Consulta a Clip el cobro del pedido que está autorizando el banco y actúa según el resultado. */
+  const resolveBankAuth = async (orderId: string) => {
+    if (bankAuthBusyRef.current) return;
+    bankAuthBusyRef.current = true;
+    try {
+      const r = await fetch('/api/charge-clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status', orderId }),
+      });
+      const j = await r.json().catch(() => ({} as Record<string, any>));
+      const st = r.ok ? String(j?.status || '') : '';
+      if (['paid', 'shipped', 'delivered'].includes(st)) {
+        void fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId }), keepalive: true }).catch(() => {});
+        trackEvent('purchase', { transaction_id: orderId, currency: 'MXN', value: finalTotal, coupon: couponCode || undefined, items: analyticsItems(items) });
+        setBankAuth(null);
+        clearCart();
+        navigate(`/pago-exitoso?order=${orderId}`);
+      } else if (st === 'cancelled') {
+        setBankAuth(null);
+        setLoading(false);
+        setError('Tu banco no autorizó la compra. No se hizo ningún cargo. Intenta de nuevo o usa otra tarjeta.');
+      }
+    } finally {
+      bankAuthBusyRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!bankAuth) return;
+    let origin = '';
+    try { origin = new URL(bankAuth.url).origin; } catch { origin = ''; }
+    // El iframe de Clip avisa con postMessage cuando la clienta termina; el resultado real se consulta en el servidor
+    const onMessage = (e: MessageEvent) => { if (origin && e.origin === origin) void resolveBankAuth(bankAuth.orderId); };
+    window.addEventListener('message', onMessage);
+    // Respaldo por si el aviso no llega: consulta a Clip cada 5 s
+    const timer = window.setInterval(() => { void resolveBankAuth(bankAuth.orderId); }, 5000);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancelBankAuth(); };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('message', onMessage);
+      window.clearInterval(timer);
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bankAuth]);
+
+  /** La clienta cierra la ventana del banco: una última consulta a Clip y vuelve al checkout. */
+  const cancelBankAuth = () => {
+    const current = bankAuth;
+    setBankAuth(null);
+    setLoading(false);
+    setError('No se completó la autorización con tu banco. No se hizo ningún cargo; puedes intentar de nuevo.');
+    if (current) void resolveBankAuth(current.orderId);
+  };
+
   const handlePagar = async () => {
     if (isDemo) {
       setError('Vista previa del admin: aquí no se puede pagar.');
@@ -304,7 +366,7 @@ export const CheckoutPage: React.FC = () => {
         // El banco pide autorizar la compra (3-D Secure). No es rechazo: la clienta autoriza y se confirma con Clip.
         // El carrito se conserva hasta que el pago quede aprobado (lo vacía /pago-exitoso).
         if (typeof chargeData.action_url === 'string' && /^https:\/\//i.test(chargeData.action_url)) {
-          window.location.assign(chargeData.action_url);
+          setBankAuth({ url: chargeData.action_url, orderId: order.id });
           return;
         }
         navigate(`/pago-exitoso?order=${order.id}`);
@@ -657,6 +719,25 @@ export const CheckoutPage: React.FC = () => {
       {shown('checkout_show_footer') && cfg('checkout_footer_img') && (
         <div className="cv2__footer-badges">
           <img src={imgSrc(cfg('checkout_footer_img'))} alt="PCI DSS nivel 1, cifrado SSL de 256 bits, Verified by Visa, Mastercard ID Check, Clip partner oficial, empresa mexicana" />
+        </div>
+      )}
+      {bankAuth && (
+        <div className="cv2-bank" role="dialog" aria-modal="true" aria-labelledby="cv2-bank-title">
+          <div className="cv2-bank__box">
+            <header className="cv2-bank__head">
+              <div>
+                <h2 id="cv2-bank-title">Autoriza tu compra con tu banco</h2>
+                <p>Tu banco puede pedirte un código por SMS o confirmar en su app. No cierres esta ventana.</p>
+              </div>
+              <button type="button" className="cv2-bank__close" onClick={cancelBankAuth} aria-label="Cancelar autorización y volver al pago">Cancelar</button>
+            </header>
+            <iframe
+              className="cv2-bank__frame"
+              src={bankAuth.url}
+              title="Autorización de tu banco (3-D Secure)"
+              allow="payment *"
+            />
+          </div>
         </div>
       )}
     </div>
