@@ -273,13 +273,20 @@ export const CheckoutPage: React.FC = () => {
       });
       if (!order) throw new Error('No se pudo registrar la orden.');
 
+      // Huella del dispositivo del antifraude de Clip (Cybersource/Forter): amarra el cobro con esta sesión.
+      // Sin esto Clip ve "dispositivo desconocido", sube el riesgo y manda a 3-D Secure.
+      let prevention: { session_id?: string; user_agent?: string } | null = null;
+      try { prevention = sdkCardRef.current?.preventionData?.() ?? null; } catch { prevention = null; }
+
       const chargeRes = await fetch('/api/charge-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: finalTotal, orderId: order.id,
           description: `Divina Store — ${form.name} — Orden ${order.id}`,
-          cardTokenId, customerEmail: form.email, userAgent: navigator.userAgent,
+          cardTokenId, customerEmail: form.email,
+          userAgent: prevention?.user_agent || navigator.userAgent,
+          sessionId: prevention?.session_id || undefined,
           couponCode: appliedCoupon ?? null,
         }),
       });
