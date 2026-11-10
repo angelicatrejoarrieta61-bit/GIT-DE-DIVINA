@@ -10,6 +10,7 @@ import {
  * Trabajos (?job=…):
  *  - tick           Revisa los productos bajo pedido cuya última revisión tiene más de N horas (pocos por llamada)
  *                   y, de paso, si llegaron los correos de confirmación de pedidos (send-email → order-mail-check).
+ *                   y confirma con Clip los cobros pendientes de autorización del banco (charge-clip → sweep).
  *                   Lo llama Supabase (pg_cron) cada 10 min con el header x-cron-token.
  *  - opportunities  Ideas nuevas desde tus búsquedas semilla + evaluación de oportunidades. pg_cron, 1 vez al día.
  *  - check          Revisar un producto ahora (admin).            Body: { productId }
@@ -48,6 +49,27 @@ async function checkOrderMails(req: VercelRequest) {
     });
     const j = await r.json().catch(() => ({}));
     return { status: r.status, checked: Array.isArray(j?.results) ? j.results.length : 0, skipped: j?.skipped ?? null };
+  } catch (e) {
+    return { status: 0, error: (e as Error).message };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Confirma con Clip los cobros que quedaron esperando autorización del banco (3-D Secure). Nunca detiene la revisión. */
+async function sweepClipPending(req: VercelRequest) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'www.divinastore.com.mx');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const r = await fetch(`https://${host}/api/charge-clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-token': String(req.headers['x-cron-token'] || '') },
+      body: JSON.stringify({ action: 'sweep' }),
+      signal: ctrl.signal,
+    });
+    const j = await r.json().catch(() => ({}));
+    return { status: r.status, checked: Number(j?.checked) || 0 };
   } catch (e) {
     return { status: 0, error: (e as Error).message };
   } finally {
@@ -98,8 +120,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Revisión programada ───────────────────────────────────────
     if (job === 'tick') {
       // De paso (cada 10 min): ¿llegaron los correos de confirmación? Reenvía los que fallaron.
-      const mail = caller === 'cron' ? await checkOrderMails(req) : null;
-      if (!cfg.enabled) return res.status(200).json({ ok: true, skipped: 'Automatización apagada', mail });
+      const [mail, clip] = caller === 'cron' ? await Promise.all([checkOrderMails(req), sweepClipPending(req)]) : [null, null];
+      if (!cfg.enabled) return res.status(200).json({ ok: true, skipped: 'Automatización apagada', mail, clip });
       const due = await dueProducts(db, cfg, PRODUCTS_PER_TICK);
       const results = [];
       for (const p of due) {
@@ -111,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           results.push({ productId: p.id, status: 'error', note: (e as Error).message });
         }
       }
-      return res.status(200).json({ ok: true, checked: results.length, results, mail });
+      return res.status(200).json({ ok: true, checked: results.length, results, mail, clip });
     }
 
     // ── Oportunidades (diario) ────────────────────────────────────

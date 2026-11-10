@@ -3,12 +3,14 @@
  * POST { orderIds?: string[] }  (sin orderIds: revisa los cobros aún no confirmados, máx. 60)
  * Requiere sesión del admin (Authorization: Bearer <token de Supabase>).
  * Consulta GET https://api.payclip.com/payments/{id} y guarda estado, recibo, tarjeta y monto.
+ * Aprobado con monto correcto → pagado + avisos. Rechazado/cancelado en Clip y el pedido seguía sin pagar → cancelado.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const FINAL = ['approved', 'rejected', 'cancelled', 'refunded'];
+const FAIL = ['rejected', 'cancelled', 'canceled', 'refunded', 'declined', 'expired'];
 const MAX = 60;
 
 const cfg = () => ({
@@ -43,6 +45,20 @@ function clipFields(data: any) {
     clip_verified_at: new Date().toISOString(),
     clip_raw: raw ?? null,
   };
+}
+
+/** Avisos de pedido pagado (send-email evita duplicados y solo envía si el pedido está pagado). */
+async function notifyPaid(req: VercelRequest, orderId: string) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'www.divinastore.com.mx').split(',')[0].trim();
+  try {
+    await fetch(`https://${host}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'order-paid', orderId }),
+    });
+  } catch (e: any) {
+    console.error('[clip-verify] notifyPaid:', e?.message);
+  }
 }
 
 async function fetchClip(paymentId: string) {
@@ -94,16 +110,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!f.clip_payment_id) f.clip_payment_id = String(o.pid);
       const patch: Record<string, unknown> = { ...f };
       let promoted = false;
-      if (f.clip_status === 'approved' && (o.status || 'pending') === 'pending') {
+      let status = o.status || 'pending';
+      const mismatch = f.clip_amount != null && Math.abs(Number(f.clip_amount) - Number(o.total || 0)) > 0.01;
+      // Aprobado por Clip con el monto correcto → pagado (también si se había cancelado por error)
+      if (f.clip_status === 'approved' && !mismatch && ['pending', 'cancelled'].includes(status)) {
         patch.status = 'paid';
+        patch.internal_note = null;
         patch.payment_info = { ...(o.payment_info || {}), provider: 'clip', transaction_id: f.clip_payment_id, receipt_no: f.clip_receipt_no, paid_at: f.clip_approved_at || new Date().toISOString() };
         promoted = true;
+        status = 'paid';
+      } else if (FAIL.includes(String(f.clip_status)) && status === 'pending') {
+        // Clip ya lo rechazó o canceló (p. ej. no se completó la autorización del banco) → cancelado
+        patch.status = 'cancelled';
+        patch.internal_note = `Clip: ${f.clip_status}${f.clip_status_code ? ` (${f.clip_status_code})` : ''}`;
+        status = 'cancelled';
       }
       const { error: upErr } = await db.from('orders').update(patch).eq('id', o.id);
       if (upErr) { results.push({ id: o.id, result: 'error', error: upErr.message }); return; }
-      const mismatch = f.clip_amount != null && Math.abs(Number(f.clip_amount) - Number(o.total || 0)) > 0.01;
+      if (promoted) await notifyPaid(req, o.id);
       const { clip_raw: _raw, ...fields } = f;
-      results.push({ id: o.id, result: 'ok', promoted, mismatch, status: promoted ? 'paid' : o.status, ...fields });
+      results.push({ id: o.id, result: 'ok', promoted, mismatch, status, ...fields });
     } catch (e: any) {
       results.push({ id: o.id, result: 'error', error: e?.message || 'Error consultando Clip' });
     }

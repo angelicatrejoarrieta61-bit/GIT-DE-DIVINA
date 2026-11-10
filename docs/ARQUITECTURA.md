@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 29 de octubre de 2026 · **Admin:** v1.3
+**Actualizado:** 10 de noviembre de 2026 · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -161,12 +161,16 @@ Flujo actual, en `CheckoutPage.tsx`:
 1. El SDK de Clip (cargado en `index.html`) pinta el formulario de tarjeta con `VITE_CLIP_API_KEY`.
 2. Al pagar, el SDK devuelve un **token** de la tarjeta. Los datos de la tarjeta nunca pasan por nuestro servidor.
 3. Se crea el pedido en `orders` con estado `pending`.
-4. Se llama a `/api/charge-clip`, que cobra en `api.payclip.com/payments` con las llaves secretas.
+4. Se llama a `/api/charge-clip`, que cobra en `api.payclip.com/payments` con las llaves secretas. Manda a Clip los datos de la clienta tomados del pedido en el servidor (nombre y apellidos, celular a 10 dígitos, calle, colonia, ciudad, estado, CP, referencia), `external_reference` = id del pedido y `return_url` = `/pago-exitoso?order=<id>`. Si Clip no acepta ese formato (400/422 sin crear el cobro), reintenta solo con lo mínimo. **No se manda `statement_descriptor`.**
 5. `charge-clip` guarda en el pedido lo que respondió Clip (aprobado, pendiente o rechazado) en las columnas `clip_*`: id del pago, estado, `status_detail.code`, `receipt_no`, tarjeta (marca, últimos 4, banco), monto y fecha. Si Clip aprueba, **marca el pedido como `paid` desde el servidor**. El navegador también lo marca, como respaldo, pero eso no habilita el envío.
-6. **Pago no aprobado** (rechazo, error o `pending` con verificación del banco 3-D Secure): `charge-clip` responde 402 `payment_failed` y **cancela ese pedido** (`status = cancelled`, motivo en `internal_note`) para que no quede "En proceso". La clienta ve solo: **"Tu compra no fue satisfactoria. Intenta con otra tarjeta."** Decisión (29-oct-2026): **3-D Secure no se implementa.**
+6. **Pendiente de autorización del banco (3-D Secure)** — decisión del 10-nov-2026, reemplaza la del 29-oct: `charge-clip` responde **202 `bank_authorization`** con `action_url` (liga del banco que venga en `pending_action`) y **no cancela** el pedido (`internal_note` = "Esperando autorización del banco"). El checkout lleva a la clienta a esa liga (o a `/pago-exitoso` si no vino liga) y **conserva el carrito**. Nunca se marca pagado algo que Clip no aprobó. **Rechazado o error:** 402 `payment_failed`, el pedido se cancela y la clienta ve "Tu compra no fue satisfactoria. Intenta con otra tarjeta."
+6 bis. **Confirmación del pendiente**, por tres vías, todas con la misma regla (aprobado y monto correcto → `paid` + avisos; `rejected/cancelled/refunded` en Clip con el pedido sin pagar → `cancelled`):
+   - `/pago-exitoso` llama a `charge-clip` con `{ action: 'status', orderId }` al abrir y cada 4 s mientras siga pendiente (máx. 20 min; Clip cancela una autorización no completada en ~15 min, código `CA-AUT01`).
+   - El cron de 10 min (`sourcing-auto?job=tick`) llama a `charge-clip` con `{ action: 'sweep' }` + `x-cron-token`: revisa los pendientes de las últimas 24 h (máx. 20), aunque la clienta haya cerrado la página.
+   - `clip-verify` (admin).
 7. El checkout y `/pago-exitoso` piden a `/api/send-email` el aviso `order-paid` (ver sección 11).
-8. **Confirmación con Clip** (`/api/clip-verify`, requiere sesión del admin): consulta `GET https://api.payclip.com/payments/{id}` y actualiza las columnas `clip_*`. Si Clip aprueba un pedido que seguía "Sin pagar", lo pasa a pagado y manda los avisos. Pedidos la llama sola al abrir (para los cobros sin estado final) y desde los botones "Consultar a Clip" / "Verificar todo con Clip".
-9. **Después de pagar** (`/pago-exitoso?order=<id>`): agradecimiento y, al final, el **resumen completo** (número copiable, avance Pagado → Preparando → En camino → Entregado, productos con foto, subtotal, descuento, envío, total y dirección). El pedido queda guardado en el navegador para verlo en **Mi pedido**. Si alguien abre la página con un pedido no pagado, dice "Tu compra no fue satisfactoria".
+8. **Confirmación con Clip** (`/api/clip-verify`, requiere sesión del admin): consulta `GET https://api.payclip.com/payments/{id}` y actualiza las columnas `clip_*`. Si Clip aprueba (con el monto correcto) un pedido "Sin pagar" o cancelado, lo pasa a pagado y manda los avisos (`send-email` · `order-paid`); si Clip lo rechazó o canceló y seguía sin pagar, lo cancela. Pedidos la llama sola al abrir (para los cobros sin estado final) y desde los botones "Consultar a Clip" / "Verificar todo con Clip".
+9. **Después de pagar** (`/pago-exitoso?order=<id>`): agradecimiento y, al final, el **resumen completo** (número copiable, avance Pagado → Preparando → En camino → Entregado, productos con foto, subtotal, descuento, envío, total y dirección). El pedido queda guardado en el navegador para verlo en **Mi pedido**. Mientras el banco no responde muestra "Confirmando tu pago con el banco…" y se actualiza sola; solo dice "aprobado" cuando Clip lo aprobó (entonces vacía el carrito y pide los avisos). Si Clip lo rechazó o canceló, dice "Tu compra no fue satisfactoria".
 
 **Número de autorización:** la documentación pública de Clip no lista un campo de código de autorización; se guarda `receipt_no` (recibo de Clip) y, si Clip llega a mandar `authorization_code`, también. La respuesta completa (sin el token) queda en `clip_raw` para revisar qué campos manda Clip en realidad.
 
@@ -425,3 +429,5 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - La imagen de métodos de pago del checkout muestra PayPal, Discover, Diners y SPEI, pero solo se cobra con tarjeta; los sellos prometen "30-day money back" y "24/7 support".
 - El campo Referencia del checkout viene prellenado con "Casa".
 - Borrar el código antiguo de Clip y los archivos sueltos de la raíz, una vez confirmado que nada los usa.
+- **Cuenta de Clip (10-nov-2026):** los cobros salen a nombre de **EQ CREACIONES ARTISTICAS LIBELULA MEXICO**, giro MCC 5045 "Venta de equipo de cómputo y telefonía". Es la causa más probable de rechazos del banco (`RE-ISS99`) y de contracargos por cargo no reconocido. Se arregla con Clip (cuenta o sub-afiliación de Divina con giro de cosméticos/farmacia), no en el código.
+- **3-D Secure por API de Clip:** el formato exacto de `pending_action` no está en la documentación pública. `charge-clip` toma la primera liga `https://` que venga ahí. Confirmarlo con el primer pago real que pida autenticación (revisar `clip_raw`).

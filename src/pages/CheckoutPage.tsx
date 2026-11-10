@@ -293,8 +293,18 @@ export const CheckoutPage: React.FC = () => {
         navigate(`/pago-exitoso?order=${order.id}`);
         return;
       }
+      if (chargeRes.status === 202 && chargeData.pending) {
+        // El banco pide autorizar la compra (3-D Secure). No es rechazo: la clienta autoriza y se confirma con Clip.
+        // El carrito se conserva hasta que el pago quede aprobado (lo vacía /pago-exitoso).
+        if (typeof chargeData.action_url === 'string' && /^https:\/\//i.test(chargeData.action_url)) {
+          window.location.assign(chargeData.action_url);
+          return;
+        }
+        navigate(`/pago-exitoso?order=${order.id}`);
+        return;
+      }
       if (!chargeRes.ok || !chargeData.success) {
-        // Rechazo, verificación del banco (3-D Secure, no se usa) o error: no se cobró
+        // Rechazado o error: no se cobró
         throw new Error(FAILED_MSG);
       }
       await updateOrderStatus(order.id, 'paid');
