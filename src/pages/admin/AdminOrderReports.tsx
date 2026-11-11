@@ -5,6 +5,8 @@
  * imprimible, avisos de pedido nuevo y acceso a campañas desde Clientes.
  * Pago Clip: cada cobro se confirma con la API de Clip (/api/clip-verify). Un pedido
  * solo se puede enviar cuando Clip lo reporta aprobado y el monto coincide.
+ * Diagnóstico del cobro: al consultar a Clip, el detalle del pedido muestra el motivo, lo que leyó Clip de la tarjeta,
+ * la IP del comprador, qué envió la tienda y en qué paso quedó (sin abrir Supabase).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -65,7 +67,7 @@ const CLIP: Record<ClipKey, { label: string; tone: string; hint: string }> = {
   approved:   { label: 'Aprobado',      tone: 'ok',    hint: 'Clip confirma el cobro' },
   authorized: { label: 'Autorizado',    tone: 'info',  hint: 'Autorizado, aún no capturado' },
   pending:    { label: 'En proceso',    tone: 'warn',  hint: 'Clip aún no lo aprueba (ej. 3D Secure)' },
-  rejected:   { label: 'Rechazado',     tone: 'bad',   hint: 'El banco rechazó el cobro' },
+  rejected:   { label: 'Rechazado',     tone: 'bad',   hint: 'Cobro rechazado; el motivo está en el detalle del pedido' },
   cancelled:  { label: 'Cancelado',     tone: 'bad',   hint: 'Cobro cancelado en Clip' },
   refunded:   { label: 'Reembolsado',   tone: 'bad',   hint: 'Se devolvió el dinero' },
   unverified: { label: 'Sin verificar', tone: 'muted', hint: 'Tiene cobro en Clip; falta consultarlo' },
@@ -81,6 +83,63 @@ const clipKey = (o: Order): ClipKey => {
 const clipMismatch = (o: Order) => o.clip_amount != null && Math.abs(Number(o.clip_amount) - Number(o.total || 0)) > 0.01;
 const clipOk = (o: Order) => clipKey(o) === 'approved' && !clipMismatch(o);
 const clipNo = (o: Order) => o.clip_auth_code ? `Aut. ${o.clip_auth_code}` : o.clip_receipt_no ? `Rec. ${o.clip_receipt_no}` : '';
+
+/** Significado de status_detail.code según la documentación de Clip (developer.clip.mx → Códigos de status_detail). */
+const CLIP_CODES: Record<string, string> = {
+  'AP-PAI01': 'Pagado', 'AP-REF01': 'Reembolso parcial', 'RE-REF01': 'Reembolsado', 'AU-CAP01': 'Autorizado, pendiente de captura',
+  'CA-AUT01': 'Cancelado: no prosperó desde pendiente', 'CA-MAN01': 'Cancelado', 'CA-MER01': 'Cancelado',
+  'RE-3DS01': 'Falló la autenticación 3-D Secure', 'RE-ERI05': 'La cuenta de Clip no completó su verificación (KYC)',
+  'RE-BIN01': 'Rechazado', 'RE-ERI03': 'Rechazado', 'RE-CHI01': 'Rechazado',
+  'RE-ISS01': 'Fondos insuficientes', 'RE-ISS02': 'El banco no lo aceptó (do not honour)', 'RE-ISS03': 'Tarjeta restringida',
+  'RE-ISS04': 'Reservado para uso privado', 'RE-ISS05': 'Transacción no permitida para esta tarjeta', 'RE-ISS06': 'Tarjeta retenida',
+  'RE-ISS07': 'Tarjeta vencida', 'RE-ISS08': 'Excede el límite de la tarjeta', 'RE-ISS09': 'PIN inválido', 'RE-ISS10': 'Intentos de PIN excedidos',
+  'RE-ISS11': 'Consultar al banco emisor', 'RE-ISS12': 'Monto inválido', 'RE-ISS13': 'Banco emisor no disponible',
+  'RE-ISS14': 'Banco emisor o red fuera de servicio', 'RE-ISS15': 'Fallback Visa/Mastercard', 'RE-ISS16': 'Número de tarjeta inválido',
+  'RE-ISS17': 'Comercio inválido', 'RE-ISS18': 'Transacción inválida', 'RE-ISS19': 'Rechazado', 'RE-ISS20': 'Rechazado',
+  'RE-ISS99': 'Error genérico: Clip no indica el motivo',
+  'PE-3DS01': 'Esperando autenticación 3-D Secure', 'PE-EMV01': 'Esperando EMV', 'PE-SIG01': 'Esperando firma', 'PE-TIC01': 'Esperando pago',
+};
+
+/** Diagnóstico que devuelve /api/clip-verify por pedido. */
+interface ClipDiag {
+  code: string | null; message: string | null; holder: string | null; exp: string | null; card_type: string | null; ip: string | null;
+  clip_session_id: boolean | null;
+  clip_customer: { phone: boolean; name: boolean; address: boolean } | null;
+  sent: { amount: number; ip: string; request_3ds: boolean | null; session_id: boolean; phone: boolean; first_name: boolean; last_name: boolean; address: boolean; minimal_retry: boolean } | null;
+  first: { http: number; status: string | null; code: string | null; message: string | null; pending_action: boolean; payment_id: string | null } | null;
+  stage: 'not_sent' | 'sending' | 'answered' | 'no_payment' | 'error' | null;
+  error: string | null; attempted_at: string | null; clip_created_at: string | null; clip_updated_at: string | null; note: string | null;
+}
+const STAGE: Record<NonNullable<ClipDiag['stage']>, string> = {
+  not_sent: 'No se envió a Clip',
+  sending: 'Se envió a Clip y no quedó respuesta (tiempo agotado o conexión cortada)',
+  answered: 'Clip respondió',
+  no_payment: 'Clip respondió sin crear el cobro',
+  error: 'Falló el servidor antes de tener respuesta de Clip',
+};
+const yn = (v: boolean) => (v ? 'sí' : 'no');
+/** Filas del diagnóstico: solo las que tienen dato. */
+function diagRows(d: ClipDiag): [string, string][] {
+  const rows: [string, string][] = [];
+  if (d.code) rows.push(['Motivo (Clip)', `${d.code} · ${CLIP_CODES[d.code] || d.message || 'sin descripción'}`]);
+  if (d.stage) rows.push(['Paso', STAGE[d.stage]]);
+  if (d.first) rows.push(['Primera respuesta', `${d.first.status || 'sin estado'}${d.first.code ? ` (${d.first.code})` : ''} · HTTP ${d.first.http}${d.first.pending_action ? ' · con liga 3DS' : ''}`]);
+  if (d.error) rows.push(['Error', d.error]);
+  if (d.holder) rows.push(['Titular (como lo leyó Clip)', d.holder]);
+  if (d.exp) rows.push(['Vencimiento (como lo leyó Clip)', d.exp]);
+  if (d.ip) rows.push(['IP del comprador', d.ip]);
+  if (d.sent) {
+    rows.push(['3DS pedido por la tienda', d.sent.request_3ds === null ? 'no se indicó (decide Clip)' : d.sent.request_3ds ? 'sí, siempre' : 'no, omitir']);
+    rows.push(['Huella antifraude enviada', yn(d.sent.session_id)]);
+    rows.push(['Datos enviados', `teléfono ${yn(d.sent.phone)} · nombre ${yn(d.sent.first_name)} · apellido ${yn(d.sent.last_name)} · dirección ${yn(d.sent.address)}${d.sent.minimal_retry ? ' · se reintentó con datos mínimos' : ''}`]);
+  }
+  if (d.clip_session_id !== null) rows.push(['Huella en Clip', yn(d.clip_session_id)]);
+  if (d.clip_customer) rows.push(['Cliente en Clip', `teléfono ${yn(d.clip_customer.phone)} · nombre ${yn(d.clip_customer.name)} · dirección ${yn(d.clip_customer.address)}`]);
+  if (d.attempted_at) rows.push(['Intento', fmtDate(d.attempted_at)]);
+  if (d.clip_updated_at) rows.push(['Última actualización en Clip', fmtDate(d.clip_updated_at)]);
+  if (!rows.length) rows.push(['Sin datos', 'Este pedido no tiene respuesta de Clip guardada ni rastro del intento (es anterior al diagnóstico).']);
+  return rows;
+}
 
 const shortId = (id: string) => id.slice(0, 8).toUpperCase();
 const money = (n: number) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -183,6 +242,7 @@ export const AdminOrderReports: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string[] | 'all' | null>(null);
   const [override, setOverride] = useState<Set<string>>(new Set());
+  const [diag, setDiag] = useState<Record<string, ClipDiag>>({});
   const toastTimer = useRef<number | undefined>(undefined);
   const autoChecked = useRef(false);
 
@@ -243,6 +303,8 @@ export const AdminOrderReports: React.FC = () => {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { if (!silent) notify('err', d.error || `No se pudo consultar Clip (${r.status}).`); return; }
       const results: any[] = Array.isArray(d.results) ? d.results : [];
+      const withDiag = results.filter(x => x.id && x.diag);
+      if (withDiag.length) setDiag(prev => ({ ...prev, ...Object.fromEntries(withDiag.map(x => [x.id, x.diag as ClipDiag])) }));
       const byId = new Map(results.filter(x => x.result === 'ok').map(x => [x.id, x]));
       if (byId.size) {
         setOrders(prev => prev.map(o => {
@@ -264,6 +326,7 @@ export const AdminOrderReports: React.FC = () => {
       const errs = results.filter(x => x.result === 'error');
       const none = results.filter(x => x.result === 'no_payment').length;
       if (!results.length) return notify('ok', 'Todo al día: no hay cobros pendientes de confirmar.');
+      if (!byId.size && !errs.length && none) return notify('ok', none === 1 ? 'Este pedido no tiene cobro en Clip. El diagnóstico está en su detalle.' : `${none} pedidos sin cobro en Clip.`);
       if (errs.length) return notify('err', `Clip: ${byId.size} consultado${byId.size === 1 ? '' : 's'}, ${errs.length} con error — ${errs[0].error}`);
       notify('ok', `Clip: ${byId.size} cobro${byId.size === 1 ? '' : 's'} consultado${byId.size === 1 ? '' : 's'}${none ? ` · ${none} sin cobro` : ''}.`);
     } catch {
@@ -587,6 +650,7 @@ export const AdminOrderReports: React.FC = () => {
                                 {o.promoter_code && <p className="ord-muted">Promotora: {o.promoter_code}</p>}
                                 <ClipDetail
                                   order={o}
+                                  diag={diag[o.id]}
                                   busy={isVerifying(o.id)}
                                   overridden={override.has(o.id)}
                                   onVerify={() => void verifyClip([o.id])}
@@ -975,7 +1039,7 @@ const ClipCell: React.FC<{ order: Order; busy: boolean; onVerify: () => void }> 
 };
 
 /* ── Pago Clip: detalle dentro del pedido ── */
-const ClipDetail: React.FC<{ order: Order; busy: boolean; overridden: boolean; onVerify: () => void; onOverride: () => void }> = ({ order: o, busy, overridden, onVerify, onOverride }) => {
+const ClipDetail: React.FC<{ order: Order; diag?: ClipDiag; busy: boolean; overridden: boolean; onVerify: () => void; onOverride: () => void }> = ({ order: o, diag, busy, overridden, onVerify, onOverride }) => {
   const [ask, setAsk] = useState(false);
   const k = clipKey(o);
   const mm = clipMismatch(o);
@@ -995,13 +1059,21 @@ const ClipDetail: React.FC<{ order: Order; busy: boolean; overridden: boolean; o
     <div className={`ord-paybox t-${mm ? 'bad' : CLIP[k].tone}`}>
       <div className="ord-paybox__head">
         <h4><CreditCard size={12} aria-hidden="true" /> Pago Clip</h4>
-        <button type="button" className="ord-btn" disabled={busy || !pid} onClick={onVerify}>
-          <RefreshCw size={12} className={busy ? 'ord-spin' : ''} aria-hidden="true" /> {busy ? 'Consultando…' : 'Consultar a Clip'}
+        <button type="button" className="ord-btn" disabled={busy} onClick={onVerify} title={pid ? 'Consulta el cobro en Clip y muestra el diagnóstico' : 'Muestra por qué este pedido no tiene cobro'}>
+          <RefreshCw size={12} className={busy ? 'ord-spin' : ''} aria-hidden="true" /> {busy ? 'Consultando…' : pid ? 'Consultar a Clip' : 'Ver diagnóstico'}
         </button>
       </div>
       <dl>
         {rows.map(([a, b]) => <React.Fragment key={a}><dt>{a}</dt><dd className={a === 'ID de pago' ? 'is-mono' : ''}>{b}</dd></React.Fragment>)}
       </dl>
+      {diag && (
+        <div className="ord-paybox__diag" aria-live="polite">
+          <h5>Diagnóstico del cobro</h5>
+          <dl>
+            {diagRows(diag).map(([a, b]) => <React.Fragment key={a}><dt>{a}</dt><dd>{b}</dd></React.Fragment>)}
+          </dl>
+        </div>
+      )}
       {paid && !clipOk(o) && (
         overridden ? (
           <p className="ord-paybox__warn"><AlertTriangle size={12} aria-hidden="true" /> Envío habilitado manualmente para este pedido.</p>

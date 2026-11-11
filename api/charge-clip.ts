@@ -12,6 +12,9 @@
  * POST { action: 'sweep' } + x-cron-token        Igual que 'status' para los cobros pendientes de las últimas 24 h (cron).
  *
  * Nunca se marca pagado un pedido que Clip no aprobó con el monto correcto.
+ *
+ * Diagnóstico: cada intento deja en orders.clip_raw._divina qué se envió a Clip (sin el token), la primera
+ * respuesta y en qué paso quedó. Lo muestra el admin (Pedidos → Pago Clip → Consultar a Clip) vía /api/clip-verify.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
@@ -68,12 +71,40 @@ function pendingActionUrl(data: any): string | null {
     return find(data?.pending_action, 0) || find(data?.three_ds, 0) || find(data?.redirect_url, 0) || null;
 }
 
+/** Rastro de un intento de cobro (se guarda en orders.clip_raw._divina; nunca incluye el token de la tarjeta). */
+interface ChargeTrace {
+    v: 1;
+    at: string;
+    /** not_sent: no se envió a Clip · sending: enviado, sin respuesta registrada · answered: Clip respondió con un cobro ·
+     *  no_payment: Clip respondió sin crear el cobro · error: falló el servidor */
+    stage: 'not_sent' | 'sending' | 'answered' | 'no_payment' | 'error';
+    sent?: {
+        amount: number; ip: string; request_3ds: boolean | null; session_id: boolean;
+        phone: boolean; first_name: boolean; last_name: boolean; address: boolean; minimal_retry: boolean;
+    };
+    first?: { http: number; status: string | null; code: string | null; message: string | null; pending_action: boolean; payment_id: string | null };
+    error?: string | null;
+}
+
+/** Deja el rastro en el pedido cuando todavía no hay respuesta de Clip que guardar. Nunca detiene el cobro. */
+async function saveTrace(orderId: string, trace: ChargeTrace) {
+    try {
+        const db = serviceDb();
+        if (!db || !UUID_RE.test(orderId)) return;
+        const { error } = await db.from('orders').update({ clip_raw: { _divina: trace } }).eq('id', orderId);
+        if (error) console.error('[charge-clip] saveTrace:', error.message);
+    } catch (e: any) {
+        console.error('[charge-clip] saveTrace:', e?.message);
+    }
+}
+
 /** Guarda el resultado del cobro en el pedido. Si Clip lo aprobó, marca el pedido como pagado. Si falla, el cobro no se afecta. */
-async function saveClipResult(orderId: string, data: any) {
+async function saveClipResult(orderId: string, data: any, trace?: ChargeTrace) {
     try {
         const db = serviceDb();
         if (!db || !UUID_RE.test(orderId)) return;
         const fields = clipFields(data);
+        if (trace && fields.clip_raw && typeof fields.clip_raw === 'object') fields.clip_raw = { ...fields.clip_raw, _divina: trace };
         const patch: Record<string, unknown> = { ...fields };
         if (fields.clip_status === 'approved') {
             patch.status = 'paid';
@@ -241,7 +272,7 @@ async function notifyPaid(req: VercelRequest, orderId: string) {
 
 /** Consulta a Clip el cobro de un pedido y deja el pedido como corresponde. */
 async function refreshOrder(req: VercelRequest, db: any, orderId: string) {
-    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,clip_payment_id,clip_status').eq('id', orderId).maybeSingle();
+    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,clip_payment_id,clip_status,clip_raw').eq('id', orderId).maybeSingle();
     if (error || !o) return { found: false as const };
     const pid = o.clip_payment_id || o.payment_info?.transaction_id || null;
     if (['paid', 'shipped', 'delivered'].includes(String(o.status))) return { found: true as const, status: String(o.status), clip_status: o.clip_status ?? null };
@@ -252,6 +283,8 @@ async function refreshOrder(req: VercelRequest, db: any, orderId: string) {
 
     const f = clipFields(r.data);
     if (!f.clip_payment_id) f.clip_payment_id = String(pid);
+    // El rastro del intento (qué se envió y la primera respuesta) se conserva al refrescar
+    if (o.clip_raw?._divina && f.clip_raw && typeof f.clip_raw === 'object') f.clip_raw = { ...f.clip_raw, _divina: o.clip_raw._divina };
     const patch: Record<string, unknown> = { ...f };
     let status = String(o.status);
     const amountOk = f.clip_amount == null || Math.abs(Number(f.clip_amount) - Number(o.total || 0)) <= 0.5;
@@ -337,10 +370,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     if (check.ok === false) {
         const fail = check as Extract<CheckoutCheck, { ok: false }>;
+        // No se envió a Clip. Salvo que ya esté pagado o no exista, el pedido se cancela con el motivo
+        // (el checkout crea uno nuevo al reintentar) para que no quede "Sin pagar" sin explicación.
+        if (fail.status !== 404 && fail.body.code !== 'already_paid') {
+            const why = String(fail.body.error || 'No se pudo confirmar el total').slice(0, 200);
+            await saveTrace(String(orderId), { v: 1, at: new Date().toISOString(), stage: 'not_sent', error: why });
+            await cancelUnpaid(String(orderId), `No se envió a Clip: ${why}`);
+        }
         return res.status(fail.status).json(fail.body);
     }
     const okCheck = check as Extract<CheckoutCheck, { ok: true }>;
     const chargeAmount = okCheck.amount;
+
+    const trace: ChargeTrace = { v: 1, at: new Date().toISOString(), stage: 'sending' };
 
     try {
         const clientIp = (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim() || '127.0.0.1';
@@ -371,21 +413,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return_url: returnUrl,
         };
 
+        trace.sent = {
+            amount: base.amount,
+            ip: clientIp,
+            request_3ds: typeof base.prevention_data.request_3ds === 'boolean' ? base.prevention_data.request_3ds : null,
+            session_id: Boolean(base.prevention_data.session_id),
+            phone: Boolean(full.customer.phone),
+            first_name: Boolean(full.customer.first_name),
+            last_name: Boolean(full.customer.last_name),
+            address: Boolean(full.customer.address),
+            minimal_retry: false,
+        };
+        // Se deja el rastro ANTES de llamar a Clip: si la función se corta, el pedido dice "enviado, sin respuesta"
+        await saveTrace(String(orderId), trace);
+
         console.log('[charge-clip] Payload to Clip:', JSON.stringify({ ...full, payment_method: { token: '***' } }));
         let { response, data } = await postClip(apiKey, full);
 
         // Si Clip rechaza el formato de algún dato extra (sin crear el cobro), se reintenta con lo mínimo para no perder la venta
         if (!response.ok && !data?.id && (response.status === 400 || response.status === 422)) {
             console.warn('[charge-clip] Clip no aceptó el payload completo, reintento mínimo:', response.status, JSON.stringify(data).slice(0, 300));
+            trace.error = `Clip no aceptó el envío completo (HTTP ${response.status}): ${JSON.stringify(data).slice(0, 300)}`;
+            trace.sent.minimal_retry = true;
             ({ response, data } = await postClip(apiKey, { ...base, customer: customerEmail ? { email: customerEmail } : {} }));
         }
 
-        // Registrar en el pedido lo que respondió Clip (aprobado, pendiente o rechazado)
-        if (data && (data.id || data.transaction_id || data.status)) {
-            await saveClipResult(String(orderId), data);
-        }
-
         const status = String(data?.status || '').toLowerCase();
+        const created = Boolean(data && (data.id || data.transaction_id || data.status));
+        trace.stage = created ? 'answered' : 'no_payment';
+        trace.first = {
+            http: response.status,
+            status: status || null,
+            code: data?.status_detail?.code ?? null,
+            message: data?.status_detail?.message ?? data?.message ?? null,
+            pending_action: Boolean(pendingActionUrl(data)),
+            payment_id: data?.id ?? data?.transaction_id ?? null,
+        };
+        if (!created) trace.error = `${trace.error ? `${trace.error} · ` : ''}Clip respondió HTTP ${response.status} sin crear el cobro: ${JSON.stringify(data).slice(0, 300)}`;
+
+        // Registrar en el pedido lo que respondió Clip (aprobado, pendiente o rechazado) junto con el rastro del intento
+        if (created) await saveClipResult(String(orderId), data, trace);
+        else await saveTrace(String(orderId), trace);
 
         if (response.ok && status === 'approved') {
             return res.status(200).json({
@@ -421,6 +489,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (err: any) {
         console.error('[charge-clip] Server error:', err.message);
+        // Solo si Clip aún no había respondido: no se pisa una respuesta ya guardada
+        if (trace.stage === 'sending') {
+            trace.stage = 'error';
+            trace.error = String(err?.message || 'Error del servidor').slice(0, 300);
+            await saveTrace(String(orderId), trace);
+        }
         await cancelUnpaid(String(orderId), `Error al cobrar: ${String(err?.message || '').slice(0, 160)}`);
         return res.status(500).json({ error: FAILED_MSG, code: 'payment_failed' });
     }

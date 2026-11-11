@@ -3,6 +3,9 @@
  * POST { orderIds?: string[] }  (sin orderIds: revisa los cobros aún no confirmados, máx. 60)
  * Requiere sesión del admin (Authorization: Bearer <token de Supabase>).
  * Consulta GET https://api.payclip.com/payments/{id} y guarda estado, recibo, tarjeta y monto.
+ * Cada resultado trae `diag`: el diagnóstico del cobro (motivo de Clip, titular y vencimiento que leyó Clip, IP del
+ * comprador, qué datos se enviaron, si se pidió 3DS, primera respuesta de Clip y en qué paso quedó). Sale de
+ * orders.clip_raw (respuesta de Clip + rastro `_divina` que deja /api/charge-clip). Sin token ni número de tarjeta.
  * Aprobado con monto correcto → pagado + avisos. Rechazado/cancelado en Clip y el pedido seguía sin pagar → cancelado.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -61,6 +64,38 @@ async function notifyPaid(req: VercelRequest, orderId: string) {
   }
 }
 
+/** Diagnóstico legible de un cobro a partir de clip_raw (respuesta de Clip + rastro del intento). */
+function buildDiag(raw: any, note: string | null) {
+  const t = raw?._divina || null;
+  const pm = raw?.payment_method || {};
+  const card = pm.card || {};
+  const cust = raw?.customer || {};
+  const hasPayment = Boolean(raw?.id);
+  return {
+    code: raw?.status_detail?.code ?? t?.first?.code ?? null,
+    message: raw?.status_detail?.message ?? t?.first?.message ?? null,
+    holder: card.name ?? null,
+    exp: card.exp_month && card.exp_year ? `${card.exp_month}/${card.exp_year}` : null,
+    card_type: pm.type ?? null,
+    ip: raw?.location?.ip ?? t?.sent?.ip ?? null,
+    /** Lo que Clip tiene registrado del antifraude y de la clienta */
+    clip_session_id: hasPayment ? Boolean(raw?.prevention_data?.session_id) : null,
+    clip_customer: hasPayment ? {
+      phone: Boolean(cust.phone), name: Boolean(cust.first_name || cust.last_name),
+      address: Boolean(cust.address?.street || cust.address?.postal_code),
+    } : null,
+    /** Lo que envió la tienda (solo intentos desde que existe el rastro) */
+    sent: t?.sent ?? null,
+    first: t?.first ?? null,
+    stage: t?.stage ?? null,
+    error: t?.error ?? null,
+    attempted_at: t?.at ?? null,
+    clip_created_at: raw?.created_at ?? null,
+    clip_updated_at: raw?.updated_at ?? null,
+    note: note || null,
+  };
+}
+
 async function fetchClip(paymentId: string) {
   const keys = [process.env.CLIP_API_KEY, process.env.CLIP_SECRET].filter((k, i, a): k is string => Boolean(k) && a.indexOf(k) === i);
   if (!keys.length) return { ok: false, status: 500, data: { error: 'Falta CLIP_API_KEY en Vercel' } };
@@ -97,17 +132,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let targets = (rows || []).map(o => ({ ...o, pid: o.clip_payment_id || o.payment_info?.transaction_id || null }));
   if (!ids.length) targets = targets.filter(o => o.pid && !FINAL.includes(String(o.clip_status || ''))).slice(0, MAX);
 
+  // Respuesta guardada de Clip + rastro del intento (solo de los pedidos que se van a consultar)
+  const stored = new Map<string, { clip_raw: any; internal_note: string | null }>();
+  if (targets.length) {
+    const { data: extra } = await db.from('orders').select('id,clip_raw,internal_note').in('id', targets.map(t => t.id));
+    (extra || []).forEach((e: any) => stored.set(e.id, { clip_raw: e.clip_raw ?? null, internal_note: e.internal_note ?? null }));
+  }
+
   const results: any[] = [];
   const work = async (o: (typeof targets)[number]) => {
-    if (!o.pid) { results.push({ id: o.id, result: 'no_payment' }); return; }
+    const prev = stored.get(o.id);
+    if (!o.pid) { results.push({ id: o.id, result: 'no_payment', status: o.status, diag: buildDiag(prev?.clip_raw, prev?.internal_note ?? null) }); return; }
     try {
       const r = await fetchClip(String(o.pid));
       if (!r.ok) {
-        results.push({ id: o.id, result: 'error', error: r.data?.message || r.data?.error || `Clip respondió ${r.status}`, http: r.status });
+        results.push({ id: o.id, result: 'error', error: r.data?.message || r.data?.error || `Clip respondió ${r.status}`, http: r.status, diag: buildDiag(prev?.clip_raw, prev?.internal_note ?? null) });
         return;
       }
       const f = clipFields(r.data);
       if (!f.clip_payment_id) f.clip_payment_id = String(o.pid);
+      // El rastro del intento se conserva al refrescar la respuesta de Clip
+      if (prev?.clip_raw?._divina && f.clip_raw && typeof f.clip_raw === 'object') f.clip_raw = { ...f.clip_raw, _divina: prev.clip_raw._divina };
       const patch: Record<string, unknown> = { ...f };
       let promoted = false;
       let status = o.status || 'pending';
@@ -129,7 +174,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (upErr) { results.push({ id: o.id, result: 'error', error: upErr.message }); return; }
       if (promoted) await notifyPaid(req, o.id);
       const { clip_raw: _raw, ...fields } = f;
-      results.push({ id: o.id, result: 'ok', promoted, mismatch, status, ...fields });
+      const note = typeof patch.internal_note === 'string' ? patch.internal_note : patch.internal_note === null ? null : prev?.internal_note ?? null;
+      results.push({ id: o.id, result: 'ok', promoted, mismatch, status, ...fields, diag: buildDiag(f.clip_raw, note) });
     } catch (e: any) {
       results.push({ id: o.id, result: 'error', error: e?.message || 'Error consultando Clip' });
     }
