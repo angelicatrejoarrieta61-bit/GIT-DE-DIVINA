@@ -126,6 +126,7 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
     }
 
     let discount = 0;
+    let freeShip = false; // cupón ENVIO*: envío en $0, sin descuento a productos
     const code = String(order.coupon_code || (typeof couponHint === 'string' ? couponHint : '') || '').toUpperCase().replace(/\s+/g, '');
     if (code) {
         const { data: v, error: vErr } = await db.rpc('validate_coupon', { p_code: code, p_subtotal: subtotal });
@@ -135,10 +136,11 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
         } else if (v && (v as any).valid) {
             type = (v as any).discount_type; value = Number((v as any).discount_value) || 0;
         }
-        if (type) discount = r2(Math.min(type === 'percent' ? subtotal * Math.min(value, 100) / 100 : value, subtotal));
+        if (type && code.startsWith('ENVIO')) { freeShip = true; discount = 0; }
+        else if (type) discount = r2(Math.min(type === 'percent' ? subtotal * Math.min(value, 100) / 100 : value, subtotal));
     }
     const products = r2(subtotal - discount);
-    const shipping = products <= 0 ? 0 : products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
+    const shipping = freeShip || products <= 0 ? 0 : products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
     const expected = r2(products + shipping);
 
     if (Math.abs(expected - Number(clientAmount)) > 0.5) {

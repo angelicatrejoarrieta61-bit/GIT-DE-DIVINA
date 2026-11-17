@@ -47,6 +47,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /** Normaliza lo que escribe la persona: mayúsculas, sin espacios. */
 export const normalizeCode = (raw: string) => raw.toUpperCase().replace(/\s+/g, '');
 
+/**
+ * Cupón especial de ENVÍO: cualquier código que empiece con ENVIO (ej. ENVIOGRATIS).
+ * No descuenta productos: deja el envío en $0. Se crea en Admin → Cupones como cualquier otro
+ * (el tipo/valor que se capture es solo de relleno y se ignora).
+ */
+export const isShippingCoupon = (code?: string | null): boolean =>
+  !!code && normalizeCode(code).startsWith('ENVIO');
+
 /** Mismo formato que la regla de la base (coupons_code_chk). */
 export const CODE_PATTERN = /^[A-Z0-9_-]{3,40}$/;
 

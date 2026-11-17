@@ -10,17 +10,17 @@ export { SHIPPING_COST, FREE_SHIPPING_FROM };
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Costo de envío para un subtotal de productos (después de cupón). */
-export function shippingFor(subtotal: number): number {
-  if (!subtotal || subtotal <= 0) return 0;
+export function shippingFor(subtotal: number, freeShip = false): number {
+  if (freeShip || !subtotal || subtotal <= 0) return 0;
   return subtotal >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
 }
 
 /** Cuánto falta para el envío gratis (0 si ya aplica). */
-export function missingForFreeShipping(subtotal: number): number {
-  return subtotal >= FREE_SHIPPING_FROM ? 0 : round2(FREE_SHIPPING_FROM - subtotal);
+export function missingForFreeShipping(subtotal: number, freeShip = false): number {
+  return freeShip || subtotal >= FREE_SHIPPING_FROM ? 0 : round2(FREE_SHIPPING_FROM - subtotal);
 }
 
 /** Total a cobrar: productos + envío. */
-export function orderTotal(subtotal: number): number {
-  return round2(subtotal + shippingFor(subtotal));
+export function orderTotal(subtotal: number, freeShip = false): number {
+  return round2(subtotal + shippingFor(subtotal, freeShip));
 }

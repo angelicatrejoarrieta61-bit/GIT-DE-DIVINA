@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CartItem, Product } from '../types';
-import { validateCoupon, couponDiscount, type CouponType } from '../lib/coupons';
+import { validateCoupon, couponDiscount, isShippingCoupon, type CouponType } from '../lib/coupons';
 import { supabase } from '../lib/supabase';
 import { trackProductEvent } from '../lib/productEvents';
 
@@ -157,6 +157,7 @@ export const useCartStore = create<CartStore>()(
       discountAmount: () => {
         const { couponCode, couponType, couponValue } = get();
         if (!couponCode || get().couponBelowMin()) return 0;
+        if (isShippingCoupon(couponCode)) return 0; // cupón de envío: no toca productos
         return couponDiscount(couponType, couponValue, get().total());
       },
 

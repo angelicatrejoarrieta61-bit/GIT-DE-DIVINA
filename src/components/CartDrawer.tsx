@@ -8,7 +8,7 @@ import type { Product } from '../types';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
-import { couponLabel } from '../lib/coupons';
+import { couponLabel, isShippingCoupon } from '../lib/coupons';
 
 type CheckoutState = 'idle' | 'loading' | 'error';
 
@@ -103,14 +103,16 @@ export const CartDrawer: React.FC = () => {
     if (err) setCouponError(err);
     else setCouponInput('');
   };
-  const couponText = couponLabel(couponType, couponValue);
   const belowMin = couponBelowMin();
+  const shipCoupon = isShippingCoupon(couponCode);
+  const couponText = shipCoupon ? 'envío gratis' : couponLabel(couponType, couponValue);
 
   const cartTotal = total();
   const productsTotal = couponCode ? totalAfterDiscount() : cartTotal;
-  const shipping = shippingFor(productsTotal);
-  const grandTotal = orderTotal(productsTotal);
-  const missingFree = missingForFreeShipping(productsTotal);
+  const freeShip = shipCoupon && !belowMin;
+  const shipping = shippingFor(productsTotal, freeShip);
+  const grandTotal = orderTotal(productsTotal, freeShip);
+  const missingFree = missingForFreeShipping(productsTotal, freeShip);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -257,7 +259,7 @@ export const CartDrawer: React.FC = () => {
             <div className="cart-drawer__coupon-container">
               {couponCode ? (
                 <div className="cart-drawer__coupon-applied">
-                  <span className="coupon-tag">🏷️ {couponCode} (-{couponText})</span>
+                  <span className="coupon-tag">🏷️ {couponCode} ({shipCoupon ? couponText : `-${couponText}`})</span>
                   <button type="button" onClick={removeCoupon} className="coupon-remove-btn" aria-label="Eliminar cupón" title="Eliminar cupón"><X size={11} aria-hidden="true" /></button>
                 </div>
               ) : (
@@ -291,7 +293,7 @@ export const CartDrawer: React.FC = () => {
               <span>Subtotal:</span>
               <span>{formatCurrency(cartTotal)}</span>
             </div>
-            {couponCode && !belowMin && (
+            {couponCode && !belowMin && !shipCoupon && (
               <div className="cart-drawer__row-item discount">
                 <span>Descuento ({couponText}):</span>
                 <span>-{formatCurrency(discountAmount())}</span>
