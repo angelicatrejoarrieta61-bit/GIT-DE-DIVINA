@@ -92,6 +92,12 @@ export interface Order {
   clip_amount?: number | null;
   clip_approved_at?: string | null;
   clip_verified_at?: string | null;
+  stripe_session_id?: string | null;
+  stripe_payment_intent?: string | null;
+  stripe_status?: string | null;
+  stripe_payment_status?: string | null;
+  stripe_amount?: number | null;
+  stripe_paid_at?: string | null;
 }
 
 export interface Promoter {

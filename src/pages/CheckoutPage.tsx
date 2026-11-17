@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
-import { createOrder, updateOrderStatus, getStoreConfig, getProducts } from '../lib/queries';
+import { createOrder, getStoreConfig, getProducts } from '../lib/queries';
 import { useAdminPreview } from '../hooks/useadminpreview';
 import type { CartItem } from '../types';
 import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
@@ -11,15 +11,6 @@ import { analyticsItems, trackEvent } from '../lib/analytics';
 import { getPromoterCode, normalizePromoterCode, savePromoterCode } from '../lib/promoterTracking';
 import { couponLabel } from '../lib/coupons';
 
-declare const ClipSDK: new (apiKey: string) => {
-  element: {
-    create: (type: string, options?: Record<string, any>) => {
-      mount: (id: string) => void;
-      cardToken: () => Promise<{ id: string }>;
-    };
-  };
-};
-
 const MEXICAN_STATES = [
   'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas', 'Chihuahua',
   'CDMX', 'Coahuila', 'Colima', 'Durango', 'Estado de México', 'Guanajuato', 'Guerrero', 'Hidalgo',
@@ -27,8 +18,6 @@ const MEXICAN_STATES = [
   'Quintana Roo', 'San Luis Potosí', 'Sinaloa', 'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala',
   'Veracruz', 'Yucatán', 'Zacatecas',
 ];
-
-type PaymentTab = 'card' | 'applepay' | 'googlepay';
 
 /** Imágenes y estilo del checkout (editables en Admin → Tu tienda → Checkout). */
 export const CHECKOUT_DEFAULTS: Record<string, string> = {
@@ -49,7 +38,8 @@ export const CHECKOUT_DEFAULTS: Record<string, string> = {
   checkout_font: '',
 };
 const imgSrc = (v: string) => (!v ? '' : v.startsWith('/') ? v : getImageUrl(v));
-const FAILED_MSG = 'Tu compra no fue satisfactoria. Intenta con otra tarjeta.';
+const OPEN_FAILED_MSG = 'No se pudo abrir el pago seguro. Intenta de nuevo en un momento.';
+const CANCELLED_MSG = 'No se completó el pago. No se hizo ningún cargo; puedes intentar de nuevo.';
 const isHex = (v?: string) => !!v && /^#[0-9a-f]{6}$/i.test(v);
 
 const IconLock = () => (
@@ -84,15 +74,11 @@ export const CheckoutPage: React.FC = () => {
   const finalTotal = orderTotal(productsTotal);
   const missingFree = missingForFreeShipping(productsTotal);
   const navigate = useNavigate();
-  const sdkCardRef = useRef<any>(null);
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // Autorización del banco (3-D Secure): Clip pide abrir su liga DENTRO de un iframe y escuchar su postMessage
-  const [bankAuth, setBankAuth] = useState<{ url: string; orderId: string } | null>(null);
-  const bankAuthBusyRef = useRef(false);
   const [config, setConfig] = useState<Record<string, string>>({});
-  const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponBusy, setCouponBusy] = useState(false);
@@ -106,7 +92,6 @@ export const CheckoutPage: React.FC = () => {
 
   const [colonias, setColonias] = useState<string[]>([]);
   const [isFetchingZip, setIsFetchingZip] = useState(false);
-  const [clipStatus, setClipStatus] = useState<'loading' | 'ready' | 'error' | 'missing_key'>('loading');
 
   useEffect(() => { getStoreConfig().then(setConfig); }, []);
   useAdminPreview(setConfig);
@@ -133,33 +118,28 @@ export const CheckoutPage: React.FC = () => {
     ...(font && { fontFamily: `"${font}", var(--f-body), sans-serif` }),
   } as React.CSSProperties;
 
-  // Init Clip SDK
+  // Regreso desde Stripe sin pagar: se expira la sesión, se cancela el pedido y el carrito sigue intacto
   useEffect(() => {
-    const CLIP_PUBLIC_KEY = import.meta.env.VITE_CLIP_API_KEY as string;
-    if (!CLIP_PUBLIC_KEY) { setClipStatus('missing_key'); return; }
-    sdkCardRef.current = null;
-    setClipStatus('loading');
-    let attempts = 0;
-    const initClip = () => {
-      const SDK = (window as any).ClipSDK ?? (typeof ClipSDK !== 'undefined' ? ClipSDK : null);
-      if (!SDK) {
-        attempts++;
-        if (attempts < 20) { setTimeout(initClip, 250); } else { setClipStatus('error'); }
-        return;
-      }
-      try {
-        const clip = new SDK(CLIP_PUBLIC_KEY);
-        const card = clip.element.create('Card', { locale: 'es', theme: 'light', amount: finalTotal });
-        card.mount('clip-card-container');
-        sdkCardRef.current = card;
-        setClipStatus('ready');
-      } catch (e) {
-        console.error('[Clip]', e);
-        setClipStatus('error');
-      }
-    };
-    initClip();
-  }, [finalTotal]);
+    if (searchParams.get('pago') !== 'cancelado') return;
+    const orderId = searchParams.get('order');
+    setError(CANCELLED_MSG);
+    if (orderId) {
+      void fetch('/api/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', orderId }),
+        keepalive: true,
+      })
+        .then((r) => r.json())
+        .then((j) => {
+          // Si en realidad sí se pagó (regresó con Atrás después de pagar), se manda a la confirmación
+          if (j && ['paid', 'shipped', 'delivered'].includes(String(j.status))) navigate(`/pago-exitoso?order=${orderId}`, { replace: true });
+        })
+        .catch(() => {});
+    }
+    navigate('/checkout', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ZIP autocomplete
   useEffect(() => {
@@ -223,80 +203,13 @@ export const CheckoutPage: React.FC = () => {
   }, []);
   const belowMin = couponBelowMin();
 
-  /** Consulta a Clip el cobro del pedido que está autorizando el banco y actúa según el resultado. */
-  const resolveBankAuth = async (orderId: string) => {
-    if (bankAuthBusyRef.current) return;
-    bankAuthBusyRef.current = true;
-    try {
-      const r = await fetch('/api/charge-clip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'status', orderId }),
-      });
-      const j = await r.json().catch(() => ({} as Record<string, any>));
-      const st = r.ok ? String(j?.status || '') : '';
-      if (['paid', 'shipped', 'delivered'].includes(st)) {
-        void fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId }), keepalive: true }).catch(() => {});
-        trackEvent('purchase', { transaction_id: orderId, currency: 'MXN', value: finalTotal, coupon: couponCode || undefined, items: analyticsItems(items) });
-        setBankAuth(null);
-        clearCart();
-        navigate(`/pago-exitoso?order=${orderId}`);
-      } else if (st === 'cancelled') {
-        setBankAuth(null);
-        setLoading(false);
-        setError('Tu banco no autorizó la compra. No se hizo ningún cargo. Intenta de nuevo o usa otra tarjeta.');
-      }
-    } finally {
-      bankAuthBusyRef.current = false;
-    }
-  };
-
-  useEffect(() => {
-    if (!bankAuth) return;
-    let origin = '';
-    try { origin = new URL(bankAuth.url).origin; } catch { origin = ''; }
-    // El iframe de Clip avisa con postMessage cuando la clienta termina; el resultado real se consulta en el servidor
-    const onMessage = (e: MessageEvent) => { if (origin && e.origin === origin) void resolveBankAuth(bankAuth.orderId); };
-    window.addEventListener('message', onMessage);
-    // Respaldo por si el aviso no llega: consulta a Clip cada 5 s
-    const timer = window.setInterval(() => { void resolveBankAuth(bankAuth.orderId); }, 5000);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancelBankAuth(); };
-    document.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('message', onMessage);
-      window.clearInterval(timer);
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bankAuth]);
-
-  /** La clienta cierra la ventana del banco: una última consulta a Clip y vuelve al checkout. */
-  const cancelBankAuth = () => {
-    const current = bankAuth;
-    setBankAuth(null);
-    setLoading(false);
-    setError('No se completó la autorización con tu banco. No se hizo ningún cargo; puedes intentar de nuevo.');
-    if (current) void resolveBankAuth(current.orderId);
-  };
-
   const handlePagar = async () => {
     if (isDemo) {
       setError('Vista previa del admin: aquí no se puede pagar.');
       return;
     }
-    if (paymentTab !== 'card') {
-      setError('Este método está próximamente. Usa Tarjeta por ahora.');
-      return;
-    }
     if (!form.name || !form.email || !form.address || !form.city) {
       setError('Por favor completa todos los campos de envío obligatorios.');
-      return;
-    }
-    if (!sdkCardRef.current) {
-      setError('El formulario de tarjeta no está listo. Recarga la página.');
       return;
     }
     setLoading(true);
@@ -313,16 +226,6 @@ export const CheckoutPage: React.FC = () => {
       const appliedCoupon = couponCode && !couponBelowMin() ? couponCode : undefined;
       const appliedDiscount = appliedCoupon ? discountAmount() : 0;
 
-      let cardToken: { id: string };
-      try {
-        cardToken = await sdkCardRef.current.cardToken();
-      } catch (sdkErr: any) {
-        console.error('[Clip] cardToken:', sdkErr);
-        throw new Error('Revisa los datos de tu tarjeta: número, vencimiento y código.');
-      }
-      const cardTokenId = cardToken?.id;
-      if (!cardTokenId) throw new Error('No se obtuvo token de tarjeta.');
-
       const order = await createOrder({
         customer_name: form.name, customer_email: form.email, customer_phone: form.phone,
         customer_address: `${form.address}, ${form.neighborhood}`,
@@ -335,56 +238,36 @@ export const CheckoutPage: React.FC = () => {
       });
       if (!order) throw new Error('No se pudo registrar la orden.');
 
-      // Huella del dispositivo del antifraude de Clip (Cybersource/Forter): amarra el cobro con esta sesión.
-      // Sin esto Clip ve "dispositivo desconocido", sube el riesgo y manda a 3-D Secure.
-      let prevention: { session_id?: string; user_agent?: string } | null = null;
-      try { prevention = sdkCardRef.current?.preventionData?.() ?? null; } catch { prevention = null; }
-
-      const chargeRes = await fetch('/api/charge-clip', {
+      // El servidor recalcula el total y abre la página de pago segura de Stripe
+      const r = await fetch('/api/stripe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: finalTotal, orderId: order.id,
-          description: `Divina Store — ${form.name} — Orden ${order.id}`,
-          cardTokenId, customerEmail: form.email,
-          userAgent: prevention?.user_agent || navigator.userAgent,
-          sessionId: prevention?.session_id || undefined,
+          action: 'create',
+          orderId: order.id,
+          amount: finalTotal,
           couponCode: appliedCoupon ?? null,
+          customerEmail: form.email,
         }),
       });
-      const chargeData = await chargeRes.json().catch(() => ({} as Record<string, any>));
-      if (chargeRes.status === 409 && (chargeData.code === 'price_changed' || chargeData.code === 'unavailable')) {
+      const data = await r.json().catch(() => ({} as Record<string, any>));
+      if (r.status === 409 && (data.code === 'price_changed' || data.code === 'unavailable')) {
         await syncCart();
-        throw new Error(chargeData.error ?? 'El total cambió. Revisa tu carrito y vuelve a pagar.');
+        throw new Error(data.error ?? 'El total cambió. Revisa tu carrito y vuelve a pagar.');
       }
-      if (chargeRes.status === 409 && chargeData.code === 'already_paid') {
+      if (r.status === 409 && data.code === 'already_paid') {
         clearCart();
         navigate(`/pago-exitoso?order=${order.id}`);
         return;
       }
-      if (chargeRes.status === 202 && chargeData.pending) {
-        // El banco pide autorizar la compra (3-D Secure). No es rechazo: la clienta autoriza y se confirma con Clip.
-        // El carrito se conserva hasta que el pago quede aprobado (lo vacía /pago-exitoso).
-        if (typeof chargeData.action_url === 'string' && /^https:\/\//i.test(chargeData.action_url)) {
-          setBankAuth({ url: chargeData.action_url, orderId: order.id });
-          return;
-        }
-        navigate(`/pago-exitoso?order=${order.id}`);
-        return;
+      if (!r.ok || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
+        throw new Error(data.error || OPEN_FAILED_MSG);
       }
-      if (!chargeRes.ok || !chargeData.success) {
-        // Rechazado o error: no se cobró
-        throw new Error(FAILED_MSG);
-      }
-      await updateOrderStatus(order.id, 'paid');
-      // Aviso de pedido nuevo + confirmación al cliente (el servidor evita duplicados)
-      void fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'order-paid', orderId: order.id }), keepalive: true }).catch(() => {});
-      trackEvent('purchase', {
-        transaction_id: order.id, currency: 'MXN', value: finalTotal,
-        coupon: couponCode || undefined, items: analyticsItems(items),
+      trackEvent('add_payment_info', {
+        currency: 'MXN', value: finalTotal, coupon: appliedCoupon, payment_type: 'stripe_checkout', items: analyticsItems(items),
       });
-      clearCart();
-      navigate(`/pago-exitoso?order=${order.id}`);
+      // El carrito se conserva hasta que Stripe confirme el pago (lo vacía /pago-exitoso)
+      window.location.assign(data.url);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado.';
       console.error('[Checkout]', msg);
@@ -509,61 +392,16 @@ export const CheckoutPage: React.FC = () => {
               </header>
               <div className="cv2__card-body">
 
-                {/* Tabs */}
-                <div className="cv2__paytabs">
-                  <button
-                    className={`cv2__paytab ${paymentTab === 'card' ? 'is-active' : ''}`}
-                    onClick={() => setPaymentTab('card')} type="button"
-                  >
-                    <span className="cv2__paytab-icon">💳</span>
-                    Tarjeta de crédito / débito
-                  </button>
-                  <button
-                    className={`cv2__paytab ${paymentTab === 'applepay' ? 'is-active' : ''}`}
-                    onClick={() => setPaymentTab('applepay')} type="button"
-                  >
-                    <span className="cv2__paytab-icon"></span>
-                    Apple Pay
-                  </button>
-                  <button
-                    className={`cv2__paytab ${paymentTab === 'googlepay' ? 'is-active' : ''}`}
-                    onClick={() => setPaymentTab('googlepay')} type="button"
-                  >
-                    <span className="cv2__paytab-icon">G</span>
-                    Google Pay
-                  </button>
-                </div>
-
-                {/* Widget */}
+                {/* Pago en la página segura de Stripe */}
                 <div className="cv2__pay-widget">
-                  <div style={{ display: paymentTab === 'card' ? 'block' : 'none', position: 'relative', minHeight: 180 }}>
-                    {clipStatus === 'loading' && (
-                      <div className="cv2__pay-status">
-                        <div className="cv2__spinner" />Conectando con Clip...
-                      </div>
-                    )}
-                    {clipStatus === 'missing_key' && (
-                      <div className="cv2__pay-status cv2__pay-status--error">
-                        Falta configurar la llave de Clip. Contacta a soporte.
-                      </div>
-                    )}
-                    {clipStatus === 'error' && (
-                      <div className="cv2__pay-status cv2__pay-status--error">
-                        Error al cargar el formulario. Recarga la página.
-                      </div>
-                    )}
-                    <div id="clip-card-container" className="cv2__clip-mount" />
+                  <div className="cv2__coming-soon">
+                    <div className="cv2__coming-soon-icon" aria-hidden="true">🔒</div>
+                    <p><strong>Pago seguro con Stripe</strong></p>
+                    <p className="cv2__coming-soon-sub">
+                      Al dar clic en pagar te llevamos a la página segura de Stripe para pagar con tarjeta de crédito o débito
+                      (o Apple Pay / Google Pay cuando estén disponibles en tu dispositivo). Si tu banco lo pide, ahí mismo autorizas la compra.
+                    </p>
                   </div>
-
-                  {(paymentTab === 'applepay' || paymentTab === 'googlepay') && (
-                    <div className="cv2__coming-soon">
-                      <div className="cv2__coming-soon-icon">🚀</div>
-                      <p><strong>Próximamente disponible</strong></p>
-                      <p className="cv2__coming-soon-sub">
-                        Estamos trabajando en habilitar este método. Por ahora usa Tarjeta.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {priceNotice && !error && <div className="cv2__error" role="status"><span>ℹ</span><span>{priceNotice}</span></div>}
@@ -573,10 +411,11 @@ export const CheckoutPage: React.FC = () => {
                   type="button"
                   onClick={handlePagar}
                   className="cv2__pay-btn"
-                  disabled={loading || (paymentTab === 'card' && clipStatus !== 'ready')}
+                  disabled={loading}
+                  aria-busy={loading}
                 >
                   {loading ? (
-                    <><span className="cv2__spinner cv2__spinner--dark" />Procesando pago...</>
+                    <><span className="cv2__spinner cv2__spinner--dark" />Abriendo pago seguro...</>
                   ) : (
                     <>
                       <IconLock />
@@ -690,18 +529,18 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="cv2__msi">💳 Hasta 12 MSI según tu banco</div>
+              <div className="cv2__msi">💳 Tarjetas de crédito y débito</div>
 
               <ul className="cv2__benefits">
                 <li>🚚 Envío $120 · gratis en compras desde $999 MXN</li>
                 <li>🔒 Tu información está protegida</li>
-                <li>⚡ Proceso rápido y seguro con Clip México</li>
+                <li>⚡ Pago procesado por Stripe</li>
               </ul>
 
               {/* IMAGEN 3 */}
               <div className="cv2__payment-methods">
                 <p>Métodos de pago aceptados</p>
-                <img src={imgSrc(cfg('checkout_payment_img'))} alt="Clip, Visa, Mastercard, Diners, Discover, American Express, PayPal y SPEI" />
+                <img src={imgSrc(cfg('checkout_payment_img'))} alt="Métodos de pago aceptados" />
               </div>
             </div>
 
@@ -718,26 +557,7 @@ export const CheckoutPage: React.FC = () => {
       {/* IMAGEN 5 */}
       {shown('checkout_show_footer') && cfg('checkout_footer_img') && (
         <div className="cv2__footer-badges">
-          <img src={imgSrc(cfg('checkout_footer_img'))} alt="PCI DSS nivel 1, cifrado SSL de 256 bits, Verified by Visa, Mastercard ID Check, Clip partner oficial, empresa mexicana" />
-        </div>
-      )}
-      {bankAuth && (
-        <div className="cv2-bank" role="dialog" aria-modal="true" aria-labelledby="cv2-bank-title">
-          <div className="cv2-bank__box">
-            <header className="cv2-bank__head">
-              <div>
-                <h2 id="cv2-bank-title">Autoriza tu compra con tu banco</h2>
-                <p>Tu banco puede pedirte un código por SMS o confirmar en su app. No cierres esta ventana.</p>
-              </div>
-              <button type="button" className="cv2-bank__close" onClick={cancelBankAuth} aria-label="Cancelar autorización y volver al pago">Cancelar</button>
-            </header>
-            <iframe
-              className="cv2-bank__frame"
-              src={bankAuth.url}
-              title="Autorización de tu banco (3-D Secure)"
-              allow="payment *"
-            />
-          </div>
+          <img src={imgSrc(cfg('checkout_footer_img'))} alt="Compra segura" />
         </div>
       )}
     </div>

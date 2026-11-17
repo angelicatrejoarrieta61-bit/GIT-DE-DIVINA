@@ -3,9 +3,9 @@
  * Confirma la compra y, al final, muestra el resumen completo del pedido (productos, totales, envío y dirección).
  * Guarda el pedido en este dispositivo para verlo después en /mi-pedido (ícono junto al carrito).
  *
- * Si el banco pidió autorizar la compra (3-D Secure), el pedido llega aquí "pendiente": la página consulta a Clip
- * (/api/charge-clip · action status) cada pocos segundos y cambia sola a "aprobado" o "no satisfactoria".
- * Nunca se dice "aprobado" sin que Clip lo haya aprobado.
+ * Stripe regresa aquí después de cobrar. La página consulta a Stripe (/api/stripe · action status) y, si el pago
+ * sigue en proceso, vuelve a consultar cada pocos segundos hasta que quede "aprobado" o "no satisfactoria".
+ * Nunca se dice "aprobado" sin que Stripe lo haya confirmado (el webhook de Stripe hace lo mismo en el servidor).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -13,15 +13,16 @@ import { Check, Package, X, Loader2 } from 'lucide-react';
 import { OrderView } from '../components/OrderView';
 import { lookupOrder, rememberOrder, type PublicOrder } from '../lib/orderPublic';
 import { useCartStore } from '../store/cartStore';
+import { analyticsItems, trackEvent } from '../lib/analytics';
 import './OrderPages.css';
 
 const PAID = ['paid', 'shipped', 'delivered'];
 const POLL_MS = 4000;
-const POLL_MAX_MS = 20 * 60_000; // Clip cancela una autorización no completada en ~15 min
+const POLL_MAX_MS = 20 * 60_000;
 
-async function askClip(orderId: string): Promise<string | null> {
+async function askStripe(orderId: string): Promise<string | null> {
   try {
-    const r = await fetch('/api/charge-clip', {
+    const r = await fetch('/api/stripe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'status', orderId }),
@@ -46,19 +47,20 @@ export const PaymentSuccessPage: React.FC = () => {
   const [params] = useSearchParams();
   const orderId = params.get('order');
   const clearCart = useCartStore((s) => s.clearCart);
+  const cartItems = useCartStore((s) => s.items);
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(Boolean(orderId));
   const [status, setStatus] = useState<string | null>(null);
   const startedRef = useRef(Date.now());
 
-  // Carga inicial: si viene del banco y sigue pendiente, primero se consulta a Clip
+  // Carga inicial: primero se consulta a Stripe el estado real del pago
   useEffect(() => {
     if (!orderId) return;
     rememberOrder(orderId);
     let alive = true;
     (async () => {
-      const fresh = await askClip(orderId);
+      const fresh = await askStripe(orderId);
       try {
         const o = await lookupOrder({ orderId });
         if (!alive) return;
@@ -73,13 +75,13 @@ export const PaymentSuccessPage: React.FC = () => {
     return () => { alive = false; };
   }, [orderId]);
 
-  // Pendiente de autorización del banco: consulta a Clip hasta que tenga respuesta final
+  // Pago en proceso: consulta a Stripe hasta que tenga respuesta final
   useEffect(() => {
     if (!orderId || status !== 'pending') return;
     let alive = true;
     const timer = window.setInterval(async () => {
       if (Date.now() - startedRef.current > POLL_MAX_MS) { window.clearInterval(timer); return; }
-      const s = await askClip(orderId);
+      const s = await askStripe(orderId);
       if (!alive || !s || s === 'pending') return;
       window.clearInterval(timer);
       setStatus(s);
@@ -94,7 +96,15 @@ export const PaymentSuccessPage: React.FC = () => {
     if (!orderId || !status || !PAID.includes(status) || doneRef.current) return;
     doneRef.current = true;
     notifyPaid(orderId);
+    // Compra para Analytics solo la primera vez (con el carrito aún lleno); al recargar ya no se repite
+    if (cartItems.length) {
+      trackEvent('purchase', {
+        transaction_id: orderId, currency: 'MXN', value: order?.total ?? undefined,
+        coupon: order?.coupon_code || undefined, items: analyticsItems(cartItems),
+      });
+    }
     clearCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, status, clearCart]);
 
   const name = order?.first_name;
@@ -111,7 +121,7 @@ export const PaymentSuccessPage: React.FC = () => {
               <span className="op-band__icon" aria-hidden="true"><Loader2 size={24} strokeWidth={2.6} style={{ animation: 'op-spin 1s linear infinite' }} /></span>
               <div>
                 <h1>{loading ? 'Confirmando tu pago…' : 'Confirmando tu pago con el banco…'}</h1>
-                <p>{loading ? 'Un momento, estamos revisando tu pago con Clip.' : <>Si tu banco te pidió autorizar la compra en su app o por SMS, autorízala. Esta página se actualiza sola; no la cierres.</>}</p>
+                <p>{loading ? 'Un momento, estamos revisando tu pago.' : <>Tu pago está en proceso. Esta página se actualiza sola; no la cierres.</>}</p>
               </div>
             </>
           ) : failed ? (

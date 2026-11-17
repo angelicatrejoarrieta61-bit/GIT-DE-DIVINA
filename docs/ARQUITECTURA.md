@@ -9,17 +9,18 @@ Este documento explica cómo está armado el sitio y con qué se conecta, para q
 
 ## 1. En una frase
 
-Tienda en React (una sola página, SPA) alojada en **Vercel**, con datos en **Supabase**, cobro con **Clip**, correos con **Resend** y un buscador de proveedores que consulta Google Shopping a través de **Bright Data**. Se vende **sin inventario**: llega un pedido, el dueño busca dónde comprar el producto y decide él. Nada se compra ni se busca solo.
+Tienda en React (una sola página, SPA) alojada en **Vercel**, con datos en **Supabase**, cobro con **Stripe Checkout** (Clip hasta el 14-nov-2026, cuenta cancelada por Clip), correos con **Resend** y un buscador de proveedores que consulta Google Shopping a través de **Bright Data**. Se vende **sin inventario**: llega un pedido, el dueño busca dónde comprar el producto y decide él. Nada se compra ni se busca solo.
 
 ## 2. Mapa de conexiones
 
 ```
 Navegador (React SPA)
  ├── Supabase (llave anónima)      datos de tienda, sesión del admin, imágenes
- ├── SDK de Clip (script externo)  convierte la tarjeta en un token
+ ├── checkout.stripe.com          página de pago de Stripe (la tarjeta nunca toca Divina)
  └── /api/*  (funciones de Vercel, aquí viven las llaves secretas)
-      ├── charge-clip       → API de Clip (cobro)
-      ├── clip-verify       → API de Clip (confirmar cobros, solo admin)
+      ├── stripe            → API de Stripe (crear pago, consultar, cancelar) + webhook de Stripe
+      ├── charge-clip       → API de Clip (solo consulta de pedidos viejos; la cuenta está cancelada)
+      ├── clip-verify       → API de Clip (pedidos viejos, solo admin)
       ├── send-email        → Resend (correos) + Supabase
       ├── sourcing-search   → Bright Data (Google Shopping MX) + Supabase
       └── admin-users       → Supabase con llave de servicio
@@ -37,7 +38,7 @@ Regla de oro: **ninguna llave secreta va en el navegador**. Todo lo que empieza 
 | Iconos | lucide-react |
 | Base de datos, sesión, archivos | Supabase (Postgres, Auth, Storage, Realtime) |
 | Servidor | Funciones serverless de Vercel en `/api` (Node 24) |
-| Pagos | Clip México |
+| Pagos | Stripe Checkout (desde 16-nov-2026). Antes Clip México |
 | Correo | Resend |
 | Búsqueda de proveedores | Bright Data, zona SERP |
 | Escáner de código de barras | @zxing/browser |
@@ -154,7 +155,26 @@ Casi todo lo visual sale de la tabla `store_config`: logo, tipografías, textos 
 - `page_bg_mode` (`default` / `solid` / `gradient`), `page_bg_c1`, `page_bg_c2`, `page_bg_c3`, `page_bg_angle` — fondo de la tienda
 - `home_layout_order` — orden de bloques del Home
 
-## 9. Pagos (Clip)
+## 9. Pagos (Stripe Checkout) — desde 16-nov-2026
+
+Clip canceló la cuenta de forma definitiva el 14-nov-2026 (folio 05550506). El cobro pasó a **Stripe Checkout**: la clienta paga en la página de Stripe y Divina nunca ve la tarjeta. Sin dependencias nuevas: `api/stripe.ts` usa la API REST de Stripe con `fetch`.
+
+1. **Checkout** (`CheckoutPage.tsx`): valida datos de envío, revalida el cupón, crea el pedido `pending` y llama a `/api/stripe` con `{ action: 'create', orderId, amount, couponCode }`.
+2. **`/api/stripe` · create:** recalcula el total en el servidor (precios actuales de `products`, cupón con `validate_coupon`, regla de envío). Si cambió → 409 `price_changed`; producto agotado → 409 `unavailable`; ya pagado → 409 `already_paid`. Si cuadra, crea la sesión (`POST /v1/checkout/sessions`, `mode=payment`, MXN, una línea "Divina Store · Pedido XXXXXXXX" con el total del servidor, `client_reference_id` y `metadata.order_id` = id del pedido, `locale=es-419`) con `Idempotency-Key`, guarda `stripe_session_id` y devuelve la `url`. El navegador redirige a Stripe. **El carrito no se vacía** hasta que el pago se confirma.
+3. **Stripe cobra** (tarjeta y 3-D Secure en su página; Apple Pay / Google Pay si están activos en el dashboard de Stripe).
+4. **Regreso pagado** → `/pago-exitoso?order=<id>&session_id=...`: la página llama a `/api/stripe` · `status`; el servidor consulta la sesión a Stripe y, si `payment_status = 'paid'`, el monto coincide (±$0.50) y la sesión es de ese pedido, lo marca `paid` y manda los avisos (`send-email` · `order-paid`). Luego la página vacía el carrito y registra `purchase` en Analytics (solo la primera vez).
+5. **Webhook** (`POST /api/stripe` con `Stripe-Signature`, firma validada con `STRIPE_WEBHOOK_SECRET`, tolerancia 5 min): `checkout.session.completed` y `checkout.session.async_payment_succeeded` → misma regla del punto 4 (por si la clienta cerró la pestaña); `checkout.session.async_payment_failed` → cancelado; `checkout.session.expired` → cancelado si seguía sin pagar. Si no se pudo escribir en la base responde 500 y Stripe reintenta.
+6. **Regreso sin pagar** → `/checkout?pago=cancelado&order=<id>`: el checkout llama a `/api/stripe` · `cancel`, que expira la sesión en Stripe y cancela el pedido (si en realidad sí se pagó, lo marca pagado y manda a `/pago-exitoso`). La clienta ve "No se completó el pago. No se hizo ningún cargo" con su carrito intacto.
+7. **Candados en la base** (`20261116120000_orders_stripe.sql`): las columnas `stripe_*` solo las escribe el servidor; la llave pública (`anon`) **no puede** crear ni cambiar un pedido a `paid/shipped/delivered`. La sesión del admin sí puede cambiar el estado (pagos por transferencia).
+8. **Admin → Pedidos:** un pedido con `stripe_payment_status = 'paid'` cuenta como cobro confirmado (columna de pago "Aprobado") y habilita "Enviar pedido". El monto comparado es `stripe_amount`.
+
+**Variables (Vercel):** `STRIPE_SECRET_KEY` (sk_…), `STRIPE_WEBHOOK_SECRET` (whsec_…). `VITE_STRIPE_PUBLISHABLE_KEY` (pk_…) queda reservada; Checkout alojado no la necesita.
+**Webhook en Stripe:** Developers → Webhooks → endpoint `https://www.divinastore.com.mx/api/stripe` (el dominio exacto que abre sin redirigir) con los 4 eventos del punto 5.
+**Prueba:** en modo prueba, tarjeta `4242 4242 4242 4242`, cualquier fecha futura y CVC. Nunca probar con tarjetas reales en producción.
+
+## 9 (histórico). Pagos (Clip) — cuenta cancelada el 14-nov-2026
+
+Lo de abajo describe cómo funcionaba Clip. Ya no cobra. `charge-clip` y `clip-verify` se conservan solo para consultar pedidos viejos.
 
 Flujo actual, en `CheckoutPage.tsx`:
 
@@ -175,7 +195,7 @@ Flujo actual, en `CheckoutPage.tsx`:
 
 **Número de autorización:** la documentación pública de Clip no lista un campo de código de autorización; se guarda `receipt_no` (recibo de Clip) y, si Clip llega a mandar `authorization_code`, también. La respuesta completa (sin el token) queda en `clip_raw` para revisar qué campos manda Clip en realidad.
 
-**Código antiguo que sigue en el repo y no usa el checkout actual:** `api/clip-payment.ts`, `api/clip-card-token.ts`, `api/clip-installments.ts`, `api/clip-webhook.ts`, `api/create-payment.ts`, `api/test-clip.ts` y `src/hooks/useClipPayment.ts`. Antes de borrarlos, confirmar en el panel de Clip que no haya un webhook apuntando a `clip-webhook`.
+**Código antiguo de Clip borrado el 16-nov-2026:** `api/clip-payment.ts`, `api/clip-card-token.ts`, `api/clip-installments.ts`, `api/clip-webhook.ts`, `api/create-payment.ts`, `api/test-clip.ts`, `src/hooks/useClipPayment.ts` y `src/components/CheckoutModal.tsx/.css` (no se usaban). El SDK de Clip se quitó de `index.html`.
 
 **Envío** (`src/lib/shipping.ts`, única fuente de la regla): **$120 MXN con IVA** por pedido si los productos (ya con cupón) suman menos de **$999**; desde $999 es gratis. Se suma al total que se cobra en Clip y que se guarda en `orders.total`. El carrito y el checkout muestran Subtotal, Descuento, Envío (o "Gratis") y una barra de "te faltan $X para envío gratis"; la ficha de producto dice "Envío $120 · gratis desde $999". No hay columna aparte para el envío en `orders`.
 
@@ -272,7 +292,7 @@ Ya **no** se exigen días de entrega capturados para revisar. Historial en `prod
 
 **Costo en Bright Data:** ≈ productos automatizados × (24 / horas de revisión) × 1–2 búsquedas al día + oportunidades por día. Ej.: 40 productos cada 5 h ≈ 192–384/día.
 
-**Límites reales:** Google Shopping no confirma existencia exacta ni entrega a un CP; por eso la regla es "proveedor autorizado que entrega al día siguiente" y la verificación en vivo antes de comprar. Las funciones de Vercel van en **12**, el máximo del plan gratuito: una función nueva obliga a juntar o borrar otra (candidata: `api/test-clip.ts`).
+**Límites reales:** Google Shopping no confirma existencia exacta ni entrega a un CP; por eso la regla es "proveedor autorizado que entrega al día siguiente" y la verificación en vivo antes de comprar. Las funciones de Vercel van en **7** (16-nov-2026: se borró el código muerto de Clip y entró `stripe`); el máximo del plan gratuito es 12.
 
 ## 11. Correo (Resend)
 
@@ -354,11 +374,14 @@ Nunca se guardan en el repositorio.
 | Variable | Dónde se usa | Pública |
 |---|---|---|
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Navegador y build | Sí |
-| `VITE_CLIP_API_KEY` | Formulario de tarjeta | Sí |
+| `VITE_CLIP_API_KEY` | Ya no se usa (Clip cancelado) | Sí |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Reservada (Stripe Checkout alojado no la necesita) | Sí |
 | `VITE_GA_MEASUREMENT_ID` | Google Analytics | Sí |
 | `SUPABASE_URL` | Funciones `/api` | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` (avisos de pedido), `charge-clip` (marcar pagado), `clip-verify` | **No** |
 | `CLIP_API_KEY`, `CLIP_SECRET` | Cobro y `clip-verify` (prueba `CLIP_API_KEY`; si Clip responde 401/403, usa `CLIP_SECRET`) | **No** |
+| `STRIPE_SECRET_KEY` | `/api/stripe` (crear, consultar y cancelar pagos) | **No** |
+| `STRIPE_WEBHOOK_SECRET` | `/api/stripe` (validar la firma del webhook) | **No** |
 | `RESEND_API_KEY` | Correo | **No** |
 | `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE` | Buscador de proveedores | **No** |
 | `SUPABASE_SERVICE_KEY`, `CLIP_API_URL`, `CLIP_API_URL_SECURE` | Solo el código antiguo de Clip | No |
@@ -411,12 +434,14 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Search Console:** después del deploy, enviar `https://www.divinastore.com.mx/sitemap.xml` y pedir indexación de las 4 colecciones (cambiaron de URL canónica).
 - **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
+- **Migración `20261116120000_orders_stripe.sql`:** columnas `stripe_*` y candado de estado; se aplica sola con la Action al hacer push.
+- **Stripe — pendientes:** (a) el admin de Pedidos sigue rotulando la columna como "Pago Clip" y el modal "Pagos Clip"; un pedido de Stripe se ve "Aprobado". (b) Imágenes del checkout con logos de Clip (`checkout_payment_img`, `checkout_footer_img`, etc.): cambiarlas en Admin → Checkout. (c) El cron sigue llamando `charge-clip · sweep` (sin efecto). (d) Comisión de Clip 5 % en el cálculo de margen: actualizar a la comisión de Stripe cuando se confirme la tarifa de la cuenta.
 - **Migración `20261025120000_coupons.sql`:** crea `coupons`, `validate_coupon`, columnas `orders.coupon_code`/`discount_amount` y el primer cupón `DESCUENTO202610`. Hasta correrla, `/admin/cupones` muestra el aviso y la tienda solo acepta ese código.
 
 **Revisión del proceso de compra (25-oct-2026)** — hallazgos, sin cambios aplicados:
 - ~~Crítico — monto del cobro sin verificar~~ **Resuelto el 29-oct-2026:** `charge-clip` recalcula y cobra el total del servidor (sección 10 bis, punto 4).
-- **Pedido marcado `paid` desde el navegador** (`updateOrderStatus` tras el cobro). El servidor ya lo marca; revisar en Supabase que la regla de `orders` no permita a la llave pública cambiar `status`.
-- **Al aplicar un cupón en el checkout se vuelve a montar el formulario de tarjeta de Clip** (el efecto depende de `finalTotal`) y se borra lo que la clienta ya había escrito.
+- ~~Pedido marcado `paid` desde el navegador~~ **Resuelto el 16-nov-2026:** el checkout ya no lo hace y el trigger `orders_protect_stripe` impide que la llave pública ponga `paid/shipped/delivered`.
+- ~~Al aplicar un cupón se volvía a montar el formulario de tarjeta de Clip~~ Ya no aplica: la tarjeta se captura en Stripe.
 - **Enlaces rotos:** "Términos y Condiciones" (`/terminos`) y "Aviso de Privacidad" (`/privacidad`) no tienen ruta: dan 404.
 - **"Hasta 12 MSI según tu banco"** en el resumen, pero el cobro va con `installments: 1`.
 - **Teléfono, CP y colonia** no se validan antes de pagar (solo nombre, correo, calle y ciudad).

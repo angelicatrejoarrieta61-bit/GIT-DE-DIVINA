@@ -5,9 +5,6 @@
     "api/send-email.ts": {
       "maxDuration": 60
     },
-    "api/create-payment.ts": {
-      "maxDuration": 30
-    },
     "api/sourcing-search.ts": {
       "maxDuration": 60
     },
@@ -15,6 +12,9 @@
       "maxDuration": 60
     },
     "api/charge-clip.ts": {
+      "maxDuration": 30
+    },
+    "api/stripe.ts": {
       "maxDuration": 30
     }
   },

@@ -64,7 +64,7 @@ const EMPTY_CFG: ShipCfg = { orders_notify_email: 'admin@divinastore.com.mx', sh
 /* ── Pago Clip ── */
 type ClipKey = 'approved' | 'authorized' | 'pending' | 'rejected' | 'cancelled' | 'refunded' | 'unverified' | 'none';
 const CLIP: Record<ClipKey, { label: string; tone: string; hint: string }> = {
-  approved:   { label: 'Aprobado',      tone: 'ok',    hint: 'Clip confirma el cobro' },
+  approved:   { label: 'Aprobado',      tone: 'ok',    hint: 'Cobro confirmado (Stripe o Clip)' },
   authorized: { label: 'Autorizado',    tone: 'info',  hint: 'Autorizado, aún no capturado' },
   pending:    { label: 'En proceso',    tone: 'warn',  hint: 'Clip aún no lo aprueba (ej. 3D Secure)' },
   rejected:   { label: 'Rechazado',     tone: 'bad',   hint: 'Cobro rechazado; el motivo está en el detalle del pedido' },
@@ -76,11 +76,14 @@ const CLIP: Record<ClipKey, { label: string; tone: string; hint: string }> = {
 const CLIP_FINAL = ['approved', 'rejected', 'cancelled', 'refunded'];
 const clipPid = (o: Order): string | null => o.clip_payment_id || o.payment_info?.transaction_id || null;
 const clipKey = (o: Order): ClipKey => {
+  // Cobro con Stripe (desde nov 2026): pagado = Stripe confirmó payment_status 'paid' desde el servidor
+  if ((o.stripe_payment_status || '').toLowerCase() === 'paid') return 'approved';
   const s = (o.clip_status || '').toLowerCase() as ClipKey;
   if (s && s in CLIP && s !== 'unverified' && s !== 'none') return s;
   return clipPid(o) ? 'unverified' : 'none';
 };
-const clipMismatch = (o: Order) => o.clip_amount != null && Math.abs(Number(o.clip_amount) - Number(o.total || 0)) > 0.01;
+const payAmount = (o: Order): number | null => o.clip_amount ?? o.stripe_amount ?? null;
+const clipMismatch = (o: Order) => payAmount(o) != null && Math.abs(Number(payAmount(o)) - Number(o.total || 0)) > 0.01;
 const clipOk = (o: Order) => clipKey(o) === 'approved' && !clipMismatch(o);
 const clipNo = (o: Order) => o.clip_auth_code ? `Aut. ${o.clip_auth_code}` : o.clip_receipt_no ? `Rec. ${o.clip_receipt_no}` : '';
 
