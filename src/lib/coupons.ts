@@ -49,8 +49,8 @@ export const normalizeCode = (raw: string) => raw.toUpperCase().replace(/\s+/g, 
 
 /**
  * Cupón especial de ENVÍO: cualquier código que empiece con ENVIO (ej. ENVIOGRATIS).
- * No descuenta productos: deja el envío en $0. Se crea en Admin → Cupones como cualquier otro
- * (el tipo/valor que se capture es solo de relleno y se ignora).
+ * No descuenta productos: su monto (fijo o %) se resta del envío, con tope en lo que cuesta el envío.
+ * Se crea en Admin → Cupones como cualquier otro (ej. ENVIO120 de $120 = envío gratis, ENVIO50 de $50 = envío a $70).
  */
 export const isShippingCoupon = (code?: string | null): boolean =>
   !!code && normalizeCode(code).startsWith('ENVIO');
@@ -98,7 +98,8 @@ export async function validateCoupon(rawCode: string, subtotal?: number): Promis
 
   const { data, error } = await supabase.rpc('validate_coupon', {
     p_code: code,
-    p_subtotal: typeof subtotal === 'number' ? round2(subtotal) : null,
+    // Cupón de envío: sin mínimo de compra (aplica a cualquier carrito)
+    p_subtotal: typeof subtotal === 'number' && !isShippingCoupon(code) ? round2(subtotal) : null,
   });
 
   if (error) {
@@ -119,7 +120,7 @@ export async function validateCoupon(rawCode: string, subtotal?: number): Promis
         code: String(r.code),
         type: r.discount_type === 'fixed' ? 'fixed' : 'percent',
         value: Number(r.discount_value) || 0,
-        minSubtotal: Number(r.min_subtotal) || 0,
+        minSubtotal: isShippingCoupon(code) ? 0 : Number(r.min_subtotal) || 0,
       },
     };
   }

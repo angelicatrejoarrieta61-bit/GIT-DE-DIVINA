@@ -25,6 +25,7 @@ export const SITE_URL: string;
 export const SITE_NAME: string;
 export const DEFAULT_OG_IMAGE: string;
 export const STORAGE_BUCKET: string;
+export const SHIPPING_ACTIVE: boolean;
 export const SHIPPING_COST: number;
 export const FREE_SHIPPING_FROM: number;
 export const HOME_TITLE: string;

@@ -4,12 +4,12 @@ import { useCartStore } from '../store/cartStore';
 import { createOrder, getStoreConfig, getProducts } from '../lib/queries';
 import { useAdminPreview } from '../hooks/useadminpreview';
 import type { CartItem } from '../types';
-import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
+import { shippingFor, orderTotal, missingForFreeShipping, shippingCouponDiscount, FREE_SHIPPING_FROM } from '../lib/shipping';
 import { getImageUrl } from '../lib/supabase';
 import './CheckoutPage.css';
 import { analyticsItems, trackEvent } from '../lib/analytics';
 import { getPromoterCode, normalizePromoterCode, savePromoterCode } from '../lib/promoterTracking';
-import { couponLabel } from '../lib/coupons';
+import { couponLabel, isShippingCoupon } from '../lib/coupons';
 
 const MEXICAN_STATES = [
   'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas', 'Chihuahua',
@@ -111,6 +111,7 @@ export const CheckoutPage: React.FC = () => {
     couponBelowMin, discountAmount, totalAfterDiscount, refreshPrices,
   } = useCartStore();
   const [priceNotice, setPriceNotice] = useState('');
+  const shipCoupon = isShippingCoupon(couponCode);
   const couponText = couponLabel(couponType, couponValue);
 
   // Vista previa del admin (iframe): con el carrito vacío se muestran productos de ejemplo
@@ -126,8 +127,9 @@ export const CheckoutPage: React.FC = () => {
 
   // Productos (con cupón) + envío: $120 si no llega a $999, gratis desde $999
   const productsTotal = isDemo ? subtotal : (couponCode ? totalAfterDiscount() : total());
-  const shipping = shippingFor(productsTotal);
-  const finalTotal = orderTotal(productsTotal);
+  const shipDiscount = shipCoupon && !couponBelowMin() ? shippingCouponDiscount(couponType, couponValue, productsTotal) : 0;
+  const shipping = shippingFor(productsTotal, shipDiscount);
+  const finalTotal = orderTotal(productsTotal, shipDiscount);
   const missingFree = missingForFreeShipping(productsTotal);
   const navigate = useNavigate();
 
@@ -714,7 +716,7 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="cv2__summary-total">
                 <div className="cv2__summary-row"><span>Subtotal</span><span>${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
-                {couponCode && !belowMin && (
+                {couponCode && !belowMin && !shipCoupon && (
                   <div className="cv2__summary-row cv2__summary-row--discount">
                     <span>Descuento ({couponText})</span>
                     <span>-${discountAmount().toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>

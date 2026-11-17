@@ -3,7 +3,7 @@ import { useCartStore } from '../store/cartStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../lib/supabase';
 import { getProducts } from '../lib/queries';
-import { shippingFor, orderTotal, missingForFreeShipping, FREE_SHIPPING_FROM } from '../lib/shipping';
+import { shippingFor, orderTotal, missingForFreeShipping, shippingCouponDiscount, FREE_SHIPPING_FROM } from '../lib/shipping';
 import type { Product } from '../types';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import './CartDrawer.css';
@@ -105,14 +105,14 @@ export const CartDrawer: React.FC = () => {
   };
   const belowMin = couponBelowMin();
   const shipCoupon = isShippingCoupon(couponCode);
-  const couponText = shipCoupon ? 'envío gratis' : couponLabel(couponType, couponValue);
+  const couponText = couponLabel(couponType, couponValue);
 
   const cartTotal = total();
   const productsTotal = couponCode ? totalAfterDiscount() : cartTotal;
-  const freeShip = shipCoupon && !belowMin;
-  const shipping = shippingFor(productsTotal, freeShip);
-  const grandTotal = orderTotal(productsTotal, freeShip);
-  const missingFree = missingForFreeShipping(productsTotal, freeShip);
+  const shipDiscount = shipCoupon && !belowMin ? shippingCouponDiscount(couponType, couponValue, productsTotal) : 0;
+  const shipping = shippingFor(productsTotal, shipDiscount);
+  const grandTotal = orderTotal(productsTotal, shipDiscount);
+  const missingFree = missingForFreeShipping(productsTotal);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -259,7 +259,7 @@ export const CartDrawer: React.FC = () => {
             <div className="cart-drawer__coupon-container">
               {couponCode ? (
                 <div className="cart-drawer__coupon-applied">
-                  <span className="coupon-tag">🏷️ {couponCode} ({shipCoupon ? couponText : `-${couponText}`})</span>
+                  <span className="coupon-tag">🏷️ {couponCode} (-{couponText})</span>
                   <button type="button" onClick={removeCoupon} className="coupon-remove-btn" aria-label="Eliminar cupón" title="Eliminar cupón"><X size={11} aria-hidden="true" /></button>
                 </div>
               ) : (
@@ -299,9 +299,15 @@ export const CartDrawer: React.FC = () => {
                 <span>-{formatCurrency(discountAmount())}</span>
               </div>
             )}
-            <div className={`cart-drawer__row-item ${shipping === 0 ? 'discount' : ''}`}>
+            {shipDiscount > 0 && (
+              <div className="cart-drawer__row-item discount">
+                <span>Descuento de envío:</span>
+                <span>-{formatCurrency(shipDiscount)}</span>
+              </div>
+            )}
+            <div className={`cart-drawer__row-item ${shipping === 0 && !shipDiscount ? 'discount' : ''}`}>
               <span>Envío:</span>
-              <span>{shipping === 0 ? 'Gratis' : formatCurrency(shipping)}</span>
+              <span>{shipDiscount > 0 ? formatCurrency(shipping + shipDiscount) : shipping === 0 ? 'Gratis' : formatCurrency(shipping)}</span>
             </div>
             {missingFree > 0 && (
               <p className="cart-drawer__ship-hint">

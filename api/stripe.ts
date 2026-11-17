@@ -28,7 +28,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { SHIPPING_COST, FREE_SHIPPING_FROM } from '../src/lib/seoRules.js';
+import { SHIPPING_COST, FREE_SHIPPING_FROM, SHIPPING_ACTIVE } from '../src/lib/seoRules.js';
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const PAID = ['paid', 'shipped', 'delivered'];
@@ -129,7 +129,7 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
     let freeShip = false; // cupón ENVIO*: envío en $0, sin descuento a productos
     const code = String(order.coupon_code || (typeof couponHint === 'string' ? couponHint : '') || '').toUpperCase().replace(/\s+/g, '');
     if (code) {
-        const { data: v, error: vErr } = await db.rpc('validate_coupon', { p_code: code, p_subtotal: subtotal });
+        const { data: v, error: vErr } = await db.rpc('validate_coupon', { p_code: code, p_subtotal: code.startsWith('ENVIO') ? null : subtotal });
         let type: string | null = null; let value = 0;
         if (vErr && (vErr.code === 'PGRST202' || vErr.code === '42883')) {
             if (code === 'DESCUENTO202610') { type = 'percent'; value = 10; }
@@ -140,7 +140,7 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
         else if (type) discount = r2(Math.min(type === 'percent' ? subtotal * Math.min(value, 100) / 100 : value, subtotal));
     }
     const products = r2(subtotal - discount);
-    const shipping = freeShip || products <= 0 ? 0 : products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
+    const shipping = !SHIPPING_ACTIVE || freeShip || products <= 0 ? 0 : products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
     const expected = r2(products + shipping);
 
     if (Math.abs(expected - Number(clientAmount)) > 0.5) {

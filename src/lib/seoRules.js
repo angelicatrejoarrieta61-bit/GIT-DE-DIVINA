@@ -16,6 +16,8 @@ export const SITE_NAME = 'Divina Store MX';
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.jpg`;
 export const STORAGE_BUCKET = 'divina-assets';
 
+/** false = el envío no se cobra (todo sale en $0). Poner true para volver a cobrar SHIPPING_COST. */
+export const SHIPPING_ACTIVE = true;
 export const SHIPPING_COST = 120;
 export const FREE_SHIPPING_FROM = 999;
 
