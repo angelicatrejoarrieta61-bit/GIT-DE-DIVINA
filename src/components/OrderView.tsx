@@ -47,8 +47,10 @@ export const OrderView: React.FC<{ order: PublicOrder; compact?: boolean }> = ({
         </ol>
       ) : order.status === 'cancelled' ? (
         <p className="op-note op-note--bad">Este pedido se canceló y no se hizo ningún cargo. Si tienes dudas escríbenos.</p>
+      ) : order.status === 'pending' ? (
+        <p className="op-note op-note--warn">Estamos confirmando tu pago con el banco. Si ya autorizaste el pago, no pagues de nuevo: te avisamos por correo en cuanto se confirme.</p>
       ) : (
-        <p className="op-note op-note--warn">El pago de este pedido no se completó y no se hizo ningún cargo. Puedes volver a comprar con otra tarjeta.</p>
+        <p className="op-note op-note--warn">El pago de este pedido no se completó. Si ves un cargo en tu tarjeta, escríbenos con tu número de pedido.</p>
       )}
 
       {(order.status === 'shipped' || order.status === 'delivered') && order.delivery.kind && (

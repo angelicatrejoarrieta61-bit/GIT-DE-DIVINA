@@ -126,7 +126,7 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
     }
 
     let discount = 0;
-    let freeShip = false; // cupón ENVIO*: envío en $0, sin descuento a productos
+    let shipType: string | null = null; let shipValue = 0; // cupón ENVIO*: descuenta del envío, no de productos
     const code = String(order.coupon_code || (typeof couponHint === 'string' ? couponHint : '') || '').toUpperCase().replace(/\s+/g, '');
     if (code) {
         const { data: v, error: vErr } = await db.rpc('validate_coupon', { p_code: code, p_subtotal: code.startsWith('ENVIO') ? null : subtotal });
@@ -136,11 +136,14 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
         } else if (v && (v as any).valid) {
             type = (v as any).discount_type; value = Number((v as any).discount_value) || 0;
         }
-        if (type && code.startsWith('ENVIO')) { freeShip = true; discount = 0; }
+        if (type && code.startsWith('ENVIO')) { shipType = type; shipValue = value; discount = 0; }
         else if (type) discount = r2(Math.min(type === 'percent' ? subtotal * Math.min(value, 100) / 100 : value, subtotal));
     }
     const products = r2(subtotal - discount);
-    const shipping = !SHIPPING_ACTIVE || freeShip || products <= 0 ? 0 : products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
+    const baseShip = !SHIPPING_ACTIVE || products <= 0 || products >= FREE_SHIPPING_FROM ? 0 : SHIPPING_COST;
+    const shipDisc = shipType && baseShip > 0 && shipValue > 0
+        ? r2(Math.min(shipType === 'percent' ? baseShip * Math.min(shipValue, 100) / 100 : shipValue, baseShip)) : 0;
+    const shipping = r2(baseShip - shipDisc);
     const expected = r2(products + shipping);
 
     if (Math.abs(expected - Number(clientAmount)) > 0.5) {
@@ -178,23 +181,29 @@ function cardLabel(pi: any): string | null {
         .filter(Boolean).join(' · ') || null;
 }
 
-function stripeFields(pi: any) {
+/**
+ * Datos de Stripe del pedido. Se guardan dentro de `payment_info` (columna que ya existe),
+ * así no hace falta ninguna migración de base de datos.
+ */
+function stripeInfo(existing: any, pi: any) {
     const amount = Number(pi?.amount);
     return {
+        ...(existing && typeof existing === 'object' ? existing : {}),
+        provider: 'stripe',
         stripe_payment_intent: pi?.id ?? null,
-        stripe_status: pi?.status ?? null,                                  // requires_payment_method · requires_action · processing · succeeded · canceled
-        stripe_payment_status: pi?.status === 'succeeded' ? 'paid' : 'unpaid',
+        stripe_status: pi?.status ?? null,   // requires_payment_method · requires_action · processing · succeeded · canceled
         stripe_amount: Number.isFinite(amount) ? amount / 100 : null,
         stripe_verified_at: new Date().toISOString(),
     };
 }
+const intentOf = (o: any): string | null => (o?.payment_info && typeof o.payment_info === 'object' ? o.payment_info.stripe_payment_intent : null) || null;
 
 /**
  * Aplica al pedido el estado de su PaymentIntent. Devuelve el estado final del pedido.
  * Lanza error si no se pudo escribir en la base (el webhook responde 500 y Stripe reintenta).
  */
 async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any): Promise<string> {
-    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,stripe_payment_intent').eq('id', orderId).maybeSingle();
+    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info').eq('id', orderId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!o) return 'not_found';
 
@@ -204,8 +213,7 @@ async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any
         return String(o.status);
     }
 
-    const f = stripeFields(pi);
-    const patch: Record<string, unknown> = { ...f };
+    const patch: Record<string, unknown> = { payment_info: stripeInfo(o.payment_info, pi) };
     let status = String(o.status);
     const received = Number(pi?.amount_received ?? pi?.amount ?? 0);
     const amountOk = Math.abs(received - cents(Number(o.total || 0))) <= 50;
@@ -215,14 +223,11 @@ async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any
     if (pi?.status === 'succeeded' && amountOk && ['pending', 'cancelled'].includes(status)) {
         patch.status = 'paid';
         patch.internal_note = null;
-        patch.stripe_paid_at = new Date().toISOString();
         patch.payment_info = {
-            ...(o.payment_info || {}),
-            provider: 'stripe',
-            stripe_payment_intent: pi.id,
+            ...stripeInfo(o.payment_info, pi),
             charge_id: typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge?.id ?? null,
             card,
-            paid_at: patch.stripe_paid_at,
+            paid_at: new Date().toISOString(),
         };
         status = 'paid';
     } else if (pi?.status === 'succeeded' && !amountOk && status === 'pending') {
@@ -315,7 +320,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, db: any, bo
         return res.status(502).json({ error: 'No se pudo iniciar el pago. Intenta de nuevo.' });
     }
 
-    const { error: upErr } = await db.from('orders').update(stripeFields(r.data)).eq('id', order.id);
+    const { error: upErr } = await db.from('orders').update({ payment_info: stripeInfo(order.payment_info, r.data) }).eq('id', order.id);
     if (upErr) console.error('[stripe] guardar intent:', upErr.message);
 
     return res.status(200).json({ client_secret: r.data.client_secret, payment_intent: r.data.id, amount: check.amount });
@@ -328,12 +333,13 @@ async function getIntent(id: string) {
 async function handleStatus(req: VercelRequest, res: VercelResponse, db: any, body: any) {
     const orderId = String(body?.orderId || '');
     if (!UUID_RE.test(orderId)) return res.status(400).json({ error: 'Pedido inválido.' });
-    const { data: o, error } = await db.from('orders').select('id,status,stripe_payment_intent').eq('id', orderId).maybeSingle();
-    if (error || !o) return res.status(404).json({ error: 'No se encontró el pedido.' });
-    if (PAID.includes(String(o.status)) || !o.stripe_payment_intent) return res.status(200).json({ ok: true, status: String(o.status) });
+    const { data: o, error } = await db.from('orders').select('id,status,payment_info').eq('id', orderId).maybeSingle();
+    if (error) { console.error('[stripe status]', error.message); return res.status(500).json({ error: 'No se pudo leer el pedido: ' + error.message }); }
+    if (!o) return res.status(404).json({ error: 'No se encontró el pedido.' });
+    if (PAID.includes(String(o.status)) || !intentOf(o)) return res.status(200).json({ ok: true, status: String(o.status) });
 
     try {
-        const r = await getIntent(o.stripe_payment_intent);
+        const r = await getIntent(intentOf(o)!);
         if (!r.ok) return res.status(200).json({ ok: true, status: String(o.status), error: `Stripe respondió ${r.status}` });
         const status = await applyIntent(req, db, orderId, r.data);
         return res.status(200).json({ ok: true, status, stripe_status: r.data?.status ?? null });
@@ -347,22 +353,22 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, db: any, bo
     const orderId = String(body?.orderId || '');
     if (!UUID_RE.test(orderId)) return res.status(400).json({ error: 'Pedido inválido.' });
     const reason = String(body?.reason || '').slice(0, 160);
-    const { data: o } = await db.from('orders').select('id,status,stripe_payment_intent').eq('id', orderId).maybeSingle();
+    const { data: o } = await db.from('orders').select('id,status,payment_info').eq('id', orderId).maybeSingle();
     if (!o) return res.status(404).json({ error: 'No se encontró el pedido.' });
     if (o.status !== 'pending') return res.status(200).json({ ok: true, status: String(o.status) });
 
-    if (o.stripe_payment_intent) {
+    if (intentOf(o)) {
         try {
-            const cur = await getIntent(o.stripe_payment_intent);
+            const cur = await getIntent(intentOf(o)!);
             // Si en realidad sí se cobró, no se cancela: se marca pagado
             if (cur.ok && cur.data?.status === 'succeeded') {
                 const status = await applyIntent(req, db, orderId, cur.data);
                 return res.status(200).json({ ok: true, status });
             }
             if (cur.ok && CANCELABLE.includes(String(cur.data?.status))) {
-                await stripeCall('POST', `/payment_intents/${encodeURIComponent(o.stripe_payment_intent)}/cancel`, { cancellation_reason: 'abandoned' });
+                await stripeCall('POST', `/payment_intents/${encodeURIComponent(intentOf(o)!)}/cancel`, { cancellation_reason: 'abandoned' });
             }
-            if (cur.ok) await db.from('orders').update(stripeFields({ ...cur.data, status: 'canceled' })).eq('id', orderId);
+            if (cur.ok) await db.from('orders').update({ payment_info: stripeInfo(o.payment_info, { ...cur.data, status: 'canceled' }) }).eq('id', orderId);
         } catch (e: any) {
             console.error('[stripe] cancel:', e?.message);
         }
