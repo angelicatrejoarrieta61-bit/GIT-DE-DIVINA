@@ -1,0 +1,11 @@
+# Código viejo de Clip (cuenta cancelada nov-2026). No se publica en Vercel:
+# así /api queda en 7 funciones (límite del plan gratuito: 12).
+api/test-clip.ts
+api/clip-payment.ts
+api/clip-card-token.ts
+api/clip-installments.ts
+api/clip-webhook.ts
+api/create-payment.ts
+src/hooks/useClipPayment.ts
+src/components/CheckoutModal.tsx
+src/components/CheckoutModal.css
