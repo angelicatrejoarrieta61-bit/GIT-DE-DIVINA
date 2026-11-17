@@ -10,10 +10,10 @@ import {
 } from 'lucide-react';
 import {
   listCoupons, saveCoupon, deleteCoupon, setCouponActive, getCouponUsage, generateCode,
-  couponLabel, couponDiscount, couponState, normalizeCode, CODE_PATTERN,
+  couponLabel, couponDiscount, couponState, normalizeCode, isShippingCoupon, CODE_PATTERN,
   type Coupon, type CouponInput, type CouponType, type CouponUsage, type CouponState,
 } from '../../lib/coupons';
-import { shippingFor } from '../../lib/shipping';
+import { shippingFor, baseShipping, shippingCouponDiscount } from '../../lib/shipping';
 import './AdminCoupons.css';
 
 // ─── Utilidades ───────────────────────────────────────────────
@@ -158,6 +158,9 @@ export const AdminCoupons: React.FC = () => {
           <button type="button" className="cpn-btn" onClick={() => setEditing({ coupon: null, seedCode: generateCode() })} disabled={missingTable}>
             <Sparkles size={13} aria-hidden="true" /> Generar código
           </button>
+          <button type="button" className="cpn-btn" onClick={() => setEditing({ coupon: null, seedCode: generateCode('ENVIO') })} disabled={missingTable}>
+            <Sparkles size={13} aria-hidden="true" /> Cupón de envío
+          </button>
           <button type="button" className="cpn-btn cpn-btn--primary" onClick={() => setEditing({ coupon: null })} disabled={missingTable}>
             <Plus size={14} aria-hidden="true" /> Nuevo cupón
           </button>
@@ -252,12 +255,12 @@ export const AdminCoupons: React.FC = () => {
                             {c.description && <span className="cpn-code__note">{c.description}</span>}
                           </div>
                         </td>
-                        <td><strong className="cpn-off">−{couponLabel(c.discount_type, c.discount_value)}</strong></td>
+                        <td><strong className="cpn-off">{isShippingCoupon(c.code) ? `Envío −${money(c.discount_value)}` : `−${couponLabel(c.discount_type, c.discount_value)}`}</strong></td>
                         <td className="c-hide-sm cpn-cond">
-                          {c.min_subtotal > 0 && <span>Mín. {money(c.min_subtotal)}</span>}
+                          {c.min_subtotal > 0 && !isShippingCoupon(c.code) && <span>Mín. {money(c.min_subtotal)}</span>}
                           {c.starts_at && <span>Desde {shortDate(c.starts_at)}</span>}
                           {c.ends_at && <span>Hasta {shortDate(c.ends_at)}</span>}
-                          {!c.min_subtotal && !c.starts_at && !c.ends_at && <span className="cpn-muted">Sin condiciones</span>}
+                          {(!c.min_subtotal || isShippingCoupon(c.code)) && !c.starts_at && !c.ends_at && <span className="cpn-muted">Sin vencimiento</span>}
                         </td>
                         <td className="c-num">
                           {u.uses}{c.max_uses != null && <span className="cpn-muted"> / {c.max_uses}</span>}
@@ -333,8 +336,9 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   const isNew = !coupon;
   const [code, setCode] = useState(coupon?.code ?? seedCode ?? '');
   const [description, setDescription] = useState(coupon?.description ?? '');
-  const [type, setType] = useState<CouponType>(coupon?.discount_type ?? 'percent');
-  const [value, setValue] = useState(coupon ? String(coupon.discount_value) : '10');
+  const startsShip = isShippingCoupon(coupon?.code ?? seedCode);
+  const [type, setType] = useState<CouponType>(startsShip ? 'fixed' : (coupon?.discount_type ?? 'percent'));
+  const [value, setValue] = useState(coupon ? String(coupon.discount_value) : startsShip ? '120' : '10');
   const [minSubtotal, setMinSubtotal] = useState(coupon && coupon.min_subtotal > 0 ? String(coupon.min_subtotal) : '');
   const [maxUses, setMaxUses] = useState(coupon?.max_uses != null ? String(coupon.max_uses) : '');
   const [startsAt, setStartsAt] = useState(toLocalInput(coupon?.starts_at ?? null));
@@ -346,6 +350,14 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
+  // Código ENVIO<monto>: todo se llena solo (monto fijo, nota, sin mínimo)
+  useEffect(() => {
+    if (!shipAuto) return;
+    setType('fixed');
+    setValue(shipAuto[1]);
+    setDescription((d) => (d === '' || d.startsWith('Envío: descuento') ? `Envío: descuento de $${shipAuto[1]}` : d));
+    setMinSubtotal('');
+  }, [cleanCodeKey]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
     window.addEventListener('keydown', onKey);
@@ -353,13 +365,15 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   }, [onClose, saving]);
 
   const cleanCode = normalizeCode(code);
-  const num = Number(value);
-  const min = minSubtotal === '' ? 0 : Number(minSubtotal);
+  const shipAuto = /^ENVIO[-_]?(\d+(?:\.\d+)?)$/.exec(cleanCode); // ENVIO120 → descuenta $120 del envío
+  const isShip = isShippingCoupon(cleanCode); // código ENVIO…: descuenta solo del envío, siempre monto fijo y sin mínimo
+  const num = shipAuto ? Number(shipAuto[1]) : Number(value);
+  const min = isShip || minSubtotal === '' ? 0 : Number(minSubtotal);
   const max = maxUses === '' ? null : Number(maxUses);
 
   const errors = {
     code: !CODE_PATTERN.test(cleanCode) ? 'De 3 a 40 caracteres: letras, números, guion o guion bajo.' : '',
-    value: !(num > 0) ? 'Escribe un valor mayor a 0.' : type === 'percent' && num > 100 ? 'El porcentaje no puede pasar de 100.' : '',
+    value: !(num > 0) ? 'Escribe un valor mayor a 0.' : !isShip && type === 'percent' && num > 100 ? 'El porcentaje no puede pasar de 100.' : '',
     min: !(min >= 0) ? 'Monto inválido.' : '',
     max: max !== null && !(Number.isInteger(max) && max > 0) ? 'Número entero mayor a 0, o vacío para ilimitado.' : '',
     dates: startsAt && endsAt && new Date(endsAt) <= new Date(startsAt) ? 'El fin debe ser después del inicio.' : '',
@@ -368,9 +382,10 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   const show = (k: keyof typeof errors) => (touched ? errors[k] : '');
 
   // Vista previa con un carrito de ejemplo
-  const sample = Math.max(1000, min || 0);
-  const off = !errors.value ? couponDiscount(type, num, sample) : 0;
+  const sample = isShip ? 500 : Math.max(1000, min || 0);
+  const off = !errors.value && !isShip ? couponDiscount(type, num, sample) : 0;
   const after = sample - off;
+  const shipOff = !errors.value && isShip ? shippingCouponDiscount('fixed', num, sample) : 0;
 
   const renamedWithUses = !isNew && uses > 0 && cleanCode !== coupon!.code;
 
@@ -382,7 +397,7 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
     const input: CouponInput = {
       code: cleanCode,
       description: description.trim() || null,
-      discount_type: type,
+      discount_type: isShip ? 'fixed' : type,
       discount_value: Math.round(num * 100) / 100,
       min_subtotal: Math.round(min * 100) / 100,
       max_uses: max,
@@ -414,7 +429,7 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
               aria-invalid={!!show('code')} aria-describedby="cpn-code-hint"
               className="cpn-mono"
             />
-            <button type="button" className="cpn-btn" onClick={() => setCode(generateCode())}><Sparkles size={13} aria-hidden="true" /> Generar</button>
+            <button type="button" className="cpn-btn" onClick={() => setCode(generateCode(isShip ? 'ENVIO' : 'DIVINA'))}><Sparkles size={13} aria-hidden="true" /> Generar</button>
           </div>
           <small id="cpn-code-hint" className={show('code') ? 'is-error' : ''}>
             {show('code') || 'La clienta lo escribe tal cual (mayúsculas o minúsculas da igual).'}
@@ -431,20 +446,25 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
           <div className="cpn-field">
             <span className="cpn-label" id="cpn-type-l">Tipo</span>
             <div className="cpn-seg" role="radiogroup" aria-labelledby="cpn-type-l">
-              <button type="button" role="radio" aria-checked={type === 'percent'} className={type === 'percent' ? 'is-on' : ''} onClick={() => setType('percent')}>Porcentaje</button>
-              <button type="button" role="radio" aria-checked={type === 'fixed'} className={type === 'fixed' ? 'is-on' : ''} onClick={() => setType('fixed')}>Monto fijo</button>
+              <button type="button" role="radio" aria-checked={!isShip && type === 'percent'} className={!isShip && type === 'percent' ? 'is-on' : ''}
+                onClick={() => { if (isShip) { setCode(generateCode()); setValue('10'); } setType('percent'); }}>Porcentaje</button>
+              <button type="button" role="radio" aria-checked={!isShip && type === 'fixed'} className={!isShip && type === 'fixed' ? 'is-on' : ''}
+                onClick={() => { if (isShip) { setCode(generateCode()); setValue('100'); } setType('fixed'); }}>Monto fijo</button>
+              <button type="button" role="radio" aria-checked={isShip} className={isShip ? 'is-on' : ''}
+                onClick={() => { if (!isShip) { setCode(generateCode('ENVIO')); setValue('120'); } setType('fixed'); }}>Envío</button>
             </div>
           </div>
           <div className="cpn-field">
-            <label htmlFor="cpn-value">{type === 'percent' ? 'Porcentaje (%)' : 'Monto (MXN)'}</label>
-            <input id="cpn-value" type="number" inputMode="decimal" min={0.01} max={type === 'percent' ? 100 : undefined} step="0.01"
+            <label htmlFor="cpn-value">{isShip ? 'Monto que descuenta del envío (MXN)' : type === 'percent' ? 'Porcentaje (%)' : 'Monto (MXN)'}</label>
+            <input id="cpn-value" type="number" inputMode="decimal" min={0.01} max={!isShip && type === 'percent' ? 100 : undefined} step="0.01"
               value={value} onChange={(e) => setValue(e.target.value)} aria-invalid={!!show('value')} />
-            {show('value') && <small className="is-error">{show('value')}</small>}
+            {show('value') ? <small className="is-error">{show('value')}</small>
+              : isShip ? <small>Solo descuenta del envío (máx. lo que cuesta, ${baseShipping(0.01)}). No toca el precio de los productos.</small> : null}
           </div>
         </div>
 
         <div className="cpn-grid2">
-          <div className="cpn-field">
+          <div className="cpn-field" hidden={isShip}>
             <label htmlFor="cpn-min">Compra mínima (MXN)</label>
             <input id="cpn-min" type="number" inputMode="decimal" min={0} step="0.01" placeholder="Sin mínimo"
               value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} aria-invalid={!!show('min')} />
@@ -454,17 +474,17 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
             <label htmlFor="cpn-max">Límite de usos</label>
             <input id="cpn-max" type="number" inputMode="numeric" min={1} step="1" placeholder="Ilimitado"
               value={maxUses} onChange={(e) => setMaxUses(e.target.value)} aria-invalid={!!show('max')} />
-            {show('max') ? <small className="is-error">{show('max')}</small> : <small>Cuenta pedidos pagados.</small>}
+            {show('max') ? <small className="is-error">{show('max')}</small> : <small>Cuenta pedidos pagados. Vacío = ilimitado.</small>}
           </div>
         </div>
 
         <div className="cpn-grid2">
           <div className="cpn-field">
-            <label htmlFor="cpn-start">Empieza (opcional)</label>
+            <label htmlFor="cpn-start">Empieza (opcional, vacío = ya)</label>
             <input id="cpn-start" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
           </div>
           <div className="cpn-field">
-            <label htmlFor="cpn-end">Termina (opcional)</label>
+            <label htmlFor="cpn-end">Termina (opcional, vacío = nunca vence)</label>
             <input id="cpn-end" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} aria-invalid={!!show('dates')} />
             {show('dates') && <small className="is-error">{show('dates')}</small>}
           </div>
@@ -476,7 +496,9 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
         </label>
 
         <div className="cpn-preview" aria-live="polite">
-          {errors.value ? 'Completa el valor para ver el ejemplo.' : (
+          {errors.value ? 'Completa el valor para ver el ejemplo.' : isShip ? (
+            <>Carrito de <strong>{money(sample)}</strong> → envío {money(baseShipping(sample))} <strong>−{money(shipOff)}</strong> → envío <strong>{shipOff >= baseShipping(sample) ? 'gratis' : money(baseShipping(sample) - shipOff)}</strong></>
+          ) : (
             <>Carrito de <strong>{money(sample)}</strong> → descuento <strong>−{money(off)}</strong> → paga <strong>{money(after)}</strong>
               {' '}+ envío {shippingFor(after) === 0 ? 'gratis' : money(shippingFor(after))}</>
           )}
