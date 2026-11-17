@@ -1,25 +1,29 @@
 /**
- * /api/stripe — Cobro con Stripe Checkout (página de pago alojada por Stripe).
+ * /api/stripe — Cobro con Stripe dentro del sitio (Payment Element + PaymentIntents).
+ *
+ * El formulario de tarjeta vive en el checkout de Divina (Stripe.js lo pinta en un iframe seguro:
+ * la tarjeta nunca pasa por nuestro servidor). El banco pide 3-D Secure ahí mismo, en un modal.
  *
  * POST { action: 'create', orderId, amount, couponCode?, customerEmail? }
- *   El servidor recalcula el total con precios de la base, crea la sesión de Stripe y devuelve { url }.
- *   El navegador redirige a esa url; Stripe cobra (tarjeta, 3-D Secure, Apple Pay / Google Pay si están activos).
+ *   El servidor recalcula el total con precios de la base y crea el PaymentIntent (MXN, solo tarjeta).
+ *   Devuelve { client_secret, payment_intent, amount }. El navegador confirma el pago con Stripe.js.
  *   409 { code: 'price_changed' | 'unavailable' | 'already_paid' }   Igual que antes con Clip.
  * POST { action: 'status', orderId }
- *   Consulta a Stripe la sesión del pedido y deja el pedido como corresponde (respaldo del webhook).
- * POST { action: 'cancel', orderId }
- *   La clienta regresó sin pagar: se expira la sesión en Stripe y se cancela el pedido si sigue sin pagar.
+ *   Consulta a Stripe el PaymentIntent del pedido y deja el pedido como corresponde
+ *   (aprobado y monto correcto → pagado + avisos; cancelado → cancelado). Respaldo del webhook.
+ * POST { action: 'cancel', orderId, reason? }
+ *   El pago falló o la clienta desistió: cancela el PaymentIntent (si aún se puede) y el pedido si sigue sin pagar.
  * POST (con encabezado Stripe-Signature)
- *   Webhook de Stripe. Firma verificada con STRIPE_WEBHOOK_SECRET. Eventos:
- *   checkout.session.completed · checkout.session.async_payment_succeeded ·
- *   checkout.session.async_payment_failed · checkout.session.expired
+ *   Webhook de Stripe, firma verificada con STRIPE_WEBHOOK_SECRET. Eventos:
+ *   payment_intent.succeeded · payment_intent.payment_failed · payment_intent.canceled
  *
  * Reglas:
- *   - Un pedido solo pasa a 'paid' si Stripe confirma payment_status = 'paid' con el monto correcto
- *     y la sesión pertenece a ese pedido. Nunca lo marca pagado el navegador.
+ *   - Un pedido solo pasa a 'paid' si Stripe reporta status = 'succeeded' con el monto correcto y el
+ *     PaymentIntent pertenece a ese pedido (metadata.order_id). Nunca lo marca pagado el navegador.
  *   - Sin dependencias nuevas: usa la API REST de Stripe con fetch.
  *
  * Variables en Vercel: STRIPE_SECRET_KEY · STRIPE_WEBHOOK_SECRET · SUPABASE_SERVICE_ROLE_KEY · SUPABASE_URL (o VITE_SUPABASE_URL)
+ * En el navegador: VITE_STRIPE_PUBLISHABLE_KEY (pk_…), pública por diseño.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
@@ -30,6 +34,8 @@ const UUID_RE = /^[0-9a-f-]{36}$/i;
 const PAID = ['paid', 'shipped', 'delivered'];
 const STRIPE_API = 'https://api.stripe.com/v1';
 const SIGNATURE_TOLERANCE_S = 300;
+/** Estados del PaymentIntent desde los que Stripe permite cancelarlo. */
+const CANCELABLE = ['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture'];
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const cents = (n: number) => Math.round(n * 100);
@@ -146,7 +152,7 @@ async function verifyCheckout(db: any, orderId: string, clientAmount: number, co
     return { ok: true, amount: expected, order: { ...order, total: expected } };
 }
 
-/* ───────────────────────── Pedido ↔ sesión de Stripe ───────────────────────── */
+/* ───────────────────────── Pedido ↔ PaymentIntent ───────────────────────── */
 
 /** Avisos de pedido pagado (el servidor de correo evita duplicados). */
 async function notifyPaid(req: VercelRequest, orderId: string) {
@@ -161,60 +167,72 @@ async function notifyPaid(req: VercelRequest, orderId: string) {
     }
 }
 
-function stripeFields(s: any) {
-    const amount = Number(s?.amount_total);
+/** Marca/tarjeta y último error legibles, si Stripe los manda. */
+function cardLabel(pi: any): string | null {
+    const ch = pi?.latest_charge && typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
+    const card = ch?.payment_method_details?.card || pi?.payment_method?.card || null;
+    if (!card) return null;
+    return [String(card.brand || '').toUpperCase(), card.last4 ? `•••• ${card.last4}` : '', card.funding === 'debit' ? 'débito' : card.funding === 'credit' ? 'crédito' : '']
+        .filter(Boolean).join(' · ') || null;
+}
+
+function stripeFields(pi: any) {
+    const amount = Number(pi?.amount);
     return {
-        stripe_session_id: s?.id ?? null,
-        stripe_payment_intent: typeof s?.payment_intent === 'string' ? s.payment_intent : s?.payment_intent?.id ?? null,
-        stripe_status: s?.status ?? null,                    // open · complete · expired
-        stripe_payment_status: s?.payment_status ?? null,    // paid · unpaid · no_payment_required
+        stripe_payment_intent: pi?.id ?? null,
+        stripe_status: pi?.status ?? null,                                  // requires_payment_method · requires_action · processing · succeeded · canceled
+        stripe_payment_status: pi?.status === 'succeeded' ? 'paid' : 'unpaid',
         stripe_amount: Number.isFinite(amount) ? amount / 100 : null,
         stripe_verified_at: new Date().toISOString(),
     };
 }
 
 /**
- * Aplica al pedido el estado de su sesión de Stripe. Devuelve el estado final del pedido.
+ * Aplica al pedido el estado de su PaymentIntent. Devuelve el estado final del pedido.
  * Lanza error si no se pudo escribir en la base (el webhook responde 500 y Stripe reintenta).
  */
-async function applySession(req: VercelRequest, db: any, orderId: string, session: any): Promise<string> {
-    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,stripe_session_id').eq('id', orderId).maybeSingle();
+async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any): Promise<string> {
+    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,stripe_payment_intent').eq('id', orderId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!o) return 'not_found';
 
-    // La sesión debe ser de este pedido
-    const sessionOrder = session?.metadata?.order_id || session?.client_reference_id;
-    if (sessionOrder !== orderId) {
-        console.error('[stripe] la sesión no corresponde al pedido', session?.id, orderId);
+    // El cobro debe ser de este pedido
+    if (pi?.metadata?.order_id !== orderId) {
+        console.error('[stripe] el PaymentIntent no corresponde al pedido', pi?.id, orderId);
         return String(o.status);
     }
 
-    const f = stripeFields(session);
+    const f = stripeFields(pi);
     const patch: Record<string, unknown> = { ...f };
     let status = String(o.status);
-    const amountOk = session?.amount_total != null && Math.abs(Number(session.amount_total) - cents(Number(o.total || 0))) <= 50;
-    const paidNow = session?.payment_status === 'paid';
+    const received = Number(pi?.amount_received ?? pi?.amount ?? 0);
+    const amountOk = Math.abs(received - cents(Number(o.total || 0))) <= 50;
+    const card = cardLabel(pi);
+    const lastErr = pi?.last_payment_error?.message || pi?.last_payment_error?.decline_code || null;
 
-    if (paidNow && amountOk && ['pending', 'cancelled'].includes(status)) {
+    if (pi?.status === 'succeeded' && amountOk && ['pending', 'cancelled'].includes(status)) {
         patch.status = 'paid';
         patch.internal_note = null;
         patch.stripe_paid_at = new Date().toISOString();
         patch.payment_info = {
             ...(o.payment_info || {}),
             provider: 'stripe',
-            stripe_payment_intent: f.stripe_payment_intent,
-            stripe_session_id: f.stripe_session_id,
+            stripe_payment_intent: pi.id,
+            charge_id: typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge?.id ?? null,
+            card,
             paid_at: patch.stripe_paid_at,
         };
         status = 'paid';
-    } else if (paidNow && !amountOk && status === 'pending') {
-        patch.internal_note = `Stripe cobró $${(Number(session.amount_total) / 100).toFixed(2)} y el pedido es de $${Number(o.total).toFixed(2)}: revisar antes de enviar.`;
-    } else if (session?.status === 'expired' && status === 'pending') {
+    } else if (pi?.status === 'succeeded' && !amountOk && status === 'pending') {
+        patch.internal_note = `Stripe cobró $${(received / 100).toFixed(2)} y el pedido es de $${Number(o.total).toFixed(2)}: revisar antes de enviar.`;
+    } else if (pi?.status === 'canceled' && status === 'pending') {
         patch.status = 'cancelled';
-        patch.internal_note = 'Stripe: la sesión de pago venció sin pagarse.';
+        patch.internal_note = `Stripe: pago cancelado${pi?.cancellation_reason ? ` (${pi.cancellation_reason})` : ''}.`;
         status = 'cancelled';
-    } else if (session?.status === 'complete' && session?.payment_status === 'unpaid' && status === 'pending') {
-        patch.internal_note = 'Stripe: pago en proceso (método diferido).';
+    } else if (pi?.status === 'processing' && status === 'pending') {
+        patch.internal_note = 'Stripe: pago en proceso.';
+    } else if (lastErr && status === 'pending') {
+        patch.internal_note = `Stripe: ${String(lastErr).slice(0, 180)}`;
     }
 
     const { error: upErr } = await db.from('orders').update(patch).eq('id', orderId);
@@ -251,95 +269,103 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, db: any, bo
     }
 
     const order = check.order;
-    const host = siteHost(req);
     const short = shortId(order.id);
     const summary = (Array.isArray(order.items) ? order.items : [])
         .map((it: any) => `${Math.max(1, Math.floor(Number(it?.quantity) || 1))} × ${it?.product?.name ?? 'Producto'}`)
         .join(', ')
         .slice(0, 480);
     const email = String(order.customer_email || customerEmail || '').trim();
+    const name = String(order.customer_name || '').trim().slice(0, 100);
 
     const params: Record<string, any> = {
-        mode: 'payment',
-        locale: 'es-419',
-        client_reference_id: order.id,
-        customer_email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined,
-        line_items: [{
-            quantity: 1,
-            price_data: {
-                currency: 'mxn',
-                unit_amount: cents(check.amount),
-                product_data: { name: `Divina Store · Pedido ${short}`, description: summary || undefined },
+        amount: cents(check.amount),
+        currency: 'mxn',
+        payment_method_types: ['card'],
+        description: `Divina Store · Pedido ${short}${summary ? ` · ${summary}` : ''}`.slice(0, 500),
+        metadata: { order_id: order.id, order_number: short },
+        receipt_email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined,
+        // Datos de la clienta para el antifraude del banco (Radar): nombre, correo y domicilio del pedido
+        shipping: name ? {
+            name,
+            phone: String(order.customer_phone || '').replace(/\D/g, '').slice(-10) || undefined,
+            address: {
+                line1: String(order.customer_address || '').slice(0, 200) || undefined,
+                city: String(order.customer_city || '').slice(0, 80) || undefined,
+                state: String(order.customer_state || '').slice(0, 60) || undefined,
+                postal_code: /^\d{5}$/.test(String(order.customer_zip || '')) ? String(order.customer_zip) : undefined,
+                country: 'MX',
             },
-        }],
-        metadata: { order_id: order.id },
-        payment_intent_data: { description: `Divina Store · Pedido ${short}`, metadata: { order_id: order.id } },
-        success_url: `https://${host}/pago-exitoso?order=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `https://${host}/checkout?pago=cancelado&order=${order.id}`,
+        } : undefined,
     };
 
     let r;
     try {
-        r = await stripeCall('POST', '/checkout/sessions', params, `divina-${order.id}-${cents(check.amount)}`);
+        r = await stripeCall('POST', '/payment_intents', params, `divina-pi-${order.id}-${cents(check.amount)}`);
     } catch (e: any) {
         console.error('[stripe] create:', e?.message);
         await cancelUnpaid(db, order.id, `Error al conectar con Stripe: ${String(e?.message || '').slice(0, 160)}`);
-        return res.status(500).json({ error: 'No se pudo abrir el pago. Intenta de nuevo.' });
+        return res.status(500).json({ error: 'No se pudo iniciar el pago. Intenta de nuevo.' });
     }
-    if (!r.ok || !r.data?.url) {
+    if (!r.ok || !r.data?.client_secret) {
         const why = r.data?.error?.message || `HTTP ${r.status}`;
         console.error('[stripe] create:', r.status, why);
-        await cancelUnpaid(db, order.id, `Stripe no creó la sesión: ${String(why).slice(0, 160)}`);
-        return res.status(502).json({ error: 'No se pudo abrir el pago. Intenta de nuevo.' });
+        await cancelUnpaid(db, order.id, `Stripe no creó el cobro: ${String(why).slice(0, 160)}`);
+        return res.status(502).json({ error: 'No se pudo iniciar el pago. Intenta de nuevo.' });
     }
 
     const { error: upErr } = await db.from('orders').update(stripeFields(r.data)).eq('id', order.id);
-    if (upErr) console.error('[stripe] guardar sesión:', upErr.message);
+    if (upErr) console.error('[stripe] guardar intent:', upErr.message);
 
-    return res.status(200).json({ url: r.data.url });
+    return res.status(200).json({ client_secret: r.data.client_secret, payment_intent: r.data.id, amount: check.amount });
+}
+
+async function getIntent(id: string) {
+    return stripeCall('GET', `/payment_intents/${encodeURIComponent(id)}?expand[]=latest_charge`);
 }
 
 async function handleStatus(req: VercelRequest, res: VercelResponse, db: any, body: any) {
     const orderId = String(body?.orderId || '');
     if (!UUID_RE.test(orderId)) return res.status(400).json({ error: 'Pedido inválido.' });
-    const { data: o, error } = await db.from('orders').select('id,status,stripe_session_id').eq('id', orderId).maybeSingle();
+    const { data: o, error } = await db.from('orders').select('id,status,stripe_payment_intent').eq('id', orderId).maybeSingle();
     if (error || !o) return res.status(404).json({ error: 'No se encontró el pedido.' });
-    if (PAID.includes(String(o.status)) || !o.stripe_session_id) return res.status(200).json({ ok: true, status: String(o.status) });
+    if (PAID.includes(String(o.status)) || !o.stripe_payment_intent) return res.status(200).json({ ok: true, status: String(o.status) });
 
     try {
-        const r = await stripeCall('GET', `/checkout/sessions/${encodeURIComponent(o.stripe_session_id)}`);
+        const r = await getIntent(o.stripe_payment_intent);
         if (!r.ok) return res.status(200).json({ ok: true, status: String(o.status), error: `Stripe respondió ${r.status}` });
-        const status = await applySession(req, db, orderId, r.data);
-        return res.status(200).json({ ok: true, status });
+        const status = await applyIntent(req, db, orderId, r.data);
+        return res.status(200).json({ ok: true, status, stripe_status: r.data?.status ?? null });
     } catch (e: any) {
         console.error('[stripe] status:', e?.message);
         return res.status(500).json({ error: 'No se pudo consultar el pago.' });
     }
 }
 
-async function handleCancel(_req: VercelRequest, res: VercelResponse, db: any, body: any) {
+async function handleCancel(req: VercelRequest, res: VercelResponse, db: any, body: any) {
     const orderId = String(body?.orderId || '');
     if (!UUID_RE.test(orderId)) return res.status(400).json({ error: 'Pedido inválido.' });
-    const { data: o } = await db.from('orders').select('id,status,stripe_session_id').eq('id', orderId).maybeSingle();
+    const reason = String(body?.reason || '').slice(0, 160);
+    const { data: o } = await db.from('orders').select('id,status,stripe_payment_intent').eq('id', orderId).maybeSingle();
     if (!o) return res.status(404).json({ error: 'No se encontró el pedido.' });
     if (o.status !== 'pending') return res.status(200).json({ ok: true, status: String(o.status) });
 
-    if (o.stripe_session_id) {
+    if (o.stripe_payment_intent) {
         try {
-            const cur = await stripeCall('GET', `/checkout/sessions/${encodeURIComponent(o.stripe_session_id)}`);
-            // Si en realidad sí pagó (p. ej. regresó con el botón Atrás después de pagar), no se cancela
-            if (cur.ok && cur.data?.payment_status === 'paid') {
-                const status = await applySession(_req, db, orderId, cur.data);
+            const cur = await getIntent(o.stripe_payment_intent);
+            // Si en realidad sí se cobró, no se cancela: se marca pagado
+            if (cur.ok && cur.data?.status === 'succeeded') {
+                const status = await applyIntent(req, db, orderId, cur.data);
                 return res.status(200).json({ ok: true, status });
             }
-            if (cur.ok && cur.data?.status === 'open') {
-                await stripeCall('POST', `/checkout/sessions/${encodeURIComponent(o.stripe_session_id)}/expire`);
+            if (cur.ok && CANCELABLE.includes(String(cur.data?.status))) {
+                await stripeCall('POST', `/payment_intents/${encodeURIComponent(o.stripe_payment_intent)}/cancel`, { cancellation_reason: 'abandoned' });
             }
+            if (cur.ok) await db.from('orders').update(stripeFields({ ...cur.data, status: 'canceled' })).eq('id', orderId);
         } catch (e: any) {
             console.error('[stripe] cancel:', e?.message);
         }
     }
-    await cancelUnpaid(db, orderId, 'La clienta regresó de Stripe sin pagar.');
+    await cancelUnpaid(db, orderId, reason ? `Pago no completado: ${reason}` : 'Pago no completado.');
     return res.status(200).json({ ok: true, status: 'cancelled' });
 }
 
@@ -367,25 +393,15 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse, db: any, r
     let event: any;
     try { event = JSON.parse(raw); } catch { return res.status(400).json({ error: 'JSON inválido.' }); }
 
-    const handled = [
-        'checkout.session.completed',
-        'checkout.session.async_payment_succeeded',
-        'checkout.session.async_payment_failed',
-        'checkout.session.expired',
-    ];
+    const handled = ['payment_intent.succeeded', 'payment_intent.payment_failed', 'payment_intent.canceled'];
     if (!handled.includes(event?.type)) return res.status(200).json({ received: true, ignored: event?.type });
 
-    const session = event.data?.object;
-    const orderId = String(session?.metadata?.order_id || session?.client_reference_id || '');
+    const pi = event.data?.object;
+    const orderId = String(pi?.metadata?.order_id || '');
     if (!UUID_RE.test(orderId)) return res.status(200).json({ received: true, ignored: 'sin pedido' });
 
     try {
-        if (event.type === 'checkout.session.async_payment_failed') {
-            await db.from('orders').update({ ...stripeFields(session), status: 'cancelled', internal_note: 'Stripe: el pago diferido falló.' })
-                .eq('id', orderId).eq('status', 'pending');
-            return res.status(200).json({ received: true, status: 'cancelled' });
-        }
-        const status = await applySession(req, db, orderId, session);
+        const status = await applyIntent(req, db, orderId, pi);
         return res.status(200).json({ received: true, status });
     } catch (e: any) {
         console.error('[stripe] webhook:', e?.message);

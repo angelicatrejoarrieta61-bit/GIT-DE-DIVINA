@@ -1,6 +1,6 @@
 # Divina Store MX — Arquitectura y conexiones
 
-**Actualizado:** 11 de noviembre de 2026 · **Admin:** v1.3
+**Actualizado:** 16 de noviembre de 2026 (pagos con Stripe) · **Admin:** v1.3
 **Sitio:** https://www.divinastore.com.mx · **Repo:** `angelicatrejoarrieta61-bit/GIT-DE-DIVINA` (rama `main`)
 
 Este documento explica cómo está armado el sitio y con qué se conecta, para que quien lo siga editando no tenga que adivinar. Está escrito a partir del código real. Sustituye a `DEVELOPER_GUIDE.md` y `ESTRUCTURA_PROYECTO.md` (mayo 2026), que quedaron desactualizados (por ejemplo, mencionan una columna `sku` que no existe).
@@ -155,22 +155,23 @@ Casi todo lo visual sale de la tabla `store_config`: logo, tipografías, textos 
 - `page_bg_mode` (`default` / `solid` / `gradient`), `page_bg_c1`, `page_bg_c2`, `page_bg_c3`, `page_bg_angle` — fondo de la tienda
 - `home_layout_order` — orden de bloques del Home
 
-## 9. Pagos (Stripe Checkout) — desde 16-nov-2026
+## 9. Pagos (Stripe, formulario dentro del sitio) — desde 16-nov-2026
 
-Clip canceló la cuenta de forma definitiva el 14-nov-2026 (folio 05550506). El cobro pasó a **Stripe Checkout**: la clienta paga en la página de Stripe y Divina nunca ve la tarjeta. Sin dependencias nuevas: `api/stripe.ts` usa la API REST de Stripe con `fetch`.
+Clip canceló la cuenta de forma definitiva el 14-nov-2026 (folio 05550506). El cobro pasó a **Stripe con Payment Element**: la tarjeta se captura **dentro del checkout de Divina** (Stripe la pinta en un iframe seguro; nunca toca nuestro servidor) y 3-D Secure sale en un modal en la misma página. Sin dependencias nuevas: `api/stripe.ts` usa la API REST de Stripe con `fetch`; el checkout carga `https://js.stripe.com/v3/` solo en `/checkout`.
 
-1. **Checkout** (`CheckoutPage.tsx`): valida datos de envío, revalida el cupón, crea el pedido `pending` y llama a `/api/stripe` con `{ action: 'create', orderId, amount, couponCode }`.
-2. **`/api/stripe` · create:** recalcula el total en el servidor (precios actuales de `products`, cupón con `validate_coupon`, regla de envío). Si cambió → 409 `price_changed`; producto agotado → 409 `unavailable`; ya pagado → 409 `already_paid`. Si cuadra, crea la sesión (`POST /v1/checkout/sessions`, `mode=payment`, MXN, una línea "Divina Store · Pedido XXXXXXXX" con el total del servidor, `client_reference_id` y `metadata.order_id` = id del pedido, `locale=es-419`) con `Idempotency-Key`, guarda `stripe_session_id` y devuelve la `url`. El navegador redirige a Stripe. **El carrito no se vacía** hasta que el pago se confirma.
-3. **Stripe cobra** (tarjeta y 3-D Secure en su página; Apple Pay / Google Pay si están activos en el dashboard de Stripe).
-4. **Regreso pagado** → `/pago-exitoso?order=<id>&session_id=...`: la página llama a `/api/stripe` · `status`; el servidor consulta la sesión a Stripe y, si `payment_status = 'paid'`, el monto coincide (±$0.50) y la sesión es de ese pedido, lo marca `paid` y manda los avisos (`send-email` · `order-paid`). Luego la página vacía el carrito y registra `purchase` en Analytics (solo la primera vez).
-5. **Webhook** (`POST /api/stripe` con `Stripe-Signature`, firma validada con `STRIPE_WEBHOOK_SECRET`, tolerancia 5 min): `checkout.session.completed` y `checkout.session.async_payment_succeeded` → misma regla del punto 4 (por si la clienta cerró la pestaña); `checkout.session.async_payment_failed` → cancelado; `checkout.session.expired` → cancelado si seguía sin pagar. Si no se pudo escribir en la base responde 500 y Stripe reintenta.
-6. **Regreso sin pagar** → `/checkout?pago=cancelado&order=<id>`: el checkout llama a `/api/stripe` · `cancel`, que expira la sesión en Stripe y cancela el pedido (si en realidad sí se pagó, lo marca pagado y manda a `/pago-exitoso`). La clienta ve "No se completó el pago. No se hizo ningún cargo" con su carrito intacto.
-7. **Candados en la base** (`20261116120000_orders_stripe.sql`): las columnas `stripe_*` solo las escribe el servidor; la llave pública (`anon`) **no puede** crear ni cambiar un pedido a `paid/shipped/delivered`. La sesión del admin sí puede cambiar el estado (pagos por transferencia).
-8. **Admin → Pedidos:** un pedido con `stripe_payment_status = 'paid'` cuenta como cobro confirmado (columna de pago "Aprobado") y habilita "Enviar pedido". El monto comparado es `stripe_amount`.
+1. **Checkout** (`CheckoutPage.tsx`): al abrir, monta el Payment Element en modo diferido (`elements({ mode: 'payment', amount, currency: 'mxn', paymentMethodTypes: ['card'] })`) con la apariencia de la tienda (colores del admin, tema plano, etiquetas flotantes). El botón "Pagar" se habilita cuando Stripe reporta la tarjeta completa. Si cambia el total (cupón), `elements.update({ amount })`.
+2. **Al pagar:** valida envío → `elements.submit()` (Stripe valida la tarjeta) → crea el pedido `pending` → `/api/stripe · create` **recalcula el total en el servidor** (precios actuales, cupón con `validate_coupon`, envío; 409 `price_changed` / `unavailable` / `already_paid`) y crea el **PaymentIntent** (MXN, `payment_method_types: ['card']`, `metadata.order_id`, `receipt_email`, `shipping` con los datos del pedido para el antifraude) con `Idempotency-Key`; guarda `stripe_payment_intent` y devuelve `client_secret`.
+3. **Cobro:** `stripe.confirmPayment({ elements, clientSecret, redirect: 'if_required' })` con `billing_details` del formulario. Si el banco pide autorizar, Stripe abre el 3-D Secure en un modal; no hay redirección.
+4. **Aprobado:** el checkout llama `/api/stripe · status`; el servidor consulta el PaymentIntent (`expand[]=latest_charge`) y, si `status = 'succeeded'`, el monto coincide (±$0.50) y el intent es de ese pedido, lo marca `paid` (con tarjeta: marca · últimos 4 · crédito/débito en `payment_info.card`) y manda los avisos (`send-email` · `order-paid`). Luego carrito vacío, `purchase` en Analytics y `/pago-exitoso`. **El navegador nunca marca pagado.**
+5. **Rechazado:** `confirmPayment` devuelve error → el checkout llama `/api/stripe · cancel` (cancela el PaymentIntent si aún se puede y el pedido con el motivo) y muestra "Tu banco no aprobó el pago…" sin salir de la página. Si algo falla antes de cobrar (total cambió, Stripe no respondió), el pedido también se cancela con el motivo.
+6. **Webhook** (`POST /api/stripe` con `Stripe-Signature`, firma validada con `STRIPE_WEBHOOK_SECRET`, tolerancia 5 min): `payment_intent.succeeded` → misma regla del punto 4 (por si la clienta cerró la pestaña); `payment_intent.canceled` → cancelado; `payment_intent.payment_failed` → nota con el motivo. Si no se pudo escribir en la base responde 500 y Stripe reintenta.
+7. **`/pago-exitoso`:** consulta `status` al abrir y cada 4 s mientras siga `pending` (pago en proceso); solo dice "aprobado" cuando el servidor lo confirmó.
+8. **Candados en la base** (`20261116120000_orders_stripe.sql`): las columnas `stripe_*` solo las escribe el servidor; la llave pública (`anon`) **no puede** crear ni cambiar un pedido a `paid/shipped/delivered`. La sesión del admin sí puede (pagos por transferencia).
+9. **Admin → Pedidos:** un pedido con `stripe_payment_status = 'paid'` cuenta como cobro confirmado ("Aprobado") y habilita "Enviar pedido". El monto comparado es `stripe_amount`.
 
-**Variables (Vercel):** `STRIPE_SECRET_KEY` (sk_…), `STRIPE_WEBHOOK_SECRET` (whsec_…). `VITE_STRIPE_PUBLISHABLE_KEY` (pk_…) queda reservada; Checkout alojado no la necesita.
-**Webhook en Stripe:** Developers → Webhooks → endpoint `https://www.divinastore.com.mx/api/stripe` (el dominio exacto que abre sin redirigir) con los 4 eventos del punto 5.
-**Prueba:** en modo prueba, tarjeta `4242 4242 4242 4242`, cualquier fecha futura y CVC. Nunca probar con tarjetas reales en producción.
+**Variables (Vercel):** `STRIPE_SECRET_KEY` (sk_…), `STRIPE_WEBHOOK_SECRET` (whsec_…), `VITE_STRIPE_PUBLISHABLE_KEY` (pk_…, pública por diseño).
+**Webhook en Stripe:** Developers → Webhooks → endpoint `https://www.divinastore.com.mx/api/stripe` con `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`.
+**Prueba:** con llaves `test`, tarjeta `4242 4242 4242 4242` (3DS: `4000 0027 6000 3184`; rechazo: `4000 0000 0000 0002`). Nunca probar con tarjetas reales en producción. Guía completa: `STRIPE_INTEGRATION_TODO.md`.
 
 ## 9 (histórico). Pagos (Clip) — cuenta cancelada el 14-nov-2026
 
@@ -375,7 +376,7 @@ Nunca se guardan en el repositorio.
 |---|---|---|
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Navegador y build | Sí |
 | `VITE_CLIP_API_KEY` | Ya no se usa (Clip cancelado) | Sí |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Reservada (Stripe Checkout alojado no la necesita) | Sí |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Formulario de tarjeta (Payment Element) | Sí |
 | `VITE_GA_MEASUREMENT_ID` | Google Analytics | Sí |
 | `SUPABASE_URL` | Funciones `/api` | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sourcing-search`, `admin-users`, `send-email` (avisos de pedido), `charge-clip` (marcar pagado), `clip-verify` | **No** |
@@ -435,7 +436,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - **Feed de Google Merchant Center** (productos gratis en Google Shopping): no está; el schema ya trae precio, envío y política sin devoluciones.
 - **Migración `20261009120000_orders_clip.sql`:** debe correrse en Supabase para que exista la columna Pago Clip y el candado.
 - **Migración `20261116120000_orders_stripe.sql`:** columnas `stripe_*` y candado de estado; se aplica sola con la Action al hacer push.
-- **Stripe — pendientes:** (a) el admin de Pedidos sigue rotulando la columna como "Pago Clip" y el modal "Pagos Clip"; un pedido de Stripe se ve "Aprobado". (b) Imágenes del checkout con logos de Clip (`checkout_payment_img`, `checkout_footer_img`, etc.): cambiarlas en Admin → Checkout. (c) El cron sigue llamando `charge-clip · sweep` (sin efecto). (d) Comisión de Clip 5 % en el cálculo de margen: actualizar a la comisión de Stripe cuando se confirme la tarifa de la cuenta.
+- **Stripe — pendientes:** (a) el admin de Pedidos sigue rotulando la columna como "Pago Clip" y el modal "Pagos Clip"; un pedido de Stripe se ve "Aprobado". (b) Imágenes del checkout con logos de Clip (`checkout_payment_img`, `checkout_footer_img`, etc.): cambiarlas en Admin → Checkout. (c) El cron sigue llamando `charge-clip · sweep` (sin efecto). (d) Comisión de Clip 5 % en el cálculo de margen: actualizar a la comisión de Stripe cuando se confirme la tarifa de la cuenta. (e) Los 9 archivos muertos de Clip quedaron vacíos (y en `.vercelignore`); borrarlos del repo cuando se pueda.
 - **Migración `20261025120000_coupons.sql`:** crea `coupons`, `validate_coupon`, columnas `orders.coupon_code`/`discount_amount` y el primer cupón `DESCUENTO202610`. Hasta correrla, `/admin/cupones` muestra el aviso y la tienda solo acepta ese código.
 
 **Revisión del proceso de compra (25-oct-2026)** — hallazgos, sin cambios aplicados:
@@ -443,7 +444,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - ~~Pedido marcado `paid` desde el navegador~~ **Resuelto el 16-nov-2026:** el checkout ya no lo hace y el trigger `orders_protect_stripe` impide que la llave pública ponga `paid/shipped/delivered`.
 - ~~Al aplicar un cupón se volvía a montar el formulario de tarjeta de Clip~~ Ya no aplica: la tarjeta se captura en Stripe.
 - **Enlaces rotos:** "Términos y Condiciones" (`/terminos`) y "Aviso de Privacidad" (`/privacidad`) no tienen ruta: dan 404.
-- **"Hasta 12 MSI según tu banco"** en el resumen, pero el cobro va con `installments: 1`.
+- ~~"Hasta 12 MSI según tu banco" en el resumen~~ Cambiado el 16-nov-2026 a "Tarjetas de crédito y débito" (Stripe Checkout no tiene MSI configurado).
 - **Teléfono, CP y colonia** no se validan antes de pagar (solo nombre, correo, calle y ciudad).
 - **El carrito se reabre solo** al recargar si estaba abierto (`isOpen` se guarda en `localStorage`).
 - `removeItem` quita por producto e ignora la variante.
@@ -454,6 +455,7 @@ Para trabajar en local: `npm install`, crear un `.env` con las variables `VITE_*
 - Decidir si se quitan las citas de estudios del generador de blog.
 - La imagen de métodos de pago del checkout muestra PayPal, Discover, Diners y SPEI, pero solo se cobra con tarjeta; los sellos prometen "30-day money back" y "24/7 support".
 - El campo Referencia del checkout viene prellenado con "Casa".
-- Borrar el código antiguo de Clip y los archivos sueltos de la raíz, una vez confirmado que nada los usa.
+- Borrar los archivos sueltos de la raíz, una vez confirmado que nada los usa (el código muerto de Clip se borró el 16-nov-2026).
+- **Lección de Clip para Stripe:** la cuenta de Stripe va a nombre de quien opera Divina y con el giro real (venta en línea de dermocosmética). Cobrar con una cuenta de otro negocio o con otro giro es motivo de cierre.
 - **Cuenta de Clip (10-nov-2026):** los cobros salen a nombre de **EQ CREACIONES ARTISTICAS LIBELULA MEXICO**, giro MCC 5045 "Venta de equipo de cómputo y telefonía". Es la causa más probable de rechazos del banco (`RE-ISS99`) y de contracargos por cargo no reconocido. Se arregla con Clip (cuenta o sub-afiliación de Divina con giro de cosméticos/farmacia), no en el código.
 - **3-D Secure de Clip:** documentación vigente en `https://developer.clip.mx/llms-full.txt` (las ligas `/reference/...` viejas dan 404). Soporte: soporte-checkout@clip.mx · developers@payclip.mx · 55 6393-2323.
