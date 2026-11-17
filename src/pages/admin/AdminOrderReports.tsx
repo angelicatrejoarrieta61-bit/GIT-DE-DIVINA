@@ -257,6 +257,10 @@ export const AdminOrderReports: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Antes de listar: confirma con Stripe los pedidos pendientes (quien pagó y cerró la página, avisos que no llegaron)
+    try {
+      await fetch('/api/stripe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reconcile' }) });
+    } catch { /* sin conexión: se intenta en la siguiente carga */ }
     setOrders(await getOrders());
     setLoading(false);
   }, []);

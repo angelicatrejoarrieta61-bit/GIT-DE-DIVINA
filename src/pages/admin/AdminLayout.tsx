@@ -88,7 +88,12 @@ export const AdminLayout: React.FC = () => {
   // ── Sesión ─────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession()
-      .then(({ data: { session } }) => { if (!session) navigate('/admin/login'); })
+      .then(async ({ data: { session } }) => {
+        if (!session) { navigate('/admin/login'); return; }
+        // Con verificación en 2 pasos activada, la sesión debe haber pasado el código (aal2)
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') navigate('/admin/login');
+      })
       .catch((err) => console.error('Session check error:', err))
       .finally(() => setLoading(false));
 

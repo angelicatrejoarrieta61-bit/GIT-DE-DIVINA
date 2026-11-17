@@ -206,7 +206,7 @@ const intentOf = (o: any): string | null => (o?.payment_info && typeof o.payment
  * Lanza error si no se pudo escribir en la base (el webhook responde 500 y Stripe reintenta).
  */
 async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any): Promise<string> {
-    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info').eq('id', orderId).maybeSingle();
+    const { data: o, error } = await db.from('orders').select('id,status,total,payment_info,items').eq('id', orderId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!o) return 'not_found';
 
@@ -245,10 +245,47 @@ async function applyIntent(req: VercelRequest, db: any, orderId: string, pi: any
         patch.internal_note = `Stripe: ${String(lastErr).slice(0, 180)}`;
     }
 
+    if (status === 'paid' && o.status !== 'paid') {
+        // Condicionado al estado anterior: si dos avisos llegan a la vez, solo uno descuenta inventario y avisa
+        const { data: upd, error: upErr } = await db.from('orders').update(patch).eq('id', orderId).in('status', ['pending', 'cancelled']).select('id');
+        if (upErr) throw new Error(upErr.message);
+        if (upd?.length) {
+            await takeStock(db, Array.isArray(o.items) ? o.items : []);
+            await notifyPaid(req, orderId);
+        }
+        return status;
+    }
     const { error: upErr } = await db.from('orders').update(patch).eq('id', orderId);
     if (upErr) throw new Error(upErr.message);
-    if (status === 'paid' && o.status !== 'paid') await notifyPaid(req, orderId);
     return status;
+}
+
+/** Descuenta del inventario lo vendido. Si el producto maneja `stock` y llega a 0, deja de mostrarse (in_stock=false). */
+async function takeStock(db: any, items: any[]) {
+    try {
+        const qtyById = new Map<string, number>();
+        for (const it of items) {
+            const id = it?.product?.id;
+            if (id) qtyById.set(String(id), (qtyById.get(String(id)) || 0) + Math.max(1, Math.floor(Number(it?.quantity) || 1)));
+        }
+        if (!qtyById.size) return;
+        const { data: prods } = await db.from('products').select('*').in('id', [...qtyById.keys()]);
+        for (const p of prods ?? []) {
+            const qty = qtyById.get(String(p.id)) || 0;
+            const patch: Record<string, unknown> = {};
+            if (typeof p.stock === 'number' || (typeof p.stock === 'string' && p.stock !== '' && !Number.isNaN(Number(p.stock)))) {
+                const left = Math.max(0, Number(p.stock) - qty);
+                patch.stock = left;
+                if (left === 0) patch.in_stock = false;
+            } // sin cantidad registrada (stock vacío): no se toca, el producto sigue disponible
+            if (Object.keys(patch).length) {
+                const { error } = await db.from('products').update(patch).eq('id', p.id);
+                if (error) console.error('[stripe] inventario', p.id, error.message);
+            }
+        }
+    } catch (e: any) {
+        console.error('[stripe] takeStock:', e?.message);
+    }
 }
 
 async function cancelUnpaid(db: any, orderId: string, note: string) {
