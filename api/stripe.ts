@@ -30,6 +30,9 @@ import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SHIPPING_COST, FREE_SHIPPING_FROM, SHIPPING_ACTIVE } from '../src/lib/seoRules.js';
 
+/** Sin parseo automático: el webhook necesita los bytes EXACTOS que manda Stripe para validar la firma. */
+export const config = { api: { bodyParser: false } };
+
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const PAID = ['paid', 'shipped', 'delivered'];
 const STRIPE_API = 'https://api.stripe.com/v1';
@@ -336,10 +339,27 @@ async function handleStatus(req: VercelRequest, res: VercelResponse, db: any, bo
     const { data: o, error } = await db.from('orders').select('id,status,payment_info').eq('id', orderId).maybeSingle();
     if (error) { console.error('[stripe status]', error.message); return res.status(500).json({ error: 'No se pudo leer el pedido: ' + error.message }); }
     if (!o) return res.status(404).json({ error: 'No se encontró el pedido.' });
-    if (PAID.includes(String(o.status)) || !intentOf(o)) return res.status(200).json({ ok: true, status: String(o.status) });
+    if (PAID.includes(String(o.status))) return res.status(200).json({ ok: true, status: String(o.status) });
 
     try {
-        const r = await getIntent(intentOf(o)!);
+        let piId = intentOf(o);
+        if (!piId) {
+            // Sin id guardado: se busca en Stripe el cobro de este pedido (metadata.order_id)
+            const found = await stripeCall('GET', `/payment_intents/search?query=${encodeURIComponent(`metadata['order_id']:'${orderId}'`)}&limit=1`);
+            piId = found.ok ? (found.data?.data?.[0]?.id ?? null) : null;
+            if (!piId) {
+                // La búsqueda de Stripe puede tardar o no estar permitida: se revisan los cobros recientes
+                const since = Math.floor(Date.now() / 1000) - 3 * 86400;
+                const recent = await stripeCall('GET', `/payment_intents?limit=100&created[gte]=${since}`);
+                const hit = recent.ok ? (recent.data?.data || []).find((x: any) => x?.metadata?.order_id === orderId) : null;
+                piId = hit?.id ?? null;
+            }
+            if (!piId) {
+                console.error('[stripe status] sin cobro encontrado', found.status, found.data?.error?.message);
+                return res.status(200).json({ ok: true, status: String(o.status), diag: { stripe_search_http: found.status, stripe_error: found.data?.error?.message ?? null, encontrados: found.data?.data?.length ?? 0 } });
+            }
+        }
+        const r = await getIntent(piId);
         if (!r.ok) return res.status(200).json({ ok: true, status: String(o.status), error: `Stripe respondió ${r.status}` });
         const status = await applyIntent(req, db, orderId, r.data);
         return res.status(200).json({ ok: true, status, stripe_status: r.data?.status ?? null });
@@ -375,6 +395,38 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, db: any, bo
     }
     await cancelUnpaid(db, orderId, reason ? `Pago no completado: ${reason}` : 'Pago no completado.');
     return res.status(200).json({ ok: true, status: 'cancelled' });
+}
+
+/**
+ * Red de seguridad: revisa los pedidos pendientes de los últimos 3 días contra Stripe y deja cada uno como
+ * corresponde (pagado si Stripe cobró). Cubre a quien pagó y cerró la página, o un aviso (webhook) que no llegó.
+ * Es seguro llamarla cuantas veces sea: solo copia lo que Stripe ya confirmó.
+ */
+async function handleReconcile(req: VercelRequest, res: VercelResponse, db: any) {
+    const sinceIso = new Date(Date.now() - 3 * 86400_000).toISOString();
+    const { data: pend, error } = await db.from('orders').select('id').eq('status', 'pending').gte('created_at', sinceIso).limit(200);
+    if (error) return res.status(500).json({ error: 'No se pudo leer pedidos: ' + error.message });
+    const ids = new Set((pend ?? []).map((o: any) => String(o.id)));
+    if (!ids.size) return res.status(200).json({ ok: true, revisados: 0, pagados: 0 });
+
+    const since = Math.floor(Date.now() / 1000) - 3 * 86400;
+    let pagados = 0; let revisados = 0; let cursor = ''; const seen = new Set<string>();
+    for (let page = 0; page < 5; page++) {
+        const r = await stripeCall('GET', `/payment_intents?limit=100&created[gte]=${since}${cursor ? `&starting_after=${cursor}` : ''}`);
+        if (!r.ok) return res.status(502).json({ error: 'Stripe respondió ' + r.status });
+        const list: any[] = r.data?.data || [];
+        for (const pi of list) {
+            const oid = String(pi?.metadata?.order_id || '');
+            if (!ids.has(oid) || seen.has(oid)) continue;
+            // un pedido puede tener varios intentos: gana el cobrado
+            if (pi.status !== 'succeeded' && list.some((x: any) => x?.metadata?.order_id === oid && x.status === 'succeeded')) continue;
+            seen.add(oid); revisados++;
+            try { if ((await applyIntent(req, db, oid, pi)) === 'paid') pagados++; } catch (e: any) { console.error('[stripe] reconcile', oid, e?.message); }
+        }
+        if (!r.data?.has_more || !list.length) break;
+        cursor = list[list.length - 1].id;
+    }
+    return res.status(200).json({ ok: true, revisados, pagados });
 }
 
 /* ───────────────────────── Webhook ───────────────────────── */
@@ -450,5 +502,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body?.action === 'create') return handleCreate(req, res, db, body);
     if (body?.action === 'status') return handleStatus(req, res, db, body);
     if (body?.action === 'cancel') return handleCancel(req, res, db, body);
+    if (body?.action === 'reconcile') return handleReconcile(req, res, db);
     return res.status(400).json({ error: 'Acción no reconocida.' });
 }
