@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { supabase } from '../../lib/supabase';
 
 interface AdminUser {
   id:              string;
@@ -21,9 +22,10 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
 
 async function apiRequest(action: string, body?: object) {
   const isGet = action === 'list';
+  const { data: s } = await supabase.auth.getSession();
   const res = await fetch(`${API_BASE}/api/admin-users`, {
     method: isGet ? 'GET' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` },
     body:    isGet ? undefined : JSON.stringify({ action, ...body }),
   });
   const json = await res.json();

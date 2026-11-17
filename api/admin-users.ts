@@ -28,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const supabaseAdmin = getAdminClient();
+
+    // Solo una sesión iniciada en el admin puede usar esta ruta (antes estaba abierta a cualquiera)
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+    if (!token) return res.status(401).json({ ok: false, error: 'Inicia sesión en el admin para continuar.' });
+    const { data: caller, error: callerErr } = await supabaseAdmin.auth.getUser(token);
+    if (callerErr || !caller?.user) return res.status(401).json({ ok: false, error: 'Tu sesión expiró. Vuelve a iniciar sesión.' });
+
     const { action, email, password, userId } = (req.body || {}) as Record<string, string>;
     const method = req.method?.toUpperCase();
 
@@ -81,8 +88,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ ok: false, error: 'userId es requerido.' });
       }
 
+      if (userId === caller.user.id) {
+        return res.status(400).json({ ok: false, error: 'No puedes eliminar tu propio usuario.' });
+      }
+
+      // Borrado definitivo; si la base lo impide (el usuario tiene datos ligados), se desactiva y se libera el correo
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (error) throw error;
+      if (error) {
+        console.error('[admin-users] borrado definitivo falló, se intenta desactivar:', error.message);
+        const { error: softErr } = await supabaseAdmin.auth.admin.deleteUser(userId, true);
+        if (softErr) throw softErr;
+        return res.status(200).json({ ok: true, soft: true });
+      }
 
       return res.status(200).json({ ok: true });
     }
