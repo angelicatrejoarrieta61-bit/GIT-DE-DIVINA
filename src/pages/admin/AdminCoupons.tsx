@@ -158,7 +158,7 @@ export const AdminCoupons: React.FC = () => {
           <button type="button" className="cpn-btn" onClick={() => setEditing({ coupon: null, seedCode: generateCode() })} disabled={missingTable}>
             <Sparkles size={13} aria-hidden="true" /> Generar código
           </button>
-          <button type="button" className="cpn-btn" onClick={() => setEditing({ coupon: null, seedCode: generateCode('ENVIO') })} disabled={missingTable}>
+          <button type="button" className="cpn-btn" onClick={() => setEditing({ coupon: null, seedCode: 'ENVIO120' })} disabled={missingTable}>
             <Sparkles size={13} aria-hidden="true" /> Cupón de envío
           </button>
           <button type="button" className="cpn-btn cpn-btn--primary" onClick={() => setEditing({ coupon: null })} disabled={missingTable}>
@@ -350,14 +350,6 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
-  // Código ENVIO<monto>: todo se llena solo (monto fijo, nota, sin mínimo)
-  useEffect(() => {
-    if (!shipAuto) return;
-    setType('fixed');
-    setValue(shipAuto[1]);
-    setDescription((d) => (d === '' || d.startsWith('Envío: descuento') ? `Envío: descuento de $${shipAuto[1]}` : d));
-    setMinSubtotal('');
-  }, [cleanCodeKey]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
     window.addEventListener('keydown', onKey);
@@ -367,6 +359,14 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
   const cleanCode = normalizeCode(code);
   const shipAuto = /^ENVIO[-_]?(\d+(?:\.\d+)?)$/.exec(cleanCode); // ENVIO120 → descuenta $120 del envío
   const isShip = isShippingCoupon(cleanCode); // código ENVIO…: descuenta solo del envío, siempre monto fijo y sin mínimo
+  const shipAmount = shipAuto ? shipAuto[1] : '';
+  useEffect(() => {
+    if (!shipAmount) return;
+    setType('fixed');
+    setValue(shipAmount);
+    setDescription((d) => (d === '' || d.startsWith('Envío: descuento') ? `Envío: descuento de $${shipAmount}` : d));
+    setMinSubtotal('');
+  }, [shipAmount]);
   const num = shipAuto ? Number(shipAuto[1]) : Number(value);
   const min = isShip || minSubtotal === '' ? 0 : Number(minSubtotal);
   const max = maxUses === '' ? null : Number(maxUses);
@@ -442,29 +442,40 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
           <input id="cpn-desc" value={description} maxLength={120} onChange={(e) => setDescription(e.target.value)} placeholder="Ej. Campaña Buen Fin, influencer @nombre" />
         </div>
 
-        <div className="cpn-grid2">
+        {isShip ? (
           <div className="cpn-field">
-            <span className="cpn-label" id="cpn-type-l">Tipo</span>
-            <div className="cpn-seg" role="radiogroup" aria-labelledby="cpn-type-l">
-              <button type="button" role="radio" aria-checked={!isShip && type === 'percent'} className={!isShip && type === 'percent' ? 'is-on' : ''}
-                onClick={() => { if (isShip) { setCode(generateCode()); setValue('10'); } setType('percent'); }}>Porcentaje</button>
-              <button type="button" role="radio" aria-checked={!isShip && type === 'fixed'} className={!isShip && type === 'fixed' ? 'is-on' : ''}
-                onClick={() => { if (isShip) { setCode(generateCode()); setValue('100'); } setType('fixed'); }}>Monto fijo</button>
-              <button type="button" role="radio" aria-checked={isShip} className={isShip ? 'is-on' : ''}
-                onClick={() => { if (!isShip) { setCode(generateCode('ENVIO')); setValue('120'); } setType('fixed'); }}>Envío</button>
+            <span className="cpn-label">Cupón de envío</span>
+            {shipAuto ? (
+              <small>Descuenta <strong>{money(Number(shipAuto[1]))}</strong> del envío (máximo lo que cuesta el envío). No toca el precio de los productos. Sin mínimo de compra.</small>
+            ) : (
+              <>
+                <input id="cpn-value" type="number" inputMode="decimal" min={0.01} step="0.01" placeholder="Monto a descontar del envío (MXN)"
+                  value={value} onChange={(e) => setValue(e.target.value)} aria-invalid={!!show('value')} />
+                {show('value') ? <small className="is-error">{show('value')}</small> : <small>Tip: escribe el código como ENVIO120 y el monto se llena solo.</small>}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="cpn-grid2">
+            <div className="cpn-field">
+              <span className="cpn-label" id="cpn-type-l">Tipo</span>
+              <div className="cpn-seg" role="radiogroup" aria-labelledby="cpn-type-l">
+                <button type="button" role="radio" aria-checked={type === 'percent'} className={type === 'percent' ? 'is-on' : ''} onClick={() => setType('percent')}>Porcentaje</button>
+                <button type="button" role="radio" aria-checked={type === 'fixed'} className={type === 'fixed' ? 'is-on' : ''} onClick={() => setType('fixed')}>Monto fijo</button>
+              </div>
+              <small>¿Descuento de envío? Escribe el código como <strong>ENVIO120</strong>.</small>
+            </div>
+            <div className="cpn-field">
+              <label htmlFor="cpn-value">{type === 'percent' ? 'Porcentaje (%)' : 'Monto (MXN)'}</label>
+              <input id="cpn-value" type="number" inputMode="decimal" min={0.01} max={type === 'percent' ? 100 : undefined} step="0.01"
+                value={value} onChange={(e) => setValue(e.target.value)} aria-invalid={!!show('value')} />
+              {show('value') && <small className="is-error">{show('value')}</small>}
             </div>
           </div>
-          <div className="cpn-field">
-            <label htmlFor="cpn-value">{isShip ? 'Monto que descuenta del envío (MXN)' : type === 'percent' ? 'Porcentaje (%)' : 'Monto (MXN)'}</label>
-            <input id="cpn-value" type="number" inputMode="decimal" min={0.01} max={!isShip && type === 'percent' ? 100 : undefined} step="0.01"
-              value={value} onChange={(e) => setValue(e.target.value)} aria-invalid={!!show('value')} />
-            {show('value') ? <small className="is-error">{show('value')}</small>
-              : isShip ? <small>Solo descuenta del envío (máx. lo que cuesta, ${baseShipping(0.01)}). No toca el precio de los productos.</small> : null}
-          </div>
-        </div>
+        )}
 
         <div className="cpn-grid2">
-          <div className="cpn-field" hidden={isShip}>
+          <div className="cpn-field" hidden={isShip} aria-hidden={isShip}>
             <label htmlFor="cpn-min">Compra mínima (MXN)</label>
             <input id="cpn-min" type="number" inputMode="decimal" min={0} step="0.01" placeholder="Sin mínimo"
               value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} aria-invalid={!!show('min')} />
@@ -497,10 +508,11 @@ function CouponEditor({ coupon, seedCode, uses, onClose, onSaved }: EditorProps)
 
         <div className="cpn-preview" aria-live="polite">
           {errors.value ? 'Completa el valor para ver el ejemplo.' : isShip ? (
-            <>Carrito de <strong>{money(sample)}</strong> → envío {money(baseShipping(sample))} <strong>−{money(shipOff)}</strong> → envío <strong>{shipOff >= baseShipping(sample) ? 'gratis' : money(baseShipping(sample) - shipOff)}</strong></>
+            <>Carrito de <strong>{money(sample)}</strong> + envío <strong>{money(baseShipping(sample))}</strong> − descuento de envío <strong>{money(shipOff)}</strong> → paga <strong>{money(sample + baseShipping(sample) - shipOff)}</strong>
+              {shipOff >= baseShipping(sample) ? ' (envío gratis)' : ''}</>
           ) : (
-            <>Carrito de <strong>{money(sample)}</strong> → descuento <strong>−{money(off)}</strong> → paga <strong>{money(after)}</strong>
-              {' '}+ envío {shippingFor(after) === 0 ? 'gratis' : money(shippingFor(after))}</>
+            <>Carrito de <strong>{money(sample)}</strong> → descuento <strong>−{money(off)}</strong> → productos <strong>{money(after)}</strong>
+              {' '}+ envío {shippingFor(after) === 0 ? 'gratis' : money(shippingFor(after))} → paga <strong>{money(after + shippingFor(after))}</strong></>
           )}
         </div>
 
