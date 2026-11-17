@@ -66,7 +66,8 @@ async function fetchSerp(params) {
     const r = await fetch('https://api.brightdata.com/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ zone, url: target, format: 'json', data_format: 'parsed' }),
+      // country: 'mx' → la consulta sale desde México; sin esto Google muestra precios en dólares (gl=mx solo no basta)
+      body: JSON.stringify({ zone, url: target, country: 'mx', format: 'json', data_format: 'parsed' }),
       signal: ctrl.signal,
     });
     if (!r.ok) throw new Error(`Bright Data respondió ${r.status}`);
