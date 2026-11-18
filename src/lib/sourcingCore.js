@@ -192,6 +192,13 @@ export function parsePrice(raw) {
   return { value: null, installment: true };
 }
 
+/**
+ * Precio en otra moneda (dólares, dongs, euros…). Google Shopping mezcla tiendas de otros países y el número
+ * se leería como pesos ("US$14.99" → $14.99). Esas ofertas no sirven para comparar y se descartan.
+ */
+const FOREIGN_CURRENCY_RE = /(?:\b(?:US|AU|CA|NZ|HK|SG)\s*\$)|(?:\b(?:USD|EUR|GBP|AUD|CAD|NZD|VND|COP|ARS|CLP|PEN|BRL|JPY|CNY|INR|KRW|THB|PLN|SEK|NOK|DKK|CHF|HKD|SGD|TRY|AED)\b)|[€£¥₫₹₩฿₺₪]|\bR\$|\bC\$|\bA\$|\bS\$|zł|\bkr\b|\bđ\b/i;
+export const isForeignPrice = (raw) => !!raw && FOREIGN_CURRENCY_RE.test(String(raw));
+
 /** Compatibilidad: solo el número. */
 export const parseMxn = (raw) => parsePrice(raw).value;
 

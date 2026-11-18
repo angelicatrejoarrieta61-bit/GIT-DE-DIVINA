@@ -86,6 +86,7 @@ export function detectBrand(title: string): string | null;
 export function isCombo(title: string): boolean;
 export function isBarcode(q: string): boolean;
 export function looksLikeInstallment(text: string): boolean;
+export function isForeignPrice(raw?: string | null): boolean;
 export function parsePrice(raw?: string | null): { value: number | null; installment: boolean; high?: number | null };
 export function effectivePrice(o: { price_mxn: number | null; old_price_mxn?: number | null; alt_price_text?: string | null }): {
   price: number | null; original: number | null; discountPct: number | null;

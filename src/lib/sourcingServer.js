@@ -7,7 +7,7 @@
 import {
   normalizeKey, parsePrice, parseMxn, parsePackQty, splitSeller, buildSpec, evaluateAll, compactQuery,
   floorPrice, targetPrice, computeMargin, round2, DEFAULT_MARGIN, DEFAULT_RULES, effectivePrice,
-  bandPrice, findTrackedOffer, shopKey,
+  bandPrice, findTrackedOffer, shopKey, isForeignPrice,
 } from './sourcingCore.js';
 
 const BRIGHTDATA_TIMEOUT_MS = 55_000;
@@ -146,7 +146,8 @@ function altPriceText(item, main) {
 /** Ofertas listas para guardar: precio, mensualidad, paquete, vendedor. */
 export function normalizeItems(items, start = 0) {
   return items
-    .filter((it) => it.title && it.shop)
+    // Tiendas de otros países (USD, VND…): su precio no es en pesos, se descartan
+    .filter((it) => it.title && it.shop && !isForeignPrice(it.price) && !(it.price_details ?? []).some((d) => isForeignPrice(d?.price)) && !isForeignPrice(it.old_price))
     .map((it, i) => {
       const parsed = parsePrice(it.price);
       const price = parsed.value;
